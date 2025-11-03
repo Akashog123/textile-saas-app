@@ -131,6 +131,16 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# Vitest
+__screenshots__/
+
+# TypeScript
+*.tsbuildinfo
+
 # Miscellaneous
 .cache/
 *.tgz
