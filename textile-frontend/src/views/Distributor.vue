@@ -1,16 +1,16 @@
 <template>
-  <div class="customer-container">
+  <div class="distributor-container">
     <!-- Child route components render here -->
     <router-view />
   </div>
 </template>
 
 <script setup>
-// Container component for customer routes
+// Container component for distributor routes
 </script>
 
 <style scoped>
-.customer-container {
+.distributor-container {
   min-height: calc(100vh - 60px);
   background: #f8f9fa;
 }

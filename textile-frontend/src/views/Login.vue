@@ -338,10 +338,37 @@ const loadingRegister = ref(false)
 const registerError = ref('')
 const registerSuccess = ref('')
 
+const MOCK_ACCOUNTS = {
+  shopowner: { role: 'shop_owner', displayName: 'Shop Owner', password: 'shop', redirect: '/shop' },
+  distributor: { role: 'distributor', displayName: 'Manufacturer/Distributor', password: 'dist', redirect: '/distributor' },
+  customer: { role: 'customer', displayName: 'Customer', password: 'cust', redirect: '/customer' },
+}
+
 const handleLogin = async () => {
   loginError.value = ''
   loadingLogin.value = true
+
+  // Check mock credentials
   try {
+    const input = (loginForm.value.username || '').toString().trim().toLowerCase()
+    const pwd = (loginForm.value.password || '').toString()
+
+    if (input && MOCK_ACCOUNTS[input] && MOCK_ACCOUNTS[input].password === pwd) {
+      const acc = MOCK_ACCOUNTS[input]
+      // store minimal session data in localStorage so NavBar hydrates correctly
+      localStorage.setItem('token', `MOCK-TOKEN-${acc.role}`)
+      localStorage.setItem('role', acc.role)
+      localStorage.setItem('username', acc.displayName)
+      localStorage.setItem('user_id', `mock-${acc.role}`)
+
+      // Dispatch custom event to notify NavBar
+      window.dispatchEvent(new Event('user-logged-in'))
+
+      router.push(acc.redirect)
+      return
+    }
+
+    // Otherwise fall back to real API if available
     const { data } = await api.post('/login', {
       username: loginForm.value.username,
       password: loginForm.value.password,
@@ -353,6 +380,9 @@ const handleLogin = async () => {
     localStorage.setItem('role', role)
     localStorage.setItem('username', username)
     localStorage.setItem('user_id', user_id)
+
+    // Dispatch custom event to notify NavBar
+    window.dispatchEvent(new Event('user-logged-in'))
 
     // Navigate based on role
     const roleRoutes = {
