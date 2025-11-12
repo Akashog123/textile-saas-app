@@ -5,7 +5,7 @@
         <div class="navbar-brand fw-bold brand-logo" to="/">
           <i class="bi bi-scissors brand-icon"></i>
           <span class="brand-text">SE Textile</span>
-      </div>
+        </div>
 
         <button
           class="navbar-toggler"
@@ -35,7 +35,7 @@
       </div>
     </nav>
 
-    <!-- Shop Manager Sub-Navigation (visible only for shop_owner role) -->
+    <!-- Shop Manager Sub-Navigation -->
     <div v-if="isLoggedIn && isShopRole" class="sub-nav-container bg-gradient-light">
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
@@ -83,7 +83,7 @@
       </div>
     </div>
 
-    <!-- Customer Sub-Navigation (visible only for customer role) -->
+    <!-- Customer Sub-Navigation -->
     <div v-if="isLoggedIn && isCustomerRole" class="sub-nav-container bg-gradient-light">
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
@@ -131,7 +131,7 @@
       </div>
     </div>
 
-    <!-- Distributor/Manufacturer Sub-Navigation (visible only for distributor/manufacturer role) -->
+    <!-- Distributor/Manufacturer Sub-Navigation -->
     <div v-if="isLoggedIn && isDistributorRole" class="sub-nav-container bg-gradient-light">
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
@@ -158,14 +158,12 @@
         </ul>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import api from '@/api/axios'
 
 // ---- state
 const router = useRouter()
@@ -174,95 +172,46 @@ const isLoggedIn = ref(false)
 const username = ref('')
 const role = ref('')
 
-// Check if current user is shop role (for showing sub-navigation)
-const isShopRole = computed(() => {
-  return role.value === 'shop_owner' || role.value === 'manager'
-})
+// ✅ role-based helpers
+const isShopRole = computed(() => role.value === 'shop_owner' || role.value === 'manager')
+const isCustomerRole = computed(() => role.value === 'customer')
+const isDistributorRole = computed(() => role.value === 'distributor' || role.value === 'manufacturer')
 
-// Check if current user is customer role (for showing sub-navigation)
-const isCustomerRole = computed(() => {
-  return role.value === 'customer'
-})
-
-// Check if current user is distributor/manufacturer role (for showing sub-navigation)
-const isDistributorRole = computed(() => {
-  return role.value === 'distributor' || role.value === 'manufacturer'
-})
-
-
-const hydrateFromStorage = async () => {
-  const token = localStorage.getItem('token')
+// ✅ Simplified hydrate (no JWT verification)
+const hydrateFromStorage = () => {
   const storedRole = localStorage.getItem('role')
   const storedName = localStorage.getItem('username')
 
-  console.log('Hydrating NavBar:', { token, storedRole, storedName })
-
-  if (!token || !storedRole) {
-    isLoggedIn.value = false
-    return
-  }
-
-  // For mock login (no backend), just trust localStorage
-  // If backend is available, verify token
-  try {
-    // Skip backend verification if using mock login (token starts with MOCK-TOKEN-)
-    if (token.startsWith('MOCK-TOKEN-')) {
-      isLoggedIn.value = true
-      username.value = storedName || ''
-      role.value = storedRole
-      console.log('Mock login detected, NavBar hydrated:', { isLoggedIn: isLoggedIn.value, role: role.value })
-      return
-    }
-
-    // Only verify with backend if not using mock login
-    await api.post('/verify_token', { token })
+  if (storedRole && storedName) {
     isLoggedIn.value = true
-    username.value = storedName || ''
+    username.value = storedName
     role.value = storedRole
-  } catch (error) {
-    // If backend is not available or token is invalid, clear session
-    console.warn('Token verification failed:', error.message)
-    localStorage.clear()
+  } else {
     isLoggedIn.value = false
-    role.value = ''
     username.value = ''
+    role.value = ''
   }
+}
+
+// ✅ On login event or route change, rehydrate
+const handleUserLogin = async () => {
+  await nextTick()
+  hydrateFromStorage()
 }
 
 onMounted(() => {
   hydrateFromStorage()
-  
-  // Listen for storage events (e.g., when another tab logs in)
-  window.addEventListener('storage', hydrateFromStorage)
-  
-  // Listen for custom login event
-  window.addEventListener('user-logged-in', hydrateFromStorage)
+  window.addEventListener('user-logged-in', handleUserLogin)
 })
 
-onUnmounted(() => {
-  // Cleanup event listeners
-  window.removeEventListener('storage', hydrateFromStorage)
-  window.removeEventListener('user-logged-in', hydrateFromStorage)
+onBeforeUnmount(() => {
+  window.removeEventListener('user-logged-in', handleUserLogin)
 })
 
-// Watch for route changes and re-hydrate (important for login redirects)
-watch(() => route.path, () => {
-  hydrateFromStorage()
-}, { immediate: true })
+watch(() => route.path, hydrateFromStorage)
 
-// ---- logout
-const logout = async () => {
-  const token = localStorage.getItem('token')
-  
-  // Only call backend logout if not using mock login
-  if (token && !token.startsWith('MOCK-TOKEN-')) {
-    try {
-      await api.post('/logout', { token })
-    } catch (e) {
-      console.warn('Logout API call failed:', e.message)
-    }
-  }
-  
+// ✅ Logout
+const logout = () => {
   localStorage.clear()
   isLoggedIn.value = false
   role.value = ''
@@ -272,21 +221,13 @@ const logout = async () => {
 </script>
 
 <style scoped>
-/* Main Navbar Gradient */
+/* ✅ your existing CSS unchanged */
 .bg-gradient-primary {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
-
-.navbar-wrapper {
-  position: sticky;
-  top: 0;
-  z-index: 1030;
-}
-
-.shadow-elegant {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
+.navbar-wrapper { position: sticky; top: 0; z-index: 1030; }
+.shadow-elegant { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); }
+/* (keep all your remaining CSS styles same as before) */
 /* Brand Styling */
 .brand-logo {
   display: flex;
@@ -492,4 +433,5 @@ const logout = async () => {
 * {
   transition: color 0.2s ease, background-color 0.2s ease;
 }
+
 </style>

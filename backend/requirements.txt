@@ -1,0 +1,42 @@
+# ────────────── Flask Core ──────────────
+Flask==3.0.3
+Flask-Cors==4.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+python-dotenv==1.0.1
+
+# ────────────── Database ──────────────
+SQLAlchemy==2.0.31
+greenlet==3.0.3
+
+# ────────────── Data Handling ──────────────
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.5
+XlsxWriter==3.2.0
+
+# ────────────── AI / Forecasting ──────────────
+prophet==1.1.5
+cmdstanpy==1.2.4
+
+google-generativeai==0.3.2
+
+# ────────────── HTTP / Networking ──────────────
+requests==2.32.3
+urllib3==2.2.3
+
+# ────────────── Security / Auth ──────────────
+PyJWT==2.9.0
+passlib==1.7.4
+bcrypt==4.2.0
+
+# ────────────── Utilities ──────────────
+gunicorn==22.0.0        # for production WSGI serving
+Werkzeug==3.0.3
+itsdangerous==2.2.0
+click==8.1.7
+
+# ────────────── Optional Dev / Testing ──────────────
+pytest==8.3.2
+coverage==7.6.1
+black==24.8.0

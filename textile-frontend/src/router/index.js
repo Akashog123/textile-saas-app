@@ -1,109 +1,73 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import ShopOwner from '../views/ShopOwner.vue'
+import CustomerHome from '../views/CustomerHome.vue'
+import DistributorHome from '../views/Distributor.vue'
+
+// ✅ Shop Pages
 import ShopDashboard from '../views/shop/ShopDashboard.vue'
 import ShopInventory from '../views/shop/ShopInventory.vue'
 import ShopMarketing from '../views/shop/ShopMarketing.vue'
 import ShopInquiry from '../views/shop/ShopInquiry.vue'
-import Distributor from '../views/Distributor.vue'
-import RegionalDemand from '../views/distributor/RegionalDemand.vue'
-import ProductionPlanning from '../views/distributor/ProductionPlanning.vue'
-import CustomerHome from '../views/CustomerHome.vue'
-import CustomerHomePage from '../views/customer/CustomerHomePage.vue'
-import CustomerShops from '../views/customer/CustomerShops.vue'
-import CustomerProducts from '../views/customer/CustomerProducts.vue'
-import CustomerProfile from '../views/customer/CustomerProfile.vue'
-// We use the Distributor view for both distributor and manufacturer roles so there is a single dashboard
 
 const routes = [
-    {
-        path: '/login',
-        name: 'Login',
-        component: Login
+  // 🔹 Login route
+  { path: '/login', name: 'Login', component: Login },
+  { path: '/', redirect: '/login' },
+
+  // 🔹 Shop Owner / Manager routes
+  {
+    path: '/shop',
+    component: ShopOwner,
+    children: [
+      { path: '', name: 'ShopDashboard', component: ShopDashboard },
+      { path: 'dashboard', name: 'ShopDashboardExplicit', component: ShopDashboard },
+      { path: 'inventory', name: 'ShopInventory', component: ShopInventory },
+      { path: 'marketing', name: 'ShopMarketing', component: ShopMarketing },
+      { path: 'inquiry', name: 'ShopInquiry', component: ShopInquiry },
+    ],
+  },
+
+  // 🔹 Customer routes
+  {
+    path: '/customer',
+    component: CustomerHome,
+    children: [
+      { path: '', name: 'CustomerHomePage', component: () => import('@/views/customer/CustomerHomePage.vue') },
+      { path: 'products', name: 'CustomerProducts', component: () => import('@/views/customer/CustomerProducts.vue') },
+      { path: 'shops', name: 'CustomerShops', component: () => import('@/views/customer/CustomerShops.vue') },
+      { path: 'profile', name: 'CustomerProfile', component: () => import('@/views/customer/CustomerProfile.vue') },
+    ],
+  },
+
+  // 🔹 Distributor
+  {
+  path: '/distributor',
+  component: DistributorHome,
+  children: [
+    // 🟢 Keep both paths valid
+    { 
+      path: '', 
+      alias: 'planning', // allows /distributor/planning
+      name: 'ProductionPlanningDistributor', 
+      component: () => import('@/views/distributor/ProductionPlanning.vue') 
     },
-    {
-        path:'/',
-        redirect:'/login'
+    { 
+      path: 'regional-demand', 
+      alias: 'demand', // allows /distributor/demand
+      name: 'RegionalDemandDistributor', 
+      component: () => import('@/views/distributor/RegionalDemand.vue') 
     },
-    {
-        path: '/shop',
-        name: 'ShopOwner',
-        component: ShopOwner,
-        redirect: '/shop/dashboard',
-        children: [
-            {
-                path: 'dashboard',
-                name: 'ShopDashboard',
-                component: ShopDashboard
-            },
-            {
-                path: 'inventory',
-                name: 'ShopInventory',
-                component: ShopInventory
-            },
-            {
-                path: 'marketing',
-                name: 'ShopMarketing',
-                component: ShopMarketing
-            },
-            {
-                path: 'inquiry',
-                name: 'ShopInquiry',
-                component: ShopInquiry
-            }
-        ]
-    },
-    {
-        path: '/distributor',
-        name: 'Distributor',
-        component: Distributor,
-        redirect: '/distributor/demand',
-        children: [
-            {
-                path: 'demand',
-                name: 'RegionalDemand',
-                component: RegionalDemand
-            },
-            {
-                path: 'planning',
-                name: 'ProductionPlanning',
-                component: ProductionPlanning
-            }
-        ]
-    },
-    {
-        path: '/customer',
-        name: 'Customer',
-        component: CustomerHome,
-        redirect: '/customer/home',
-        children: [
-            {
-                path: 'home',
-                name: 'CustomerHomePage',
-                component: CustomerHomePage
-            },
-            {
-                path: 'shops',
-                name: 'CustomerShops',
-                component: CustomerShops
-            },
-            {
-                path: 'products',
-                name: 'CustomerProducts',
-                component: CustomerProducts
-            },
-            {
-                path: 'profile',
-                name: 'CustomerProfile',
-                component: CustomerProfile
-            }
-        ]
-    },
+  ],
+},
+
+
+  
 ]
 
 const router = createRouter({
-    history: createWebHistory(import.meta.env.BASE_URL),
-    routes
+  history: createWebHistory(),
+  routes,
 })
 
 export default router
