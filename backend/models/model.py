@@ -1,0 +1,366 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from sqlalchemy import event, Index, func
+
+db = SQLAlchemy()
+
+# --------------------
+# Utility / mixins
+# --------------------
+class TimestampMixin:
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+
+
+# --------------------
+# User
+# --------------------
+class User(db.Model, TimestampMixin):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(150), unique=True, nullable=True, index=True)
+    password = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(40), default="customer", nullable=False)
+    contact = db.Column(db.String(30))
+    address = db.Column(db.String(255))
+    city = db.Column(db.String(100))
+    state = db.Column(db.String(100))
+    pincode = db.Column(db.String(20))
+    avatar_url = db.Column(db.String(255))
+    bio = db.Column(db.Text)
+    approved = db.Column(db.Boolean, default=True, index=True)
+    last_login_at = db.Column(db.DateTime)
+
+    # Relationships
+    shops = db.relationship("Shop", backref="owner", lazy="dynamic", cascade="all, delete-orphan")
+    products = db.relationship("Product", backref="seller", lazy="dynamic", cascade="all, delete-orphan")
+    service_requests = db.relationship("ServiceRequest", foreign_keys="ServiceRequest.user_id", backref="requester", lazy="dynamic")
+    assigned_requests = db.relationship("ServiceRequest", foreign_keys="ServiceRequest.pro_id", backref="professional", lazy="dynamic")
+    notifications = db.relationship("Notification", backref="user", lazy="dynamic", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<User {self.username} ({self.role})>"
+
+
+# --------------------
+# Shop
+# --------------------
+class Shop(db.Model, TimestampMixin):
+    __tablename__ = "shops"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False, index=True)
+    description = db.Column(db.Text)
+    image_url = db.Column(db.String(255))
+    address = db.Column(db.String(255))
+    city = db.Column(db.String(100))
+    state = db.Column(db.String(100))
+    location = db.Column(db.String(255))
+    lat = db.Column(db.Float, index=True)
+    lon = db.Column(db.Float, index=True)
+    rating = db.Column(db.Float, default=4.0)
+    is_popular = db.Column(db.Boolean, default=False, index=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    # Relationships
+    reviews = db.relationship("Review", backref="shop", lazy="dynamic", cascade="all, delete-orphan")
+    sales_data = db.relationship("SalesData", back_populates="shop", lazy="dynamic", cascade="all, delete-orphan")
+    products = db.relationship("Product", backref="shop", lazy="dynamic", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Shop {self.name}>"
+
+
+# --------------------
+# Sales / Orders
+# --------------------
+class SaleOrder(db.Model, TimestampMixin):
+    __tablename__ = "sale_orders"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_number = db.Column(db.String(120), unique=True, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    total_amount = db.Column(db.Numeric(12, 2))
+    status = db.Column(db.String(50), default="created")
+    placed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    customer = db.relationship("User", backref=db.backref("orders", lazy="dynamic"))
+    line_items = db.relationship("SalesLineItem", backref="order", lazy="dynamic", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<SaleOrder {self.order_number} total={self.total_amount}>"
+
+
+class SalesLineItem(db.Model):
+    __tablename__ = "sales_line_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("sale_orders.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    total_price = db.Column(db.Numeric(12, 2), nullable=False)
+
+    def __repr__(self):
+        return f"<SalesLineItem order={self.order_id} product={self.product_id} qty={self.quantity}>"
+
+
+# --------------------
+# Product / Fabric
+# --------------------
+class Product(db.Model, TimestampMixin):
+    __tablename__ = "products"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(180), nullable=False, index=True)
+    slug = db.Column(db.String(200), unique=True, index=True)
+    sku = db.Column(db.String(80), unique=True, index=True)
+    category = db.Column(db.String(120), index=True)
+    description = db.Column(db.Text)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
+    msrp = db.Column(db.Numeric(10, 2))
+    badge = db.Column(db.String(50))
+    rating = db.Column(db.Float, default=4.0)
+    is_trending = db.Column(db.Boolean, default=False, index=True)
+    is_active = db.Column(db.Boolean, default=True, index=True)
+
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    images = db.relationship("ProductImage", backref="product", lazy="dynamic", cascade="all, delete-orphan")
+    inventory = db.relationship("Inventory", uselist=False, backref="product", cascade="all, delete-orphan")
+    embeddings = db.relationship("ProductEmbedding", backref="product", lazy="dynamic", cascade="all, delete-orphan")
+    reviews = db.relationship("Review", backref="product", lazy="dynamic", cascade="all, delete-orphan")
+    sales_lines = db.relationship("SalesLineItem", backref="product", lazy="dynamic", cascade="all, delete-orphan")
+    sales_data = db.relationship("SalesData", back_populates="product", lazy="dynamic", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Product {self.name} ({self.id})>"
+
+
+class ProductImage(db.Model):
+    __tablename__ = "product_images"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    url = db.Column(db.String(512), nullable=False)
+    alt = db.Column(db.String(255))
+    ordering = db.Column(db.Integer, default=0)
+
+
+class ProductEmbedding(db.Model):
+    __tablename__ = "product_embeddings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    vector = db.Column(db.PickleType, nullable=False)
+    model = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# --------------------
+# Inventory & Stock Transfer
+# --------------------
+class Inventory(db.Model):
+    __tablename__ = "inventory"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, unique=True, index=True)
+    qty_available = db.Column(db.Integer, default=0)
+    qty_reserved = db.Column(db.Integer, default=0)
+    safety_stock = db.Column(db.Integer, default=0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class StockTransfer(db.Model):
+    __tablename__ = "stock_transfers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    from_location = db.Column(db.String(255))
+    to_location = db.Column(db.String(255))
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(50), default="initiated")
+    initiated_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# --------------------
+# SalesData (Forecasting & Dashboard)
+# --------------------
+class SalesData(db.Model):
+    __tablename__ = "sales_data"
+
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True, index=True)
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=True, index=True)
+    region = db.Column(db.String(120), index=True)
+    fabric_type = db.Column(db.String(100))
+    quantity_sold = db.Column(db.Integer, default=0)
+    revenue = db.Column(db.Numeric(12, 2), default=0)
+
+    product = db.relationship("Product", back_populates="sales_data")
+    shop = db.relationship("Shop", back_populates="sales_data")
+
+    def __repr__(self):
+        return f"<SalesData {self.date} shop={self.shop_id} product={self.product_id} qty={self.quantity_sold}>"
+
+
+# --------------------
+# 🆕 Product Catalog (from fashion dataset)
+# --------------------
+class ProductCatalog(db.Model):
+    __tablename__ = "product_catalog"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.String(50), unique=True, index=True)
+    product_name = db.Column(db.String(255))
+    category = db.Column(db.String(100))
+    subcategory = db.Column(db.String(100))
+    article_type = db.Column(db.String(100))
+    color = db.Column(db.String(50))
+    gender = db.Column(db.String(50))
+    season = db.Column(db.String(50))
+    year = db.Column(db.Integer)
+    usage = db.Column(db.String(100))
+    image_url = db.Column(db.String(255))
+    price = db.Column(db.Integer)
+
+
+    def to_dict(self):
+        return {
+            "product_id": self.product_id,
+            "product_name": self.product_name,
+            "category": self.category,
+            "subcategory": self.subcategory,
+            "article_type": self.article_type,
+            "color": self.color,
+            "gender": self.gender,
+            "season": self.season,
+            "year": self.year,
+            "usage": self.usage,
+            "image_url": self.image_url,
+            "price": self.price,
+        }
+
+
+# --------------------
+# Review
+# --------------------
+class Review(db.Model, TimestampMixin):
+    __tablename__ = "reviews"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True, index=True)
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=True, index=True)
+    rating = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(255))
+    body = db.Column(db.Text)
+    is_verified_purchase = db.Column(db.Boolean, default=False)
+
+
+# --------------------
+# Service & Requests
+# --------------------
+class Category(db.Model):
+    __tablename__ = "categories"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    services = db.relationship("Service", backref="category", lazy="dynamic", cascade="all, delete-orphan")
+
+
+class Service(db.Model):
+    __tablename__ = "services"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    price = db.Column(db.Numeric(10, 2))
+    time_required = db.Column(db.String(80))
+    category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
+
+    service_requests = db.relationship("ServiceRequest", backref="service", lazy="dynamic", cascade="all, delete-orphan")
+
+
+class ServiceRequest(db.Model, TimestampMixin):
+    __tablename__ = "service_requests"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=True)
+    service_type = db.Column(db.String(120))
+    description = db.Column(db.Text)
+    service_status = db.Column(db.String(50), default="Requested", index=True)
+    remarks = db.Column(db.Text)
+    pro_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    scheduled_for = db.Column(db.DateTime)
+
+
+# --------------------
+# Uploads / Logs / Notifications
+# --------------------
+class Upload(db.Model, TimestampMixin):
+    __tablename__ = "uploads"
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255))
+    content_type = db.Column(db.String(120))
+    size = db.Column(db.Integer)
+    url = db.Column(db.String(800), nullable=False)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    meta_data = db.Column(db.JSON)
+
+
+class ActivityLog(db.Model):
+    __tablename__ = "activity_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    action = db.Column(db.String(255))
+    context = db.Column(db.JSON)
+    ip_address = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ForecastJob(db.Model):
+    __tablename__ = "forecast_jobs"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255))
+    params = db.Column(db.JSON)
+    status = db.Column(db.String(80), default="pending")
+    result_url = db.Column(db.String(500))
+    started_at = db.Column(db.DateTime)
+    finished_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Notification(db.Model):
+    __tablename__ = "notifications"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    title = db.Column(db.String(255))
+    message = db.Column(db.Text)
+    link = db.Column(db.String(512))
+    is_read = db.Column(db.Boolean, default=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# --------------------
+# DB Setup
+# --------------------
+def init_db(app):
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
+
+
+@event.listens_for(User, "before_insert")
+def default_user_approved(mapper, connection, target):
+    if target.role == "shop_owner" and target.approved is None:
+        target.approved = False
