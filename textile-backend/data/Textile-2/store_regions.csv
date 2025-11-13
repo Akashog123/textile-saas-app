@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 StoreName,City,Product_description,Latitude,Longitude,RegionName,ImagePath
 Store1,Kasaragod,Sarees-Festive-Pure silk:Gowns-Cocktail-Banarasi Silk:Lehanga-Bridal-Net,12.5,75,N,store_images/store1.jpg
 Store2,Ernakulam,Sarees-Festive-Georgette:Gowns-Cocktail-Raw Silk:Lehanga-Bridal-Silk,9.9816,76.2999,W,store_images/store2.jpg
@@ -6,3 +7,13 @@ Store4,Idukki,Sarees-Mehendi-Pure silk:Gowns-Festive-Banarasi Silk:Lehanga-Recep
 Store5,Thiruvananthapuram,Sarees-Mehendi-Georgette:Gowns-Festive-Raw Silk:Lehanga-Haldi-Net,8.5241,76.9366,S,store_images/store5.jpg
 Store6,Kollam,Sarees-Mehendi-Semi crepe:Sarees-Wedding-Pure silk:Gowns-Festive-Net,8.8932,76.6141,S,store_images/store6.jpg
 Store7,Kottayam,Sarees-Wedding-Georgette:Lehanga-Haldi-Silk:Sarees-Wedding-Semi crepe,9.5916,76.5222,E,store_images/store7.jpg
+=======
+StoreName,City,Product_description,Latitude,Longitude,RegionName,ImagePath
+Store1,Kasaragod,Sarees-Festive-Pure silk:Gowns-Cocktail-Banarasi Silk:Lehanga-Bridal-Net,12.5,75,N,store_images/store1.jpg
+Store2,Ernakulam,Sarees-Festive-Georgette:Gowns-Cocktail-Raw Silk:Lehanga-Bridal-Silk,9.9816,76.2999,W,store_images/store2.jpg
+Store3,Kannur,Sarees-Festive-Semi crepe:Gowns-Cocktail-Net:Lehanga-Reception-Net,11.8745,75.3704,N,store_images/store3.jpg
+Store4,Idukki,Sarees-Mehendi-Pure silk:Gowns-Festive-Banarasi Silk:Lehanga-Reception-Silk,9.8497,77.108,E,store_images/store4.jpg
+Store5,Thiruvananthapuram,Sarees-Mehendi-Georgette:Gowns-Festive-Raw Silk:Lehanga-Haldi-Net,8.5241,76.9366,S,store_images/store5.jpg
+Store6,Kollam,Sarees-Mehendi-Semi crepe:Sarees-Wedding-Pure silk:Gowns-Festive-Net,8.8932,76.6141,S,store_images/store6.jpg
+Store7,Kottayam,Sarees-Wedding-Georgette:Lehanga-Haldi-Silk:Sarees-Wedding-Semi crepe,9.5916,76.5222,E,store_images/store7.jpg
+>>>>>>> origin/vyshakh
