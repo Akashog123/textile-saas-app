@@ -198,7 +198,7 @@ def top_selling_products():
     - Region
     - Month
     - Top 3 Products (with UnitsSold and Revenue)
-    - AI Recommendation (1-2 sentences)
+    - AI Recommendation (1-2 sentences).
     """
 
     try:
