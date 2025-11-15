@@ -1,5 +1,5 @@
 <script setup>
-import NavBar from '@/components/NavBar.vue'
+import NavBar from "@/components/NavBar.vue";
 </script>
 
 <template>
@@ -8,6 +8,3 @@ import NavBar from '@/components/NavBar.vue'
     <router-view />
   </div>
 </template>
-
-<style scoped></style>
-

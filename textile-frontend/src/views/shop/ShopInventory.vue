@@ -33,13 +33,15 @@
                 <td>{{ idx + 1 }}</td>
                 <td>
                   <div class="product-thumbnail">
-                    <img :src="item.image" :alt="item.name">
+                    <img :src="item.image" :alt="item.name" />
                   </div>
                 </td>
                 <td>
                   <div class="product-name-cell">
                     <strong>{{ item.name }}</strong>
-                    <small class="d-block text-muted">{{ item.category }}</small>
+                    <small class="d-block text-muted">{{
+                      item.category
+                    }}</small>
                   </div>
                 </td>
                 <td>
@@ -49,17 +51,34 @@
                   <strong class="price-text">{{ item.price }}</strong>
                 </td>
                 <td>
-                  <span :class="['stock-badge', item.stock < 20 ? 'low' : item.stock < 50 ? 'medium' : 'high']">
+                  <span
+                    :class="[
+                      'stock-badge',
+                      item.stock < 20
+                        ? 'low'
+                        : item.stock < 50
+                          ? 'medium'
+                          : 'high',
+                    ]"
+                  >
                     {{ item.stock }}m
                   </span>
                 </td>
-                <td><small class="text-muted">{{ item.sku }}</small></td>
+                <td>
+                  <small class="text-muted">{{ item.sku }}</small>
+                </td>
                 <td>
                   <div class="action-buttons">
-                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      title="Edit"
+                    >
                       <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                    <button
+                      class="btn btn-sm btn-outline-danger"
+                      title="Delete"
+                    >
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
@@ -90,104 +109,114 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed } from "vue";
 
 const inventoryData = ref([
-  { 
-    name: 'Handwoven Silk Brocade', 
-    category: 'Premium Silk',
-    image: 'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 245, 
-    price: '₹1,850', 
-    stock: 82, 
-    sku: 'SILK-BR-001' 
+  {
+    name: "Handwoven Silk Brocade",
+    category: "Premium Silk",
+    image:
+      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 245,
+    price: "₹1,850",
+    stock: 82,
+    sku: "SILK-BR-001",
   },
-  { 
-    name: 'Premium Cotton Batik', 
-    category: 'Cotton Fabric',
-    image: 'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 312, 
-    price: '₹650', 
-    stock: 156, 
-    sku: 'COT-BAT-002' 
+  {
+    name: "Premium Cotton Batik",
+    category: "Cotton Fabric",
+    image:
+      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 312,
+    price: "₹650",
+    stock: 156,
+    sku: "COT-BAT-002",
   },
-  { 
-    name: 'Luxury Georgette Floral', 
-    category: 'Georgette',
-    image: 'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 189, 
-    price: '₹1,450', 
-    stock: 67, 
-    sku: 'GEO-FLR-003' 
+  {
+    name: "Luxury Georgette Floral",
+    category: "Georgette",
+    image:
+      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 189,
+    price: "₹1,450",
+    stock: 67,
+    sku: "GEO-FLR-003",
   },
-  { 
-    name: 'Designer Silk Collection', 
-    category: 'Designer Silk',
-    image: 'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 156, 
-    price: '₹2,150', 
-    stock: 45, 
-    sku: 'SILK-DSG-004' 
+  {
+    name: "Designer Silk Collection",
+    category: "Designer Silk",
+    image:
+      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 156,
+    price: "₹2,150",
+    stock: 45,
+    sku: "SILK-DSG-004",
   },
-  { 
-    name: 'Traditional Block Print', 
-    category: 'Cotton Print',
-    image: 'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 278, 
-    price: '₹780', 
-    stock: 123, 
-    sku: 'COT-BLK-005' 
+  {
+    name: "Traditional Block Print",
+    category: "Cotton Print",
+    image:
+      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 278,
+    price: "₹780",
+    stock: 123,
+    sku: "COT-BLK-005",
   },
-  { 
-    name: 'Artisan Handloom Cotton', 
-    category: 'Handloom',
-    image: 'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 198, 
-    price: '₹890', 
-    stock: 89, 
-    sku: 'COT-HND-006' 
+  {
+    name: "Artisan Handloom Cotton",
+    category: "Handloom",
+    image:
+      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 198,
+    price: "₹890",
+    stock: 89,
+    sku: "COT-HND-006",
   },
-  { 
-    name: 'Ethnic Paisley Print', 
-    category: 'Printed Fabric',
-    image: 'https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 167, 
-    price: '₹720', 
-    stock: 98, 
-    sku: 'PRT-PAI-007' 
+  {
+    name: "Ethnic Paisley Print",
+    category: "Printed Fabric",
+    image:
+      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 167,
+    price: "₹720",
+    stock: 98,
+    sku: "PRT-PAI-007",
   },
-  { 
-    name: 'Vintage Linen Blend', 
-    category: 'Linen',
-    image: 'https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 134, 
-    price: '₹1,120', 
-    stock: 56, 
-    sku: 'LIN-VIN-008' 
+  {
+    name: "Vintage Linen Blend",
+    category: "Linen",
+    image:
+      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 134,
+    price: "₹1,120",
+    stock: 56,
+    sku: "LIN-VIN-008",
   },
-  { 
-    name: 'Modern Abstract Print', 
-    category: 'Contemporary',
-    image: 'https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 223, 
-    price: '₹950', 
-    stock: 112, 
-    sku: 'MOD-ABS-009' 
+  {
+    name: "Modern Abstract Print",
+    category: "Contemporary",
+    image:
+      "https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 223,
+    price: "₹950",
+    stock: 112,
+    sku: "MOD-ABS-009",
   },
-  { 
-    name: 'Floral Embroidered Silk', 
-    category: 'Embroidered',
-    image: 'https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100',
-    qty: 145, 
-    price: '₹2,350', 
-    stock: 34, 
-    sku: 'SILK-EMB-010' 
-  }
-])
+  {
+    name: "Floral Embroidered Silk",
+    category: "Embroidered",
+    image:
+      "https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
+    qty: 145,
+    price: "₹2,350",
+    stock: 34,
+    sku: "SILK-EMB-010",
+  },
+]);
 
 const totalQuantity = computed(() => {
-  return inventoryData.value.reduce((sum, item) => sum + item.qty, 0)
-})
+  return inventoryData.value.reduce((sum, item) => sum + item.qty, 0);
+});
 </script>
 
 <style scoped>
@@ -222,12 +251,12 @@ h5 {
   border: none;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 .table-responsive {
@@ -255,9 +284,13 @@ h5 {
 }
 
 .table tbody tr:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   transform: scale(1.01);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .table td {
@@ -356,7 +389,7 @@ h5 {
 
 .action-buttons .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Inventory Stats */
@@ -445,7 +478,8 @@ h5 {
     padding: 1rem;
   }
 
-  .table th, .table td {
+  .table th,
+  .table td {
     padding: 0.5rem 0.4rem;
     font-size: 0.8rem;
   }

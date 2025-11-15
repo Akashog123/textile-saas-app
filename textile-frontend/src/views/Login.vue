@@ -7,7 +7,9 @@
           <div class="brand-header">
             <div class="brand-icon">
               <svg class="icon-sparkle" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                <path
+                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                />
               </svg>
             </div>
             <h1 class="brand-title">SE Textile App</h1>
@@ -18,7 +20,9 @@
             <div class="feature-item">
               <div class="feature-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                  />
                 </svg>
               </div>
               <span>Role-based Access Control</span>
@@ -26,7 +30,9 @@
             <div class="feature-item">
               <div class="feature-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                  />
                 </svg>
               </div>
               <span>Real-time Inventory Tracking</span>
@@ -34,7 +40,9 @@
             <div class="feature-item">
               <div class="feature-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                  />
                 </svg>
               </div>
               <span>Supply Chain Analytics</span>
@@ -71,7 +79,9 @@
 
             <form @submit.prevent="handleLogin" class="form-content">
               <div class="form-group">
-                <label for="loginName" class="form-label">Email or Username</label>
+                <label for="loginName" class="form-label"
+                  >Email or Username</label
+                >
                 <input
                   type="text"
                   class="form-control"
@@ -98,15 +108,31 @@
 
               <div class="form-options">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="rememberMe" v-model="loginForm.remember" />
-                  <label class="form-check-label" for="rememberMe">Remember me</label>
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="rememberMe"
+                    v-model="loginForm.remember"
+                  />
+                  <label class="form-check-label" for="rememberMe"
+                    >Remember me</label
+                  >
                 </div>
                 <a href="#" class="forgot-link">Forgot password?</a>
               </div>
 
-              <button type="submit" class="btn btn-primary w-100" :disabled="loadingLogin">
+              <button
+                type="submit"
+                class="btn btn-primary w-100"
+                :disabled="loadingLogin"
+              >
                 <span v-if="!loadingLogin">Sign In</span>
-                <span v-else class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span
+                  v-else
+                  class="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
                 <span v-if="loadingLogin">Signing in...</span>
               </button>
 
@@ -138,7 +164,9 @@
               </div>
 
               <div class="form-group">
-                <label for="registerUsername" class="form-label">Username</label>
+                <label for="registerUsername" class="form-label"
+                  >Username</label
+                >
                 <input
                   type="text"
                   id="registerUsername"
@@ -151,7 +179,9 @@
 
               <!-- Role Selection -->
               <div class="form-group">
-                <label for="registerRole" class="form-label">Account Type</label>
+                <label for="registerRole" class="form-label"
+                  >Account Type</label
+                >
                 <select
                   id="registerRole"
                   class="form-select"
@@ -191,7 +221,9 @@
                   />
                 </div>
                 <div class="form-group">
-                  <label for="shopAddress" class="form-label">Shop Address</label>
+                  <label for="shopAddress" class="form-label"
+                    >Shop Address</label
+                  >
                   <input
                     id="shopAddress"
                     class="form-control"
@@ -225,7 +257,9 @@
                   />
                 </div>
                 <div class="form-group">
-                  <label for="plantAddress" class="form-label">Plant Address</label>
+                  <label for="plantAddress" class="form-label"
+                    >Plant Address</label
+                  >
                   <input
                     id="plantAddress"
                     class="form-control"
@@ -248,7 +282,9 @@
 
               <!-- Password Fields -->
               <div class="form-group">
-                <label for="registerPassword" class="form-label">Password</label>
+                <label for="registerPassword" class="form-label"
+                  >Password</label
+                >
                 <input
                   type="password"
                   id="registerPassword"
@@ -260,7 +296,9 @@
                 />
               </div>
               <div class="form-group">
-                <label for="registerRepeatPassword" class="form-label">Confirm Password</label>
+                <label for="registerRepeatPassword" class="form-label"
+                  >Confirm Password</label
+                >
                 <input
                   type="password"
                   id="registerRepeatPassword"
@@ -272,13 +310,30 @@
               </div>
 
               <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="terms" v-model="registerForm.terms" required />
-                <label class="form-check-label" for="terms">I agree to the Terms and Conditions</label>
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="terms"
+                  v-model="registerForm.terms"
+                  required
+                />
+                <label class="form-check-label" for="terms"
+                  >I agree to the Terms and Conditions</label
+                >
               </div>
 
-              <button type="submit" class="btn btn-primary w-100" :disabled="loadingRegister">
+              <button
+                type="submit"
+                class="btn btn-primary w-100"
+                :disabled="loadingRegister"
+              >
                 <span v-if="!loadingRegister">Create Account</span>
-                <span v-else class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span
+                  v-else
+                  class="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
                 <span v-if="loadingRegister">Creating account...</span>
               </button>
 
@@ -297,122 +352,151 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import api from '@/api/axios'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import api from "@/api/axios";
 
-const router = useRouter()
-const activeTab = ref('login')
+defineOptions({
+  name: "LoginView",
+});
+
+const router = useRouter();
+const activeTab = ref("login");
 
 // LOGIN STATE
 const loginForm = ref({
-  username: '',
-  password: '',
+  username: "",
+  password: "",
   remember: true,
-})
-const loadingLogin = ref(false)
-const loginError = ref('')
+});
+const loadingLogin = ref(false);
+const loginError = ref("");
 
 // REGISTER STATE
 const registerForm = ref({
-  name: '',
-  username: '',
-  role: '',          // 'customer' | 'manufacturer' | 'shop_owner'
-  email: '',         // customer-only
-  shop: {            // shop_owner-only
-    name: '',
-    address: '',
-    mobile: '',
+  name: "",
+  username: "",
+  role: "", // 'customer' | 'manufacturer' | 'shop_owner'
+  email: "", // customer-only
+  shop: {
+    // shop_owner-only
+    name: "",
+    address: "",
+    mobile: "",
   },
-  manufacturer: {    // manufacturer-only
-    plantName: '',
-    address: '',
-    mobile: '',
+  manufacturer: {
+    // manufacturer-only
+    plantName: "",
+    address: "",
+    mobile: "",
   },
-  password: '',
-  password2: '',
+  password: "",
+  password2: "",
   terms: false,
-})
+});
 
-const loadingRegister = ref(false)
-const registerError = ref('')
-const registerSuccess = ref('')
+const loadingRegister = ref(false);
+const registerError = ref("");
+const registerSuccess = ref("");
 
 const MOCK_ACCOUNTS = {
-  shopowner: { role: 'shop_owner', displayName: 'Shop Owner', password: 'shop', redirect: '/shop' },
-  distributor: { role: 'distributor', displayName: 'Manufacturer/Distributor', password: 'dist', redirect: '/distributor' },
-  customer: { role: 'customer', displayName: 'Customer', password: 'cust', redirect: '/customer' },
-}
+  shopowner: {
+    role: "shop_owner",
+    displayName: "Shop Owner",
+    password: "shop",
+    redirect: "/shop",
+  },
+  distributor: {
+    role: "distributor",
+    displayName: "Manufacturer/Distributor",
+    password: "dist",
+    redirect: "/distributor",
+  },
+  customer: {
+    role: "customer",
+    displayName: "Customer",
+    password: "cust",
+    redirect: "/customer",
+  },
+};
 
 const handleLogin = async () => {
-  loginError.value = ''
-  loadingLogin.value = true
+  loginError.value = "";
+  loadingLogin.value = true;
 
   // Check mock credentials
   try {
-    const input = (loginForm.value.username || '').toString().trim().toLowerCase()
-    const pwd = (loginForm.value.password || '').toString()
+    const input = (loginForm.value.username || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    const pwd = (loginForm.value.password || "").toString();
 
-    if (input && MOCK_ACCOUNTS[input] && MOCK_ACCOUNTS[input].password === pwd) {
-      const acc = MOCK_ACCOUNTS[input]
+    if (
+      input &&
+      MOCK_ACCOUNTS[input] &&
+      MOCK_ACCOUNTS[input].password === pwd
+    ) {
+      const acc = MOCK_ACCOUNTS[input];
       // store minimal session data in localStorage so NavBar hydrates correctly
-      localStorage.setItem('token', `MOCK-TOKEN-${acc.role}`)
-      localStorage.setItem('role', acc.role)
-      localStorage.setItem('username', acc.displayName)
-      localStorage.setItem('user_id', `mock-${acc.role}`)
+      localStorage.setItem("token", `MOCK-TOKEN-${acc.role}`);
+      localStorage.setItem("role", acc.role);
+      localStorage.setItem("username", acc.displayName);
+      localStorage.setItem("user_id", `mock-${acc.role}`);
 
       // Dispatch custom event to notify NavBar
-      window.dispatchEvent(new Event('user-logged-in'))
+      window.dispatchEvent(new Event("user-logged-in"));
 
-      router.push(acc.redirect)
-      return
+      router.push(acc.redirect);
+      return;
     }
 
     // Otherwise fall back to real API if available
-    const { data } = await api.post('/login', {
+    const { data } = await api.post("/login", {
       username: loginForm.value.username,
       password: loginForm.value.password,
-    })
+    });
 
-    const { token, role, username, user_id } = data
+    const { token, role, username, user_id } = data;
 
-    localStorage.setItem('token', token)
-    localStorage.setItem('role', role)
-    localStorage.setItem('username', username)
-    localStorage.setItem('user_id', user_id)
+    localStorage.setItem("token", token);
+    localStorage.setItem("role", role);
+    localStorage.setItem("username", username);
+    localStorage.setItem("user_id", user_id);
 
     // Dispatch custom event to notify NavBar
-    window.dispatchEvent(new Event('user-logged-in'))
+    window.dispatchEvent(new Event("user-logged-in"));
 
     // Navigate based on role
     const roleRoutes = {
-      customer: '/customer',
-      manufacturer: '/manufacturer',
-      shop_owner: '/shop',
-      manager: '/shop'
-    }
-    router.push(roleRoutes[role] || '/')
+      customer: "/customer",
+      manufacturer: "/manufacturer",
+      shop_owner: "/shop",
+      manager: "/shop",
+    };
+    router.push(roleRoutes[role] || "/");
   } catch (err) {
-    loginError.value = err?.response?.data?.message || 'Login failed. Please try again.'
+    loginError.value =
+      err?.response?.data?.message || "Login failed. Please try again.";
   } finally {
-    loadingLogin.value = false
+    loadingLogin.value = false;
   }
-}
+};
 
 const handleRegister = async () => {
-  registerError.value = ''
-  registerSuccess.value = ''
-  loadingRegister.value = true
+  registerError.value = "";
+  registerSuccess.value = "";
+  loadingRegister.value = true;
 
   try {
     // basic validation
     if (!registerForm.value.role) {
-      registerError.value = 'Please select an account type.'
-      return
+      registerError.value = "Please select an account type.";
+      return;
     }
     if (registerForm.value.password !== registerForm.value.password2) {
-      registerError.value = 'Passwords do not match.'
-      return
+      registerError.value = "Passwords do not match.";
+      return;
     }
 
     // build payload by role
@@ -421,49 +505,55 @@ const handleRegister = async () => {
       username: registerForm.value.username,
       role: registerForm.value.role,
       password: registerForm.value.password,
+    };
+
+    let payload = { ...base };
+
+    if (registerForm.value.role === "customer") {
+      payload.email = registerForm.value.email;
     }
 
-    let payload = { ...base }
-
-    if (registerForm.value.role === 'customer') {
-      payload.email = registerForm.value.email
-    }
-
-    if (registerForm.value.role === 'shop_owner') {
+    if (registerForm.value.role === "shop_owner") {
       payload.shop = {
         name: registerForm.value.shop.name,
         address: registerForm.value.shop.address,
         mobile: registerForm.value.shop.mobile,
-      }
+      };
     }
 
-    if (registerForm.value.role === 'manufacturer') {
+    if (registerForm.value.role === "manufacturer") {
       payload.manufacturer = {
         plant_name: registerForm.value.manufacturer.plantName,
         address: registerForm.value.manufacturer.address,
         mobile: registerForm.value.manufacturer.mobile,
-      }
+      };
     }
 
     // POST to your backend
-    await api.post('/register', payload)
+    await api.post("/register", payload);
 
-    registerSuccess.value = 'Account created successfully! You can now log in.'
-    activeTab.value = 'login'
+    registerSuccess.value = "Account created successfully! You can now log in.";
+    activeTab.value = "login";
 
     // clear the form
     Object.assign(registerForm.value, {
-      name: '', username: '', role: '', email: '',
-      shop: { name: '', address: '', mobile: '' },
-      manufacturer: { plantName: '', address: '', mobile: '' },
-      password: '', password2: '', terms: false,
-    })
+      name: "",
+      username: "",
+      role: "",
+      email: "",
+      shop: { name: "", address: "", mobile: "" },
+      manufacturer: { plantName: "", address: "", mobile: "" },
+      password: "",
+      password2: "",
+      terms: false,
+    });
   } catch (err) {
-    registerError.value = err?.response?.data?.message || 'Registration failed. Please try again.'
+    registerError.value =
+      err?.response?.data?.message || "Registration failed. Please try again.";
   } finally {
-    loadingRegister.value = false
+    loadingRegister.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
@@ -474,7 +564,8 @@ const handleRegister = async () => {
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .auth-wrapper {
@@ -503,7 +594,7 @@ const handleRegister = async () => {
 }
 
 .auth-left::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;

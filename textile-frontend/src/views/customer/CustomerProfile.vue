@@ -6,7 +6,10 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex align-items-start mb-4">
-              <div class="profile-avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 80px; height: 80px; font-size: 2rem;">
+              <div
+                class="profile-avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
+                style="width: 80px; height: 80px; font-size: 2rem"
+              >
                 <i class="bi bi-person-circle"></i>
               </div>
               <div class="flex-grow-1">
@@ -14,7 +17,9 @@
                 <p class="text-muted mb-0 small">{{ profileData.detail1 }}</p>
                 <p class="text-muted mb-0 small">{{ profileData.detail2 }}</p>
                 <p class="text-muted mb-0 small">{{ profileData.detail3 }}</p>
-                <button class="btn btn-sm btn-primary mt-2" @click="enableEdit">Edit Profile</button>
+                <button class="btn btn-sm btn-primary mt-2" @click="enableEdit">
+                  Edit Profile
+                </button>
               </div>
             </div>
 
@@ -23,34 +28,80 @@
               <h6 class="mb-3">Edit Profile Information</h6>
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="form-label small">Full name</label>
-                  <input type="text" class="form-control" v-model="editForm.fullName">
+                  <label class="form-label small" for="full-name"
+                    >Full name</label
+                  >
+                  <input
+                    id="full-name"
+                    type="text"
+                    class="form-control"
+                    v-model="editForm.fullName"
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label small">Username</label>
-                  <input type="text" class="form-control" v-model="editForm.username">
+                  <label class="form-label small" for="username"
+                    >Username</label
+                  >
+                  <input
+                    id="username"
+                    type="text"
+                    class="form-control"
+                    v-model="editForm.username"
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label small">Detail 1</label>
-                  <input type="text" class="form-control" v-model="editForm.detail1">
+                  <label class="form-label small" for="detail-1"
+                    >Detail 1</label
+                  >
+                  <input
+                    id="detail-1"
+                    type="text"
+                    class="form-control"
+                    v-model="editForm.detail1"
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label small">Detail 2</label>
-                  <input type="text" class="form-control" v-model="editForm.detail2">
+                  <label class="form-label small" for="detail-2"
+                    >Detail 2</label
+                  >
+                  <input
+                    id="detail-2"
+                    type="text"
+                    class="form-control"
+                    v-model="editForm.detail2"
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label small">Detail 3</label>
-                  <input type="text" class="form-control" v-model="editForm.detail3">
+                  <label class="form-label small" for="detail-3"
+                    >Detail 3</label
+                  >
+                  <input
+                    id="detail-3"
+                    type="text"
+                    class="form-control"
+                    v-model="editForm.detail3"
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label small">Detail 4</label>
-                  <input type="text" class="form-control" v-model="editForm.detail4">
+                  <label class="form-label small" for="detail-4"
+                    >Detail 4</label
+                  >
+                  <input
+                    id="detail-4"
+                    type="text"
+                    class="form-control"
+                    v-model="editForm.detail4"
+                  />
                 </div>
               </div>
-              
+
               <div class="text-center mt-4">
-                <button class="btn btn-primary me-2" @click="updateProfile">Update</button>
-                <button class="btn btn-outline-secondary" @click="cancelEdit">Cancel</button>
+                <button class="btn btn-primary me-2" @click="updateProfile">
+                  Update
+                </button>
+                <button class="btn btn-outline-secondary" @click="cancelEdit">
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -61,54 +112,42 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive } from "vue";
 
-const isEditing = ref(false)
+const isEditing = ref(false);
 
 const profileData = reactive({
-  name: 'User Name',
-  detail1: 'Detail 1',
-  detail2: 'Detail 2',
-  detail3: 'Detail 3'
-})
+  name: "User Name",
+  detail1: "Detail 1",
+  detail2: "Detail 2",
+  detail3: "Detail 3",
+});
 
 const editForm = reactive({
-  fullName: 'User Name',
-  username: 'username',
-  detail1: 'Detail 1',
-  detail2: 'Detail 2',
-  detail3: 'Detail 3',
-  detail4: 'Detail 4'
-})
-
-const selectedShop = ref({
-  name: 'Shop Name 03',
-  rating: 4,
-  address: '298/09 Block 63 Highway 98',
-  contact: '+91 98675 54321',
-  hours: 'Open Monday to Friday, 8AM To 8PM',
-  products: [
-    { id: 1, name: 'Product Name 01', rating: 4, description: 'Product Description...' },
-    { id: 2, name: 'Product Name 02', rating: 4, description: 'Product Description...' }
-  ]
-})
+  fullName: "User Name",
+  username: "username",
+  detail1: "Detail 1",
+  detail2: "Detail 2",
+  detail3: "Detail 3",
+  detail4: "Detail 4",
+});
 
 const enableEdit = () => {
-  isEditing.value = true
-}
+  isEditing.value = true;
+};
 
 const updateProfile = () => {
-  profileData.name = editForm.fullName
-  profileData.detail1 = editForm.detail1
-  profileData.detail2 = editForm.detail2
-  profileData.detail3 = editForm.detail3
-  isEditing.value = false
-  alert('Profile updated successfully!')
-}
+  profileData.name = editForm.fullName;
+  profileData.detail1 = editForm.detail1;
+  profileData.detail2 = editForm.detail2;
+  profileData.detail3 = editForm.detail3;
+  isEditing.value = false;
+  alert("Profile updated successfully!");
+};
 
 const cancelEdit = () => {
-  isEditing.value = false
-}
+  isEditing.value = false;
+};
 </script>
 
 <style scoped>
@@ -320,23 +359,23 @@ const cancelEdit = () => {
   .customer-profile-page {
     padding: 1rem;
   }
-  
+
   .card-body {
     padding: 1.5rem;
   }
-  
+
   .profile-avatar {
     width: 80px;
     height: 80px;
     font-size: 2.5rem;
   }
-  
+
   .shop-avatar {
     width: 60px;
     height: 60px;
     font-size: 2rem;
   }
-  
+
   .edit-form {
     padding-top: 1rem;
     margin-top: 1rem;
@@ -345,6 +384,9 @@ const cancelEdit = () => {
 
 /* Smooth Transitions */
 * {
-  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 </style>
