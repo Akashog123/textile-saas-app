@@ -350,6 +350,65 @@ class Notification(db.Model):
     is_read = db.Column(db.Boolean, default=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# -------------------------------------------------------------------
+# MERGED MODELS FROM models2.py (Renamed to avoid conflict)
+# -------------------------------------------------------------------
+
+class StoreRegion(db.Model):
+    __tablename__ = 'store_regions'
+
+    RegionID = db.Column(db.Integer, primary_key=True)
+    StoreName = db.Column(db.String(100), nullable=False)
+    City = db.Column(db.String(100), nullable=False)
+    Product_description = db.Column(db.String(500), nullable=False)
+    Latitude = db.Column(db.Float, nullable=False)
+    Longitude = db.Column(db.Float, nullable=False)
+    RegionName = db.Column(db.String(50), nullable=False)
+    ImagePath = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f"<StoreRegion {self.StoreName}>"
+
+
+
+class ExternalProduct(db.Model):
+    __tablename__ = 'external_product'
+
+    ID = db.Column(db.Integer, primary_key=True)
+    ProductID = db.Column(db.Integer, unique=True, nullable=False)
+    ProductCategory = db.Column(db.String(100), nullable=False)
+    Occasion = db.Column(db.String(100))
+    Material = db.Column(db.String(100))
+    Karigari = db.Column(db.String(100))
+    Karigari_description = db.Column(db.Text)
+    Product_description = db.Column(db.Text)
+
+    sales_items = db.relationship(
+        'ExternalSalesDataItem',
+        back_populates='product',
+        cascade='all, delete-orphan'
+    )
+
+    def __repr__(self):
+        return f"<ExternalProduct {self.ProductID}>"
+
+
+class ExternalSalesDataItem(db.Model):
+    __tablename__ = 'external_sales_data_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ProductID = db.Column(db.Integer, db.ForeignKey('external_product.ProductID'), nullable=False)
+    OrderId = db.Column(db.Integer, nullable=False)
+    UnitsSold = db.Column(db.Integer, nullable=False)
+    Sales = db.Column(db.Float, nullable=False)
+    SaleDate = db.Column(db.Date, nullable=False)
+    Store = db.Column(db.String(100), nullable=False)
+    Region = db.Column(db.String(50), nullable=False)
+
+    product = db.relationship('ExternalProduct', back_populates='sales_items')
+
+    def __repr__(self):
+        return f"<ExternalSalesDataItem Order={self.OrderId}, Product={self.ProductID}>"
 
 # --------------------
 # DB Setup

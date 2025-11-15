@@ -1,4 +1,4 @@
-#!D:\SE-Textile-App\backend\venv\Scripts\python.exe
+#!D:\SE_Project\ayush\SE-Textile-App\backend\venv\Scripts\python.exe
 
 ##############################################################################
 #
