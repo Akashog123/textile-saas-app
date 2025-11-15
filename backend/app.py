@@ -30,6 +30,12 @@ from routes.shop_routes import shop_bp
 #    and contains: inventory_bp = Blueprint("inventory", __name__, url_prefix="/api/v1/inventory")
 from routes.inventory import inventory_bp  
 
+from routes.heatmap_routes import heatmap_bp
+from routes.trending_routes import trending_shops_bp
+from routes.ai_find_stores import ai_bp
+from routes.top_selling_routes import top_selling_bp
+from routes.image_routes import image_bp
+from routes.stores_routes import stores_bp
 from routes.product_routes import product_bp
 from routes.inquiry import inquiry_bp
 from routes.discovery_portal import discovery_portal_bp
@@ -73,6 +79,12 @@ app.register_blueprint(shop_bp, url_prefix="/api/v1/shop")
 # ✅ inventory_bp already defines its own url_prefix, don't repeat
 app.register_blueprint(inventory_bp)
 
+app.register_blueprint(heatmap_bp, url_prefix="/api/v1/heatmap_bp")
+app.register_blueprint(ai_bp, url_prefix="/api/v1/ai-find-stores_bp")
+app.register_blueprint(top_selling_bp, url_prefix="/api/v1/top_selling_bp")
+app.register_blueprint(trending_shops_bp, url_prefix="/api/v1/trending_shops_bp")
+app.register_blueprint(image_bp, url_prefix="/api/v1/compare-images")
+app.register_blueprint(stores_bp, url_prefix="/api/v1/stores")
 app.register_blueprint(product_bp, url_prefix="/api/v1/products")
 app.register_blueprint(inquiry_bp, url_prefix="/api/v1/inquiry")
 app.register_blueprint(discovery_portal_bp, url_prefix="/api/v1/customer")
