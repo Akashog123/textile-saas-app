@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="D:\SE_Project\ayush\SE-Textile-App\backend\venv"
+VIRTUAL_ENV="C:\Users\acer\Desktop\SE-Textile-App-Backend\backend\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
