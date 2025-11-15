@@ -4,7 +4,12 @@
       <h5 class="mb-0">Fabric Stock Inquiry</h5>
       <button class="btn btn-outline-secondary btn-sm">
         <svg width="16" height="16" fill="currentColor" class="me-1">
-          <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="2" fill="none"/>
+          <path
+            d="M2 4h12M2 8h8M2 12h10"
+            stroke="currentColor"
+            stroke-width="2"
+            fill="none"
+          />
         </svg>
         Inquiry History
       </button>
@@ -13,10 +18,11 @@
     <div class="card">
       <div class="card-body">
         <div class="mb-4">
-          <label class="form-label">Inquiry</label>
+          <label class="form-label" for="inquiry-message">Inquiry</label>
           <div class="input-group">
-            <textarea 
-              class="form-control" 
+            <textarea
+              id="inquiry-message"
+              class="form-control"
               placeholder="Add a Message (Optional)"
               v-model="inquiryMessage"
               rows="3"
@@ -24,23 +30,45 @@
           </div>
         </div>
 
-        <div class="upload-zone border border-2 border-dashed rounded p-4 text-center mb-4"
-             @dragover.prevent
-             @drop.prevent="handleInquiryFileDrop"
-             @click="$refs.inquiryFileInput.click()">
+        <div
+          class="upload-zone border border-2 border-dashed rounded p-4 text-center mb-4"
+          @dragover.prevent
+          @drop.prevent="handleInquiryFileDrop"
+          @click="$refs.inquiryFileInput.click()"
+        >
           <div class="mb-2">
             <svg width="40" height="40" fill="currentColor" class="text-muted">
-              <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="2"/>
-              <path d="M20 12v16M12 20h16" stroke="currentColor" stroke-width="2"/>
+              <circle
+                cx="20"
+                cy="20"
+                r="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                d="M20 12v16M12 20h16"
+                stroke="currentColor"
+                stroke-width="2"
+              />
             </svg>
           </div>
           <p class="mb-2 small fw-semibold">Upload Image</p>
           <p class="text-muted small mb-2">Drag and drop or click to upload</p>
-          <input type="file" @change="handleInquiryFileUpload" class="d-none" ref="inquiryFileInput" accept="image/*">
-          <button class="btn btn-outline-secondary btn-sm" @click.stop="$refs.inquiryFileInput.click()">
+          <input
+            type="file"
+            @change="handleInquiryFileUpload"
+            class="d-none"
+            ref="inquiryFileInput"
+            accept="image/*"
+          />
+          <button
+            class="btn btn-outline-secondary btn-sm"
+            @click.stop="$refs.inquiryFileInput.click()"
+          >
             Choose File / Browse
           </button>
-          
+
           <div v-if="inquiryFile" class="mt-3 text-start">
             <div class="alert alert-info small mb-0">
               <i class="bi bi-paperclip"></i> Selected: {{ inquiryFile.name }}
@@ -49,13 +77,18 @@
         </div>
 
         <div class="d-flex gap-2 justify-content-center">
-          <button class="btn btn-primary" @click="sendInquiry" :disabled="!inquiryMessage && !inquiryFile">
+          <button
+            class="btn btn-primary"
+            @click="sendInquiry"
+            :disabled="!inquiryMessage && !inquiryFile"
+          >
             Send Inquiry
           </button>
         </div>
 
         <div v-if="inquirySubmitted" class="alert alert-success mt-4">
-          <i class="bi bi-check-circle-fill"></i> Inquiry submitted successfully! You'll receive stock updates shortly.
+          <i class="bi bi-check-circle-fill"></i> Inquiry submitted
+          successfully! You'll receive stock updates shortly.
         </div>
       </div>
     </div>
@@ -63,34 +96,34 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from "vue";
 
-const inquiryMessage = ref('')
-const inquiryFile = ref(null)
-const inquirySubmitted = ref(false)
+const inquiryMessage = ref("");
+const inquiryFile = ref(null);
+const inquirySubmitted = ref(false);
 
 const handleInquiryFileUpload = (event) => {
-  const file = event.target.files[0]
+  const file = event.target.files[0];
   if (file) {
-    inquiryFile.value = file
+    inquiryFile.value = file;
   }
-}
+};
 
 const handleInquiryFileDrop = (event) => {
-  const file = event.dataTransfer.files[0]
+  const file = event.dataTransfer.files[0];
   if (file) {
-    inquiryFile.value = file
+    inquiryFile.value = file;
   }
-}
+};
 
 const sendInquiry = () => {
-  inquirySubmitted.value = true
+  inquirySubmitted.value = true;
   setTimeout(() => {
-    inquirySubmitted.value = false
-    inquiryMessage.value = ''
-    inquiryFile.value = null
-  }, 3000)
-}
+    inquirySubmitted.value = false;
+    inquiryMessage.value = "";
+    inquiryFile.value = null;
+  }, 3000);
+};
 </script>
 
 <style scoped>
@@ -117,7 +150,7 @@ const sendInquiry = () => {
   border: none;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -131,10 +164,14 @@ const sendInquiry = () => {
 }
 
 .upload-zone::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   opacity: 0;
   transition: opacity 0.3s ease;
 }

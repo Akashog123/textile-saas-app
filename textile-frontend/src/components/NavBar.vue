@@ -1,11 +1,13 @@
 <template>
   <div class="navbar-wrapper">
-    <nav class="navbar navbar-expand-lg navbar-light bg-gradient-primary shadow-elegant">
+    <nav
+      class="navbar navbar-expand-lg navbar-light bg-gradient-primary shadow-elegant"
+    >
       <div class="container-fluid px-4">
         <div class="navbar-brand fw-bold brand-logo" to="/">
           <i class="bi bi-scissors brand-icon"></i>
           <span class="brand-text">SE Textile</span>
-      </div>
+        </div>
 
         <button
           class="navbar-toggler"
@@ -21,7 +23,10 @@
 
         <div class="collapse navbar-collapse" id="mainNav">
           <!-- Right: user & logout -->
-          <div class="d-flex align-items-center gap-3 ms-auto" v-if="isLoggedIn">
+          <div
+            class="d-flex align-items-center gap-3 ms-auto"
+            v-if="isLoggedIn"
+          >
             <div class="user-profile-badge">
               <i class="bi bi-person-circle user-avatar"></i>
               <span class="username-text">{{ username }}</span>
@@ -36,13 +41,20 @@
     </nav>
 
     <!-- Shop Manager Sub-Navigation (visible only for shop_owner role) -->
-    <div v-if="isLoggedIn && isShopRole" class="sub-nav-container bg-gradient-light">
+    <div
+      v-if="isLoggedIn && isShopRole"
+      class="sub-nav-container bg-gradient-light"
+    >
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
-              :class="{ active: $route.path.includes('/shop/dashboard') || $route.path === '/shop' }"
+            <router-link
+              class="nav-link-modern"
+              :class="{
+                active:
+                  $route.path.includes('/shop/dashboard') ||
+                  $route.path === '/shop',
+              }"
               to="/shop/dashboard"
             >
               <i class="bi bi-speedometer2 nav-icon"></i>
@@ -50,8 +62,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/shop/inventory') }"
               to="/shop/inventory"
             >
@@ -60,8 +72,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/shop/marketing') }"
               to="/shop/marketing"
             >
@@ -70,8 +82,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/shop/inquiry') }"
               to="/shop/inquiry"
             >
@@ -84,13 +96,20 @@
     </div>
 
     <!-- Customer Sub-Navigation (visible only for customer role) -->
-    <div v-if="isLoggedIn && isCustomerRole" class="sub-nav-container bg-gradient-light">
+    <div
+      v-if="isLoggedIn && isCustomerRole"
+      class="sub-nav-container bg-gradient-light"
+    >
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
-              :class="{ active: $route.path.includes('/customer/home') || $route.path === '/customer' }"
+            <router-link
+              class="nav-link-modern"
+              :class="{
+                active:
+                  $route.path.includes('/customer/home') ||
+                  $route.path === '/customer',
+              }"
               to="/customer/home"
             >
               <i class="bi bi-house nav-icon"></i>
@@ -98,8 +117,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/customer/shops') }"
               to="/customer/shops"
             >
@@ -108,8 +127,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/customer/products') }"
               to="/customer/products"
             >
@@ -118,8 +137,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/customer/profile') }"
               to="/customer/profile"
             >
@@ -132,13 +151,20 @@
     </div>
 
     <!-- Distributor/Manufacturer Sub-Navigation (visible only for distributor/manufacturer role) -->
-    <div v-if="isLoggedIn && isDistributorRole" class="sub-nav-container bg-gradient-light">
+    <div
+      v-if="isLoggedIn && isDistributorRole"
+      class="sub-nav-container bg-gradient-light"
+    >
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
-              :class="{ active: $route.path.includes('/distributor/demand') || $route.path === '/distributor' }"
+            <router-link
+              class="nav-link-modern"
+              :class="{
+                active:
+                  $route.path.includes('/distributor/demand') ||
+                  $route.path === '/distributor',
+              }"
               to="/distributor/demand"
             >
               <i class="bi bi-graph-up-arrow nav-icon"></i>
@@ -146,8 +172,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/distributor/planning') }"
               to="/distributor/planning"
             >
@@ -158,117 +184,122 @@
         </ul>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import api from '@/api/axios'
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import api from "@/api/axios";
 
 // ---- state
-const router = useRouter()
-const route = useRoute()
-const isLoggedIn = ref(false)
-const username = ref('')
-const role = ref('')
+const router = useRouter();
+const route = useRoute();
+const isLoggedIn = ref(false);
+const username = ref("");
+const role = ref("");
 
 // Check if current user is shop role (for showing sub-navigation)
 const isShopRole = computed(() => {
-  return role.value === 'shop_owner' || role.value === 'manager'
-})
+  return role.value === "shop_owner" || role.value === "manager";
+});
 
 // Check if current user is customer role (for showing sub-navigation)
 const isCustomerRole = computed(() => {
-  return role.value === 'customer'
-})
+  return role.value === "customer";
+});
 
 // Check if current user is distributor/manufacturer role (for showing sub-navigation)
 const isDistributorRole = computed(() => {
-  return role.value === 'distributor' || role.value === 'manufacturer'
-})
-
+  return role.value === "distributor" || role.value === "manufacturer";
+});
 
 const hydrateFromStorage = async () => {
-  const token = localStorage.getItem('token')
-  const storedRole = localStorage.getItem('role')
-  const storedName = localStorage.getItem('username')
+  const token = localStorage.getItem("token");
+  const storedRole = localStorage.getItem("role");
+  const storedName = localStorage.getItem("username");
 
-  console.log('Hydrating NavBar:', { token, storedRole, storedName })
+  console.log("Hydrating NavBar:", { token, storedRole, storedName });
 
   if (!token || !storedRole) {
-    isLoggedIn.value = false
-    return
+    isLoggedIn.value = false;
+    return;
   }
 
   // For mock login (no backend), just trust localStorage
   // If backend is available, verify token
   try {
     // Skip backend verification if using mock login (token starts with MOCK-TOKEN-)
-    if (token.startsWith('MOCK-TOKEN-')) {
-      isLoggedIn.value = true
-      username.value = storedName || ''
-      role.value = storedRole
-      console.log('Mock login detected, NavBar hydrated:', { isLoggedIn: isLoggedIn.value, role: role.value })
-      return
+    if (token.startsWith("MOCK-TOKEN-")) {
+      isLoggedIn.value = true;
+      username.value = storedName || "";
+      role.value = storedRole;
+      console.log("Mock login detected, NavBar hydrated:", {
+        isLoggedIn: isLoggedIn.value,
+        role: role.value,
+      });
+      return;
     }
 
     // Only verify with backend if not using mock login
-    await api.post('/verify_token', { token })
-    isLoggedIn.value = true
-    username.value = storedName || ''
-    role.value = storedRole
+    await api.post("/verify_token", { token });
+    isLoggedIn.value = true;
+    username.value = storedName || "";
+    role.value = storedRole;
   } catch (error) {
     // If backend is not available or token is invalid, clear session
-    console.warn('Token verification failed:', error.message)
-    localStorage.clear()
-    isLoggedIn.value = false
-    role.value = ''
-    username.value = ''
+    console.warn("Token verification failed:", error.message);
+    localStorage.clear();
+    isLoggedIn.value = false;
+    role.value = "";
+    username.value = "";
   }
-}
+};
 
 onMounted(() => {
-  hydrateFromStorage()
-  
+  hydrateFromStorage();
+
   // Listen for storage events (e.g., when another tab logs in)
-  window.addEventListener('storage', hydrateFromStorage)
-  
+  window.addEventListener("storage", hydrateFromStorage);
+
   // Listen for custom login event
-  window.addEventListener('user-logged-in', hydrateFromStorage)
-})
+  window.addEventListener("user-logged-in", hydrateFromStorage);
+});
 
 onUnmounted(() => {
   // Cleanup event listeners
-  window.removeEventListener('storage', hydrateFromStorage)
-  window.removeEventListener('user-logged-in', hydrateFromStorage)
-})
+  window.removeEventListener("storage", hydrateFromStorage);
+  window.removeEventListener("user-logged-in", hydrateFromStorage);
+});
 
 // Watch for route changes and re-hydrate (important for login redirects)
-watch(() => route.path, () => {
-  hydrateFromStorage()
-}, { immediate: true })
+watch(
+  () => route.path,
+  () => {
+    hydrateFromStorage();
+  },
+  { immediate: true },
+);
 
 // ---- logout
 const logout = async () => {
-  const token = localStorage.getItem('token')
-  
+  const token = localStorage.getItem("token");
+
   // Only call backend logout if not using mock login
-  if (token && !token.startsWith('MOCK-TOKEN-')) {
+  if (token && !token.startsWith("MOCK-TOKEN-")) {
     try {
-      await api.post('/logout', { token })
+      await api.post("/logout", { token });
     } catch (e) {
-      console.warn('Logout API call failed:', e.message)
+      console.warn("Logout API call failed:", e.message);
     }
   }
-  
-  localStorage.clear()
-  isLoggedIn.value = false
-  role.value = ''
-  username.value = ''
-  router.push('/login')
-}
+
+  localStorage.clear();
+  isLoggedIn.value = false;
+  role.value = "";
+  username.value = "";
+  router.push("/login");
+};
 </script>
 
 <style scoped>
@@ -306,8 +337,13 @@ const logout = async () => {
 }
 
 @keyframes rotate {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(10deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
 }
 
 .brand-text {
@@ -398,7 +434,7 @@ const logout = async () => {
 }
 
 .nav-link-modern::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -447,7 +483,7 @@ const logout = async () => {
 }
 
 .navbar-nav .nav-link::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -471,18 +507,18 @@ const logout = async () => {
   .user-profile-badge {
     margin-top: 1rem;
   }
-  
+
   .btn-logout {
     width: 100%;
     justify-content: center;
     margin-top: 0.5rem;
   }
-  
+
   .nav-tabs-modern {
     flex-direction: column;
     gap: 0.25rem;
   }
-  
+
   .nav-link-modern {
     border-radius: 8px;
   }
@@ -490,6 +526,8 @@ const logout = async () => {
 
 /* Smooth Transitions */
 * {
-  transition: color 0.2s ease, background-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
 }
 </style>
