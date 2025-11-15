@@ -416,58 +416,60 @@ const MOCK_ACCOUNTS = {
   },
 };
 
-// ✅ LOGIN HANDLER (Simplified - No JWT)
+
 const handleLogin = async () => {
   loginError.value = "";
   loadingLogin.value = true;
 
   try {
-    const input = (loginForm.value.username || "")
-      .toString()
-      .trim()
-      .toLowerCase();
+    const input = (loginForm.value.username || "").toString().trim().toLowerCase();
     const pwd = (loginForm.value.password || "").toString();
 
-    // Mock account (for quick dev testing)
-    if (
-      input &&
-      MOCK_ACCOUNTS[input] &&
-      MOCK_ACCOUNTS[input].password === pwd
-    ) {
+    // Quick dev mocks (keep if helpful)
+    if (input && MOCK_ACCOUNTS[input] && MOCK_ACCOUNTS[input].password === pwd) {
       const acc = MOCK_ACCOUNTS[input];
+      const mockUser = {
+        id: `mock-${acc.role}`,
+        username: acc.displayName,
+        role: acc.role,
+      };
+      localStorage.setItem("user", JSON.stringify(mockUser));
       localStorage.setItem("role", acc.role);
       localStorage.setItem("username", acc.displayName);
-      localStorage.setItem("user_id", `mock-${acc.role}`);
+      localStorage.setItem("user_id", mockUser.id);
       localStorage.setItem("logged_in", "true");
-
-      // Notify navbar
       window.dispatchEvent(new Event("user-logged-in"));
       router.push(acc.redirect);
       return;
     }
 
-    // Real API call (no JWT)
-    const { data } = await api.post("/auth/login", {
+    // Real API call (backend returns { status: 'success', user: { ... } })
+    const resp = await api.post("/auth/login", {
       username: loginForm.value.username,
       password: loginForm.value.password,
     });
 
+    const data = resp?.data;
+
+    if (!data) {
+      loginError.value = "No response from server.";
+      return;
+    }
+
     if (data.status === "success") {
+      // backend returns user in data.user
       const user = data.user;
 
-      // ✅ Save entire user object (dashboard expects localStorage.user)
+      // Save user object for app (dashboard expects localStorage.user)
       localStorage.setItem("user", JSON.stringify(user));
-
-      // Optional: backward compatibility (if other components rely on these)
-      localStorage.setItem("role", user.role);
-      localStorage.setItem("username", user.username);
-      localStorage.setItem("user_id", user.id);
+      localStorage.setItem("role", user.role || "");
+      localStorage.setItem("username", user.username || "");
+      localStorage.setItem("user_id", user.id || "");
       localStorage.setItem("logged_in", "true");
 
-      // Notify navbar or global listeners
+      // Notify rest of app and redirect
       window.dispatchEvent(new Event("user-logged-in"));
 
-      // ✅ Redirect based on role
       const roleRoutes = {
         customer: "/customer",
         manufacturer: "/manufacturer",
@@ -477,11 +479,14 @@ const handleLogin = async () => {
       };
       router.push(roleRoutes[user.role] || "/");
     } else {
+      // backend returned a failure (invalid credentials, awaiting approval, etc)
       loginError.value = data.message || "Login failed. Please try again.";
     }
   } catch (err) {
-    loginError.value =
-      err?.response?.data?.message || "Login failed. Please try again.";
+    // Network / unexpected errors
+    const serverMsg = err?.response?.data?.message || err?.message;
+    loginError.value = serverMsg || "Login failed. Please try again.";
+    console.error("[Login Error]", err);
   } finally {
     loadingLogin.value = false;
   }
@@ -494,47 +499,93 @@ const handleRegister = async () => {
   loadingRegister.value = true;
 
   try {
-    // Validation
+    // Basic validations
     if (!registerForm.value.role) {
       registerError.value = "Please select an account type.";
       return;
     }
+
+    if (!registerForm.value.name || registerForm.value.name.trim() === "") {
+      registerError.value = "Full name is required.";
+      return;
+    }
+
+    if (!registerForm.value.username || registerForm.value.username.trim() === "") {
+      registerError.value = "Username is required.";
+      return;
+    }
+
+    if (registerForm.value.role === "customer") {
+      if (!registerForm.value.email || registerForm.value.email.trim() === "") {
+        registerError.value = "Email is required for customer accounts.";
+        return;
+      }
+    }
+
+    if (registerForm.value.role === "shop_owner") {
+      const s = registerForm.value.shop;
+      if (!s.name || !s.address || !s.mobile) {
+        registerError.value = "Shop name, address and mobile are required for Shop Owner.";
+        return;
+      }
+    }
+
+    if (registerForm.value.role === "manufacturer") {
+      const m = registerForm.value.manufacturer;
+      if (!m.plantName || !m.address || !m.mobile) {
+        registerError.value = "Plant name, address and mobile are required for Manufacturer.";
+        return;
+      }
+    }
+
+    if (!registerForm.value.password || registerForm.value.password.length < 8) {
+      registerError.value = "Password must be at least 8 characters.";
+      return;
+    }
+
     if (registerForm.value.password !== registerForm.value.password2) {
       registerError.value = "Passwords do not match.";
       return;
     }
 
-    // ✅ Fix: Map "name" → "full_name" to match backend fields
+    // Build payload matching backend fields
     const base = {
       full_name: registerForm.value.name,
       username: registerForm.value.username,
-      email: registerForm.value.email,
+      email: registerForm.value.email || `${registerForm.value.username}@noemail.com`,
       password: registerForm.value.password,
       role: registerForm.value.role,
     };
 
-    let payload = { ...base };
-
-    // Extra fields for specific roles
+    // Add role-specific fields expected by backend
     if (registerForm.value.role === "shop_owner") {
-      payload.contact = registerForm.value.shop.mobile;
-      payload.address = registerForm.value.shop.address;
+      base.contact = registerForm.value.shop.mobile;
+      base.address = registerForm.value.shop.address;
+      // include shop name as an optional field so backend or later processes can use it
+      base.shop_name = registerForm.value.shop.name;
     }
 
     if (registerForm.value.role === "manufacturer") {
-      payload.contact = registerForm.value.manufacturer.mobile;
-      payload.address = registerForm.value.manufacturer.address;
+      base.contact = registerForm.value.manufacturer.mobile;
+      base.address = registerForm.value.manufacturer.address;
+      base.plant_name = registerForm.value.manufacturer.plantName;
     }
 
-    // POST to backend
-    const { data } = await api.post("/auth/register", payload);
+    // Send to backend
+    const resp = await api.post("/auth/register", base);
+    const data = resp?.data;
+
+    if (!data) {
+      registerError.value = "No response from server.";
+      return;
+    }
 
     if (data.status === "success") {
-      registerSuccess.value =
-        "Account created successfully! You can now log in.";
+      registerSuccess.value = data.message || "Account created successfully! Please sign in.";
+
+      // Option A: Switch to login tab and reset form (recommended)
       activeTab.value = "login";
 
-      // Reset form
       Object.assign(registerForm.value, {
         name: "",
         username: "",
@@ -546,17 +597,45 @@ const handleRegister = async () => {
         password2: "",
         terms: false,
       });
+
+      // Option B: Auto-login immediately after registration (uncomment to enable)
+      /*
+      try {
+        const loginResp = await api.post("/auth/login", {
+          username: base.username,
+          password: base.password,
+        });
+        const loginData = loginResp?.data;
+        if (loginData?.status === "success") {
+          const user = loginData.user;
+          localStorage.setItem("user", JSON.stringify(user));
+          localStorage.setItem("role", user.role || "");
+          localStorage.setItem("username", user.username || "");
+          localStorage.setItem("user_id", user.id || "");
+          localStorage.setItem("logged_in", "true");
+          window.dispatchEvent(new Event("user-logged-in"));
+          const roleRoutes = { customer: "/customer", manufacturer: "/manufacturer", shop_owner: "/shop", manager: "/shop", distributor: "/distributor" };
+          router.push(roleRoutes[user.role] || "/");
+        }
+      } catch (e) {
+        // ignore auto-login errors; user can login manually
+      }
+      */
+
     } else {
-      registerError.value =
-        data.message || "Registration failed. Please try again.";
+      // backend reported a failure
+      registerError.value = data.message || "Registration failed. Please try again.";
     }
   } catch (err) {
+    console.error("[Register Error]", err);
     registerError.value =
-      err?.response?.data?.message || "Registration failed. Please try again.";
+      err?.response?.data?.message || err?.message || "Registration failed. Please try again.";
   } finally {
     loadingRegister.value = false;
   }
 };
+
+
 </script>
 
 
