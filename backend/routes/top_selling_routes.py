@@ -1,21 +1,28 @@
+import os
 from flask import Blueprint, jsonify
 from models.model import ExternalProduct, ExternalSalesDataItem
 from models.model import db
 import pandas as pd
 import google.generativeai as genai
 
-top_selling_bp = Blueprint("top_selling", __name__, url_prefix="/top-selling-products")
+top_selling_bp = Blueprint("top_selling", __name__)
 
-genai.configure(api_key="AIzaSyB4124DMFesEd6NXYhzsk6BQBIuKgZmnog")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 @top_selling_bp.route('/', methods=['GET'])
 def top_selling_products():
+    """Return yearly sales summary for the top external products."""
 
-    top_5_product_ids = [p.ProductID for p in ExternalProduct.query.order_by(ExternalProduct.ProductID).limit(5).all()]
+    top_5_product_ids = [
+        p.ProductID for p in ExternalProduct.query.order_by(ExternalProduct.ProductID).limit(5).all()
+    ]
 
     if not top_5_product_ids:
-        return jsonify({"error": "No products found"}), 404
+        return jsonify({
+            "status": "error",
+            "message": "No products found in external catalog"
+        }), 404
 
     sales_data = (
         db.session.query(
@@ -31,6 +38,13 @@ def top_selling_products():
         .all()
     )
 
+    if not sales_data:
+        return jsonify({
+            "status": "success",
+            "summary_table": [],
+            "ai_analysis": "No sales data available."
+        }), 200
+
     df = pd.DataFrame([{
         "ProductID": s.ProductID,
         "Region": s.Region,
@@ -40,21 +54,47 @@ def top_selling_products():
         "Date": s.SaleDate
     } for s in sales_data])
 
-    df['Date'] = pd.to_datetime(df['Date'])
+    if df.empty:
+        return jsonify({
+            "status": "success",
+            "summary_table": [],
+            "ai_analysis": "Sales dataset was empty."
+        }), 200
+
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df.dropna(subset=['Date'], inplace=True)
+
+    if df.empty:
+        return jsonify({
+            "status": "success",
+            "summary_table": [],
+            "ai_analysis": "Sales dates were invalid."
+        }), 200
+
     df['Year'] = df['Date'].dt.year
 
-    summary_df = df.groupby(['ProductID','Region','Year','ProductName']) \
-                   .agg({'UnitsSold':'sum','Revenue':'sum'}) \
-                   .reset_index()
+    summary_df = (
+        df.groupby(['ProductID', 'Region', 'Year', 'ProductName'])
+        .agg({'UnitsSold': 'sum', 'Revenue': 'sum'})
+        .reset_index()
+    )
 
-    prompt = f"""
-    Analyze yearly sales and provide insights.
-    Data: {summary_df.to_json(orient="records")}
-    """
-
-    ai_output = model.generate_content(prompt).text.strip()
+    ai_output = ""
+    if not summary_df.empty and os.getenv("GEMINI_API_KEY"):
+        prompt = f"""
+        Analyze yearly sales and provide insights.
+        Data: {summary_df.to_json(orient="records")}
+        """
+        try:
+            ai_output = model.generate_content(prompt).text.strip()
+        except Exception as exc:
+            print("[Top Selling AI]", exc)
+            ai_output = "AI analysis unavailable."
+    else:
+        ai_output = "No summarized sales data to analyze."
 
     return jsonify({
+        "status": "success",
         "summary_table": summary_df.to_dict(orient="records"),
         "ai_analysis": ai_output
-    })
+    }), 200

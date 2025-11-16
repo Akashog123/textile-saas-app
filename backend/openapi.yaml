@@ -1,0 +1,1946 @@
+openapi: 3.0.3
+info:
+  title: SE-Textile Backend API
+  description: Dynamically generated OpenAPI spec built from registered Flask routes.
+  version: 2.0.0
+servers:
+- url: http://127.0.0.1:5001
+  description: Local development server
+security:
+- bearerAuth: []
+paths:
+  /:
+    get:
+      tags:
+      - index
+      summary: Root API information.
+      description: Root API information.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/auth/login:
+    post:
+      tags:
+      - auth
+      summary: User login (username or email + password)
+      description: Returns a JWT token and user metadata when credentials are valid.
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+        '400':
+          description: Missing username or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '403':
+          description: Professional account awaiting approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: true
+        content:
+          application/json: &id002
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+          application/x-www-form-urlencoded: *id002
+  /api/v1/ai-find-stores/:
+    post:
+      tags:
+      - ai_find_stores
+      summary: Find matching textile stores from text prompt or audio clip.
+      description: Accepts a text prompt or voice note, transcribes if necessary, and returns best-matching stores.
+      responses:
+        '200':
+          description: Matching stores returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiFindStoreResponse'
+        '400':
+          description: Missing prompt and voice note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '503':
+          description: AI key missing or transcription unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          application/json: &id001
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                  description: Customer requirement description
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                  description: Customer requirement description
+                voice_note:
+                  type: string
+                  format: binary
+                  description: Voice note audio file
+          application/x-www-form-urlencoded: *id001
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: Logout (client-side token clearing)
+      description: Returns a success message. Clients should delete stored JWTs.
+      responses:
+        '200':
+          description: Logout acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+  /api/v1/auth/register:
+    post:
+      tags:
+      - auth
+      summary: Register new users
+      description: Registers a new user for any supported role and auto-creates a shop for shop owners.
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthRegisterResponse'
+        '400':
+          description: Missing or duplicate fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error while creating user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: true
+        content:
+          application/json: &id003
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+          application/x-www-form-urlencoded: *id003
+  /api/v1/auth/session:
+    get:
+      tags:
+      - auth
+      summary: Validate current JWT session
+      description: Returns user metadata for the currently authenticated token.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Session valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/auth/verify_token:
+    post:
+      tags:
+      - auth
+      summary: Verify JWT token payload
+      description: Validates a JWT supplied in the request body and returns decoded user info.
+      responses:
+        '200':
+          description: Token valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthVerifyResponse'
+        '400':
+          description: Token missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: true
+        content:
+          application/json: &id004
+            schema:
+              $ref: '#/components/schemas/AuthVerifyRequest'
+          application/x-www-form-urlencoded: *id004
+  /api/v1/catalog/load:
+    post:
+      tags:
+      - catalog
+      summary: Load fashion catalog data from CSV
+      description: Reads the bundled catalog dataset, clears existing records, and reloads them into the database.
+      responses:
+        '200':
+          description: Catalog loaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '404':
+          description: Catalog file missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Failure while loading catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/catalog/search:
+    get:
+      tags:
+      - catalog
+      summary: Search or filter catalog items
+      description: Supports filtering by category, color, gender, season, usage, or keyword.
+      responses:
+        '200':
+          description: Filtered catalog entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogSearchResponse'
+        '500':
+          description: Server error while filtering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: keyword
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: color
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: gender
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: season
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: usage
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/catalog/view:
+    get:
+      tags:
+      - catalog
+      summary: View catalog items
+      description: Returns a limited number of catalog entries.
+      responses:
+        '200':
+          description: Catalog items returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogProduct'
+        '500':
+          description: Error fetching catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+  /api/v1/compare-images/:
+    post:
+      tags:
+      - images
+      summary: Compare uploaded image against store reference images
+      description: Accepts a single uploaded image, compares it against the curated store image set, and returns the closest match.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - input_image
+              properties:
+                input_image:
+                  type: string
+                  format: binary
+                  description: Image file to compare against the catalog of store images
+      responses:
+        '200':
+          description: Closest matching store image identified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompareImagesResponse'
+        '400':
+          description: No image provided in the request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '404':
+          description: No reference images available for comparison
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Unexpected server error during comparison
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/customer/discovery/nearby-shops:
+    get:
+      tags:
+      - discovery_portal
+      summary: Return shops located within a given radius from provided coordinates.
+      description: Return shops located within a given radius from provided coordinates.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: lat
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: lon
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: radius
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/customer/discovery/popular-shops:
+    get:
+      tags:
+      - discovery_portal
+      summary: Return popular shops with geolocation enrichment.
+      description: Return popular shops with geolocation enrichment.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/customer/discovery/search:
+    get:
+      tags:
+      - discovery_portal
+      summary: Search for fabrics or shops by keyword.
+      description: Search for fabrics or shops by keyword.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/customer/discovery/trending-fabrics:
+    get:
+      tags:
+      - discovery_portal
+      summary: Return top trending fabrics with AI-generated marketing captions.
+      description: Return top trending fabrics with AI-generated marketing captions.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/customer/services/nearby-professionals:
+    get:
+      tags:
+      - service_explorer
+      summary: Fetch professionals near a given latitude and longitude.
+      description: Uses MapMyIndia API if available; falls back to local DB if not.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: lat
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: lon
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/customer/services/services:
+    get:
+      tags:
+      - service_explorer
+      summary: Fetch all available services dynamically with optional filters.
+      description: Includes AI-generated captions for customer-facing presentation.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: price_max
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: price_min
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/customer/shops/nearby-shops:
+    get:
+      tags:
+      - shop_explorer
+      summary: Find nearby textile shops using MapMyIndia API.
+      description: Find nearby textile shops using MapMyIndia API.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: lat
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: lon
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/customer/shops/search:
+    get:
+      tags:
+      - shop_explorer
+      summary: Search both shops and fabrics dynamically.
+      description: Search both shops and fabrics dynamically.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/customer/shops/shop/<int:shop_id>:
+    get:
+      tags:
+      - shop_explorer
+      summary: Fetch detailed shop info with all its listed fabrics.
+      description: Fetch detailed shop info with all its listed fabrics.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: shop_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/v1/customer/shops/shops:
+    get:
+      tags:
+      - shop_explorer
+      summary: Fetch all registered shops with key summary details.
+      description: Fetch all registered shops with key summary details.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/distributor/export-plan:
+    get:
+      tags:
+      - distributor
+      summary: Export AI production recommendations in CSV format using live sales
+        data.
+      description: Export AI production recommendations in CSV format using live sales
+        data.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/distributor/production-plan:
+    post:
+      tags:
+      - distributor
+      summary: Analyze uploaded CSV and generate AI-based production priorities.
+      description: Analyze uploaded CSV and generate AI-based production priorities.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /api/v1/distributor/regional-demand:
+    post:
+      tags:
+      - distributor
+      summary: Generate AI-powered regional demand insights and sales forecasting.
+      description: Combines Prophet forecasting and Gemini AI-generated business insights.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /api/v1/distributor/regional-report:
+    get:
+      tags:
+      - distributor
+      summary: Generates a downloadable PDF summary of AI insights and forecast data.
+      description: Generates a downloadable PDF summary of AI insights and forecast
+        data.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/distributor/sample-format:
+    get:
+      tags:
+      - distributor
+      summary: Provide a downloadable example structure for distributor uploads.
+      description: Helps ensure users upload valid data for forecasting.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/inquiry/history:
+    get:
+      tags:
+      - inquiry
+      summary: Fetch all inquiries (notifications) made by a given user or shop.
+      description: Fetch all inquiries (notifications) made by a given user or shop.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/inquiry/submit:
+    post:
+      tags:
+      - inquiry
+      summary: Allow customers or shop owners to submit a fabric inquiry with optional
+        image/file attachment.
+      description: Automatically runs Gemini-based AI analysis on the uploaded fabric
+        image.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /api/v1/inventory/:
+    get:
+      tags:
+      - inventory
+      summary: Fetch all inventory products for a given shop.
+      description: Fetch all inventory products for a given shop.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: shop_id
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/inventory/delete:
+    delete:
+      tags:
+      - inventory
+      summary: Delete a product and its inventory entry.
+      description: Delete a product and its inventory entry.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: product_id
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/inventory/edit:
+    post:
+      tags:
+      - inventory
+      summary: Edit price or stock of a product.
+      description: Edit price or stock of a product.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          application/json: &id005
+            schema:
+              type: object
+              properties:
+                price:
+                  type: string
+                product_id:
+                  type: string
+                stock:
+                  type: string
+          application/x-www-form-urlencoded: *id005
+  /api/v1/inventory/export:
+    get:
+      tags:
+      - inventory
+      summary: Download all inventory for a shop as Excel.
+      description: Download all inventory for a shop as Excel.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: shop_id
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/inventory/import:
+    post:
+      tags:
+      - inventory
+      summary: Upload inventory via CSV/Excel for a shop.
+      description: Upload inventory via CSV/Excel for a shop.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                shop_id:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+  /api/v1/marketing/allowed-extensions:
+    get:
+      tags:
+      - marketing
+      summary: Return allowed file types for upload.
+      description: Return allowed file types for upload.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/marketing/generate:
+    post:
+      tags:
+      - marketing
+      summary: 'Handles product uploads (CSV/XLSX/Image) and uses AI to generate:'
+      description: '- Product captions (via Gemini)
+
+        - Sales trends (if applicable)
+
+        - AI-generated marketing poster (for image uploads)'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /api/v1/pdf/generate:
+    post:
+      tags:
+      - pdf
+      summary: Generate a PDF using structured JSON content.
+      description: Generate a PDF using structured JSON content.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          application/json: &id006
+            schema:
+              type: object
+              properties:
+                footer:
+                  type: string
+                sections:
+                  type: string
+                subtitle:
+                  type: string
+                summary:
+                  type: string
+                title:
+                  type: string
+          application/x-www-form-urlencoded: *id006
+  /api/v1/production/export-plan:
+    get:
+      tags:
+      - production
+      summary: Export a production plan CSV derived from live sales data.
+      description: Export a production plan CSV derived from live sales data.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/production/production-plan:
+    post:
+      tags:
+      - production
+      summary: Upload sales CSV and get AI-powered production planning insights.
+      description: Upload sales CSV and get AI-powered production planning insights.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /api/v1/products/:
+    get:
+      tags:
+      - product
+      summary: Fetch all products dynamically with filtering and Gemini AI captions.
+      description: 'Supports filters: category, price_min, price_max, search.'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: price_max
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: price_min
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/products/<int:product_id>:
+    get:
+      tags:
+      - product
+      summary: Fetch detailed product information, including AI caption.
+      description: Fetch detailed product information, including AI caption.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/v1/products/suggested:
+    get:
+      tags:
+      - product
+      summary: Suggest top products dynamically using Prophet trend analysis
+      description: and Gemini AI captions.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/profile/:
+    get:
+      tags:
+      - profile
+      summary: Fetch the logged-in user's profile details.
+      description: Fetch the logged-in user's profile details.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/profile/update:
+    put:
+      tags:
+      - profile
+      summary: Update current user's profile fields dynamically.
+      description: Only allows editing of basic info (not role or approval).
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/region-demand-heatmap/:
+    get:
+      tags:
+      - heatmap
+      summary: Return regional demand heatmap points with basic trend analysis.
+      description: Return regional demand heatmap points with basic trend analysis.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/shop/dashboard:
+    get:
+      tags:
+      - shop
+      summary: AI-powered shop dashboard
+      description: '- Reads uploaded monthly CSV
+
+        - Generates analytics & AI insights
+
+        - Creates next-month synthetic forecast automatically'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: shop_id
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/shop/sales/export:
+    get:
+      tags:
+      - shop
+      summary: API endpoint
+      description: API endpoint
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: shop_id
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/v1/shop/upload_sales_data:
+    post:
+      tags:
+      - shop
+      summary: API endpoint
+      description: API endpoint
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                shop_id:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+  /api/v1/stores/:
+    get:
+      tags:
+      - stores
+      summary: API endpoint
+      description: API endpoint
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/top-selling-products/:
+    get:
+      tags:
+      - top_selling
+      summary: Return yearly sales summary for the top external products.
+      description: Return yearly sales summary for the top external products.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /api/v1/trending-shops/:
+    get:
+      tags:
+      - trending
+      summary: Return per-store trend data with optional AI insights.
+      description: Return per-store trend data with optional AI insights.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /datasets/<path:filename>:
+    get:
+      tags:
+      - serve_dataset_file
+      summary: Serve dataset files (images) for frontend access.
+      description: Serve dataset files (images) for frontend access.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+  /docs:
+    get:
+      tags:
+      - swagger_docs
+      summary: Serve Swagger UI for interactive API exploration.
+      description: Serve Swagger UI for interactive API exploration.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /health:
+    get:
+      tags:
+      - health_check
+      summary: Simple health check for monitoring.
+      description: Simple health check for monitoring.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /openapi.yaml:
+    get:
+      tags:
+      - openapi_spec
+      summary: Build and return an OpenAPI specification generated from current routes.
+      description: Build and return an OpenAPI specification generated from current
+        routes.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+  /uploads/<path:filename>:
+    get:
+      tags:
+      - serve_upload
+      summary: Serve uploaded files from /uploads folder.
+      description: Serve uploaded files from /uploads folder.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+      parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    GenericSuccess:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+    GenericError:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        error:
+          type: string
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        full_name:
+          type: string
+        shop_id:
+          type: integer
+        approved:
+          type: boolean
+    AuthLoginResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    AuthLoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Username or email address
+        password:
+          type: string
+          format: password
+          description: Plaintext password to authenticate
+    AuthRegisterRequest:
+      type: object
+      required:
+        - full_name
+        - username
+        - password
+        - role
+      properties:
+        full_name:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+        role:
+          type: string
+        email:
+          type: string
+        contact:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+    AuthRegisterResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    AuthSessionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    AuthVerifyRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+    AuthVerifyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    CatalogProduct:
+      type: object
+      properties:
+        product_id:
+          type: string
+        product_name:
+          type: string
+        category:
+          type: string
+        subcategory:
+          type: string
+        article_type:
+          type: string
+        color:
+          type: string
+        gender:
+          type: string
+        season:
+          type: string
+        usage:
+          type: string
+        image_url:
+          type: string
+        price:
+          type: number
+    CatalogSearchResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        total_results:
+          type: integer
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogProduct'
+    AiFindStoreMatch:
+      type: object
+      properties:
+        StoreName:
+          type: string
+        City:
+          type: string
+        RegionName:
+          type: string
+        Product_description:
+          type: string
+        Latitude:
+          type: number
+        Longitude:
+          type: number
+        ImagePath:
+          type: string
+        reason:
+          type: string
+    AiFindStoreResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        matches_found:
+          type: integer
+        matching_stores:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiFindStoreMatch'
+    CompareImagesResponse:
+      type: object
+      properties:
+        best_match_file:
+          type: string
+          description: Relative path to the closest matching reference image
+        similarity_score:
+          type: number
+          format: float
+          description: Cosine similarity score ranging from -1 to 1

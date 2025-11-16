@@ -341,7 +341,6 @@
     </div>
 
     <!-- Browse Available Products Section -->
-    <!-- ✅ Browse Available Products Section -->
     <div class="mt-4">
       <div class="card modern-card">
         <div class="card-body">
@@ -364,25 +363,15 @@
             </div>
           </div>
 
-          <!-- ✅ Loader while fetching -->
-          <div v-if="catalogLoading" class="text-center py-4 text-muted">
-            <i class="bi bi-arrow-repeat spin me-2"></i> Loading products...
-          </div>
-
-          <!-- ✅ Catalog Grid (uses live data) -->
-          <div v-else class="products-grid">
+          <div class="products-grid">
             <div
               class="product-grid-card"
-              v-for="(product, index) in catalog"
+              v-for="(product, index) in availableProducts"
               :key="index"
               @click="viewProductDetails(product)"
             >
               <div class="product-grid-image">
-                <img
-                  :src="product.image_url"
-                  :alt="product.product_name"
-                  @error="onImgError"
-                />
+                <img :src="product.image" :alt="product.name" />
                 <div class="product-overlay">
                   <button
                     class="btn btn-light btn-sm"
@@ -391,47 +380,48 @@
                     <i class="bi bi-eye"></i> Quick View
                   </button>
                 </div>
+                <div class="product-discount-badge" v-if="product.discount">
+                  ₹{{ product.discount }} OFF
+                </div>
               </div>
-
               <div class="product-grid-info p-3">
                 <div
                   class="d-flex justify-content-between align-items-start mb-2"
                 >
-                  <h6 class="product-grid-name mb-0">
-                    {{ product.product_name || "Untitled" }}
-                  </h6>
+                  <h6 class="product-grid-name mb-0">{{ product.name }}</h6>
                   <div class="rating">
                     <i class="bi bi-star-fill text-warning"></i>
-                    <span class="small">{{ product.rating || "4.0" }}</span>
+                    <span class="small">{{ product.rating }}</span>
                   </div>
                 </div>
-
                 <p class="product-description mb-2">
-                  {{ product.category || "General Fabric" }}
+                  {{ product.description }}
                 </p>
-
                 <div
                   class="d-flex justify-content-between align-items-center mb-2"
                 >
                   <div class="supplier-info">
-                    <small class="text-muted d-block">Category</small>
-                    <strong class="small">{{
-                      product.category || "N/A"
-                    }}</strong>
+                    <small class="text-muted d-block">Sold by</small>
+                    <strong class="small">{{ product.soldBy }}</strong>
                   </div>
                   <div class="stock-info text-end">
-                    <small class="text-muted d-block">Color</small>
-                    <strong class="small text-secondary">{{
-                      product.color || "N/A"
-                    }}</strong>
+                    <small class="text-muted d-block">Stock</small>
+                    <strong
+                      class="small"
+                      :class="
+                        product.stock > 10 ? 'text-success' : 'text-warning'
+                      "
+                    >
+                      {{ product.stock }} units
+                    </strong>
                   </div>
                 </div>
-
                 <div class="product-grid-footer">
                   <div class="price-section">
-                    <span class="current-price">
-                      ₹{{ product.price ? product.price : "—" }}
-                    </span>
+                    <span class="current-price">{{ product.price }}</span>
+                    <span class="original-price" v-if="product.originalPrice">{{
+                      product.originalPrice
+                    }}</span>
                   </div>
                   <button
                     class="btn btn-gradient btn-sm"
@@ -442,14 +432,6 @@
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- ✅ Empty State -->
-          <div
-            v-if="!catalogLoading && catalog.length === 0"
-            class="text-center py-4 text-muted"
-          >
-            No products available in catalog.
           </div>
         </div>
       </div>
@@ -516,64 +498,69 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import api from "../../api/axios"; // ✅ main backend API
-import catalogApi from "../../api/apiCatalog"; // ✅ catalog API for dataset
 
-// ---------------------------------------------
-// 🌍 Reactive State (Preserve UI placeholders)
-// ---------------------------------------------
+// Metrics Data
 const metrics = ref([
   {
     label: "Weekly Sales",
-    value: "₹0",
-    change: "+0%",
-    changeClass: "neutral",
-    changeIcon: "bi bi-dash",
+    value: "₹26,700",
+    change: "+12%",
+    changeClass: "positive",
+    changeIcon: "bi bi-arrow-up",
     icon: "bi bi-currency-rupee",
     iconClass: "bg-success-soft",
   },
   {
     label: "Pending Reorders",
-    value: "0",
-    change: "0",
-    changeClass: "neutral",
-    changeIcon: "bi bi-dash",
+    value: "14",
+    change: "-3",
+    changeClass: "positive",
+    changeIcon: "bi bi-arrow-down",
     icon: "bi bi-cart-check",
     iconClass: "bg-warning-soft",
   },
   {
     label: "Total Orders",
-    value: "0",
-    change: "+0%",
-    changeClass: "neutral",
-    changeIcon: "bi bi-dash",
+    value: "147",
+    change: "+8%",
+    changeClass: "positive",
+    changeIcon: "bi bi-arrow-up",
     icon: "bi bi-bag-check",
     iconClass: "bg-primary-soft",
   },
   {
     label: "Customer Rating",
-    value: "0",
-    change: "+0",
-    changeClass: "neutral",
-    changeIcon: "bi bi-dash",
+    value: "4.8",
+    change: "+0.3",
+    changeClass: "positive",
+    changeIcon: "bi bi-arrow-up",
     icon: "bi bi-star-fill",
     iconClass: "bg-info-soft",
   },
 ]);
 
-// Chart Points (Dynamic later)
-const chartPoints = ref([]);
+// Chart Points
+const chartPoints = ref([
+  { x: 0, y: 140, value: 3200 },
+  { x: 50, y: 130, value: 3500 },
+  { x: 100, y: 100, value: 4200 },
+  { x: 150, y: 110, value: 3900 },
+  { x: 200, y: 70, value: 5100 },
+  { x: 250, y: 60, value: 5400 },
+  { x: 300, y: 50, value: 5800 },
+  { x: 350, y: 35, value: 6200 },
+]);
 
-// Forecasts (Static placeholders retained)
+// Forecasts
 const forecasts = ref([
   {
     name: "Cotton",
     icon: "bi bi-graph-up-arrow fs-3",
     color: "#10b981",
     iconBg: "bg-success-soft",
-    trend: "+0%",
-    trendIcon: "bi bi-dash",
-    badgeClass: "trend-stable",
+    trend: "+20%",
+    trendIcon: "bi bi-arrow-up",
+    badgeClass: "trend-up",
   },
   {
     name: "Silk",
@@ -589,23 +576,146 @@ const forecasts = ref([
     icon: "bi bi-graph-down-arrow fs-3",
     color: "#ef4444",
     iconBg: "bg-danger-soft",
-    trend: "-0%",
-    trendIcon: "bi bi-dash",
-    badgeClass: "trend-stable",
+    trend: "-15%",
+    trendIcon: "bi bi-arrow-down",
+    badgeClass: "trend-down",
   },
 ]);
 
-// AI Insights and Reorder Products (filled later from backend)
-const aiInsights = ref([]);
-const reorderProducts = ref([]);
+// AI Insights
+const aiInsights = ref([
+  {
+    icon: "bi bi-lightbulb-fill",
+    title: "Festive Season Alert",
+    description:
+      "Expect 20% increase in silk fabric demand during upcoming festive season. Consider increasing stock.",
+  },
+  {
+    icon: "bi bi-star-fill",
+    title: "Popular Product",
+    description:
+      "Handwoven Cotton is trending. Restock recommended to meet demand surge.",
+  },
+]);
 
-// ✅ Catalog Data
-const catalog = ref([]);
-const catalogLoading = ref(true);
+// Reorder Products with Images
+const reorderProducts = ref([
+  {
+    name: "Premium Banarasi Silk",
+    image:
+      "https://images.unsplash.com/photo-1757382642968-0c8c9adbde0b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    supplier: "Varanasi Textiles",
+    quantity: 23,
+    price: "₹1,999",
+    sku: "KMC7k1237938",
+  },
+  {
+    name: "Handwoven Cotton Fabric",
+    image:
+      "https://images.unsplash.com/photo-1630312584379-ee017b579993?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    supplier: "Gujarat Mills",
+    quantity: 45,
+    price: "₹899",
+    sku: "KMHCL25827",
+  },
+  {
+    name: "Designer Velvet Cloth",
+    image:
+      "https://images.unsplash.com/photo-1623658580841-217b1726a993?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    supplier: "Luxury Fabrics Co",
+    quantity: 18,
+    price: "₹2,499",
+    sku: "RTSJLKA357648",
+  },
+  {
+    name: "Pure Linen Fabric",
+    image:
+      "https://images.unsplash.com/photo-1616057732603-0439d9ace394?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
+    supplier: "Natural Textiles",
+    quantity: 32,
+    price: "₹1,299",
+    sku: "KPSJGVEA2533",
+  },
+  {
+    name: "Printed Cotton Blend",
+    image:
+      "https://images.unsplash.com/photo-1634225288911-b7622186f517?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
+    supplier: "Color Fabrics Ltd",
+    quantity: 56,
+    price: "₹799",
+    sku: "JKHYRSH44432",
+  },
+]);
 
-function onImgError(e) {
-  e.target.src = "https://via.placeholder.com/300x300?text=No+Image";
-}
+// Available Products with Images
+const availableProducts = ref([
+  {
+    name: "Handwoven Banarasi Silk",
+    image:
+      "https://images.unsplash.com/photo-1630961680768-998a170045fa?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    description: "Premium quality silk fabric with intricate golden patterns",
+    price: "₹2,499",
+    originalPrice: "₹2,999",
+    discount: 500,
+    soldBy: "Heritage Textiles",
+    rating: 4.8,
+    stock: 15,
+  },
+  {
+    name: "Organic Cotton Fabric",
+    image:
+      "https://images.unsplash.com/photo-1631089819675-ce4528460a32?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    description: "Soft and breathable pure cotton material",
+    price: "₹899",
+    originalPrice: "₹1,199",
+    discount: 300,
+    soldBy: "Green Fabrics Co",
+    rating: 4.6,
+    stock: 28,
+  },
+  {
+    name: "Luxury Velvet Cloth",
+    image:
+      "https://images.unsplash.com/photo-1613132962851-d054d7248a35?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    description: "Rich velvet texture perfect for premium garments",
+    price: "₹3,299",
+    soldBy: "Royal Fabrics",
+    rating: 4.9,
+    stock: 8,
+  },
+  {
+    name: "Pure Linen Material",
+    image:
+      "https://images.unsplash.com/photo-1666112514180-193096c14938?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    description: "Natural linen with excellent breathability",
+    price: "₹1,799",
+    originalPrice: "₹2,299",
+    discount: 500,
+    soldBy: "Eco Textiles",
+    rating: 4.5,
+    stock: 22,
+  },
+  {
+    name: "Vibrant Printed Cotton",
+    image:
+      "https://images.unsplash.com/photo-1639155330052-ef15046d5f09?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
+    description: "Colorful prints on soft cotton blend",
+    price: "₹1,099",
+    soldBy: "Modern Prints Ltd",
+    rating: 4.7,
+    stock: 35,
+  },
+  {
+    name: "Traditional Ikkat Silk",
+    image:
+      "https://images.unsplash.com/photo-1630961680574-158007a1fb73?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
+    description: "Authentic ikkat pattern silk fabric",
+    price: "₹3,499",
+    soldBy: "Craft Textiles",
+    rating: 4.8,
+    stock: 12,
+  },
+]);
 
 // Product Filters
 const productFilters = ref([
@@ -616,144 +726,81 @@ const productFilters = ref([
 ]);
 
 const selectedFilter = ref("all");
+
+// Carousel Controls
 const carouselTrack = ref(null);
 const showLeftArrow = ref(false);
 const showRightArrow = ref(true);
+
+// Quick View
 const showQuickView = ref(false);
 const selectedProduct = ref(null);
+
+// Toast
 const showToast = ref(false);
 const toastMessage = ref("");
 const toastIcon = ref("bi bi-check-circle-fill");
 
-// ---------------------------------------------
-// ⚙️ Toast Utility
-// ---------------------------------------------
-const showToastMessage = (msg, icon = "bi bi-info-circle-fill") => {
-  toastMessage.value = msg;
-  toastIcon.value = icon;
+// Methods
+const uploadSalesData = () => {
+  toastMessage.value = "Upload dialog opened";
+  toastIcon.value = "bi bi-info-circle-fill";
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
 
-// ---------------------------------------------
-// 📁 File Upload Logic (Working Upload Button)
-// ---------------------------------------------
-const fileInput = document.createElement("input");
-fileInput.type = "file";
-fileInput.accept = ".csv, .xlsx";
-fileInput.style.display = "none";
-document.body.appendChild(fileInput);
-
-const uploadSalesData = async () => {
-  fileInput.click();
-
-  fileInput.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.id) {
-      showToastMessage(
-        "User not found. Please log in again.",
-        "bi bi-exclamation-triangle"
-      );
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("shop_id", user.id);
-
-      showToastMessage("Uploading sales data...", "bi bi-upload");
-      const response = await api.post("/shop/upload_sales_data", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (response.data.status === "success") {
-        showToastMessage(
-          "Sales data uploaded successfully!",
-          "bi bi-check-circle-fill"
-        );
-        setTimeout(() => window.location.reload(), 1200);
-      } else {
-        showToastMessage(
-          response.data.message || "Upload failed.",
-          "bi bi-exclamation-triangle"
-        );
-      }
-    } catch (err) {
-      console.error("Upload Error:", err);
-      showToastMessage("Error uploading file.", "bi bi-exclamation-triangle");
-    }
-  };
+const exportReport = () => {
+  toastMessage.value = "Exporting report...";
+  toastIcon.value = "bi bi-download";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
 };
 
-// ---------------------------------------------
-// 📤 Report Export Logic
-// ---------------------------------------------
-const exportReport = async () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.id) {
-      showToastMessage(
-        "User not found. Please log in again.",
-        "bi bi-exclamation-triangle"
-      );
-      return;
-    }
+const viewSalesReport = () => {
+  toastMessage.value = "Opening detailed sales report...";
+  toastIcon.value = "bi bi-file-earmark-bar-graph";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
 
-    showToastMessage("Generating report...", "bi bi-download");
+const viewDetailedChart = () => {
+  toastMessage.value = "Opening chart analytics...";
+  toastIcon.value = "bi bi-graph-up";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
 
-    const response = await api.get("/shop/sales/export", {
-      params: { shop_id: user.id },
-      responseType: "blob",
-    });
+const viewForecastDetails = (forecast) => {
+  toastMessage.value = `Viewing ${forecast.name} forecast details`;
+  toastIcon.value = "bi bi-calendar-check";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "sales_report.csv");
-    document.body.appendChild(link);
-    link.click();
+const applyInsight = (insight) => {
+  toastMessage.value = `Applied: ${insight.title}`;
+  toastIcon.value = "bi bi-check-circle-fill";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
 
-    showToastMessage(
-      "Report downloaded successfully!",
-      "bi bi-check-circle-fill"
-    );
-  } catch (err) {
-    console.error("Export Error:", err);
-    showToastMessage("Failed to export report.", "bi bi-exclamation-triangle");
+const viewAllSuggestions = () => {
+  toastMessage.value = "Loading all suggestions...";
+  toastIcon.value = "bi bi-grid-3x3-gap";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
+
+const scrollCarousel = (direction) => {
+  const track = carouselTrack.value;
+  const scrollAmount = 280;
+  if (direction === "left") {
+    track.scrollLeft -= scrollAmount;
+  } else {
+    track.scrollLeft += scrollAmount;
   }
 };
 
-// ---------------------------------------------
-// 🔧 Other existing methods
-// ---------------------------------------------
-const viewSalesReport = () =>
-  showToastMessage(
-    "Opening detailed sales report...",
-    "bi bi-file-earmark-bar-graph"
-  );
-const viewDetailedChart = () =>
-  showToastMessage("Opening chart analytics...", "bi bi-graph-up");
-const viewForecastDetails = (f) =>
-  showToastMessage(
-    `Viewing ${f.name} forecast details`,
-    "bi bi-calendar-check"
-  );
-const applyInsight = (i) =>
-  showToastMessage(`Applied: ${i.title}`, "bi bi-check-circle-fill");
-const viewAllSuggestions = () =>
-  showToastMessage("Loading all suggestions...", "bi bi-grid-3x3-gap");
-
-const scrollCarousel = (dir) => {
-  const track = carouselTrack.value;
-  const scrollAmount = 280;
-  if (!track) return;
-  track.scrollLeft += dir === "left" ? -scrollAmount : scrollAmount;
-  updateArrows();
-};
 const updateArrows = () => {
   const track = carouselTrack.value;
   if (track) {
@@ -763,122 +810,53 @@ const updateArrows = () => {
   }
 };
 
-const quickView = (p) => {
-  selectedProduct.value = p;
+const viewProduct = (product) => {
+  selectedProduct.value = product;
   showQuickView.value = true;
 };
+
+const addToCart = (product) => {
+  toastMessage.value = `${product.name} added to cart!`;
+  toastIcon.value = "bi bi-cart-check-fill";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
+
+const selectFilter = (filterId) => {
+  selectedFilter.value = filterId;
+  toastMessage.value = `Filter applied: ${productFilters.value.find((f) => f.id === filterId).label}`;
+  toastIcon.value = "bi bi-funnel-fill";
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
+
+const viewProductDetails = (product) => {
+  selectedProduct.value = product;
+  showQuickView.value = true;
+};
+
+const quickView = (product) => {
+  selectedProduct.value = product;
+  showQuickView.value = true;
+};
+
 const closeQuickView = () => {
   showQuickView.value = false;
   selectedProduct.value = null;
 };
-const addToCart = (p) =>
-  showToastMessage(`${p.name} added to cart!`, "bi bi-cart-check-fill");
 
-// ---------------------------------------------
-// 🔍 Catalog Filters (Dynamic Buttons)
-// ---------------------------------------------
-const selectFilter = async (id) => {
-  selectedFilter.value = id;
-  const f = productFilters.value.find((f) => f.id === id);
-  showToastMessage(`Filter applied: ${f.label}`, "bi bi-funnel-fill");
-
-  try {
-    let params = {};
-    if (id === "category") params.category = "Apparel";
-    else if (id === "price") params.keyword = "Jeans";
-    else if (id === "brand") params.keyword = "Turtle";
-
-    // If "All" selected, fetch default view
-    const endpoint =
-      id === "all"
-        ? "/view?limit=12"
-        : "/search";
-
-    const response = await catalogApi.get(endpoint, { params });
-    catalog.value = (response.data.products || response.data || []).map(
-      (item) => ({
-        ...item,
-        image_url: item.image_url.startsWith("http")
-          ? item.image_url
-          : `http://127.0.0.1:5001${item.image_url}`,
-      })
-    );
-  } catch (err) {
-    console.error("Filter Error:", err);
-    showToastMessage("Failed to filter products.", "bi bi-exclamation-triangle");
-  }
+const showTooltip = (point) => {
+  console.log("Sales:", point.value);
 };
 
-const showTooltip = (point) => console.log("Sales:", point.value);
-const hideTooltip = () => console.log("Hide tooltip");
+const hideTooltip = () => {
+  console.log("Hide tooltip");
+};
 
-// ---------------------------------------------
-// 🚀 Backend Sync Logic
-// ---------------------------------------------
-onMounted(async () => {
+onMounted(() => {
   updateArrows();
-
-  try {
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.id) {
-      showToastMessage(
-        "User not found. Please log in again.",
-        "bi bi-exclamation-triangle"
-      );
-      return;
-    }
-
-    const response = await api.get("/shop/dashboard", {
-      params: { shop_id: user.id },
-    });
-
-    if (response.data.status === "success" && response.data.data) {
-      const data = response.data.data;
-
-      metrics.value[0].value = data.weekly_sales || "₹0";
-      metrics.value[1].value = String(data.pending_reorders ?? "0");
-      metrics.value[2].value = String(data.total_orders ?? "0");
-      metrics.value[3].value = String(data.customer_rating ?? "0");
-
-      aiInsights.value = data.ai_insights || [];
-      reorderProducts.value = data.reorder_suggestions || [];
-
-      chartPoints.value = (data.trend_chart || []).map((item, idx) => ({
-        x: idx * 50,
-        y: 200 - item.revenue / 100,
-        value: item.revenue,
-      }));
-    } else {
-      showToastMessage(
-        response.data.message || "Failed to load dashboard data."
-      );
-    }
-  } catch (err) {
-    console.error("Dashboard Error:", err);
-    showToastMessage(
-      "Unable to fetch dashboard data.",
-      "bi bi-exclamation-triangle"
-    );
-  }
-
-  // ✅ Load initial catalog products
-  try {
-    const catalogRes = await catalogApi.get("/view?limit=12");
-    catalog.value = (catalogRes.data || []).map((item) => ({
-      ...item,
-      image_url: item.image_url.startsWith("http")
-        ? item.image_url
-        : `http://127.0.0.1:5001${item.image_url}`,
-    }));
-  } catch (error) {
-    console.error("Catalog Fetch Error:", error);
-    catalog.value = [];
-  } finally {
-    catalogLoading.value = false;
-  }
 });
 </script>
-
 
 <style scoped>
 /* ===== Base Styles ===== */
@@ -1003,7 +981,9 @@ h6.card-title {
 .metric-card {
   border-radius: 16px;
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.8);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1029,7 +1009,9 @@ h6.card-title {
 
 .metric-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .metric-label {

@@ -6,17 +6,15 @@ from routes.auth_routes import token_required
 
 profile_bp = Blueprint("profile", __name__)
 
-# ───────────────────────────────────────────────
-# 👤 Fetch Current User Profile
-# ───────────────────────────────────────────────
-@profile_bp.route("/profile", methods=["GET"])
+# Fetch Current User Profile
+@profile_bp.route("/", methods=["GET"])
 @token_required
-def get_profile(current_user):
+def get_profile(decoded):
     """
     Fetch the logged-in user's profile details.
     """
     try:
-        user = User.query.get(current_user.id)
+        user = User.query.get(decoded.get("user_id"))
         if not user:
             return jsonify({"status": "error", "message": "User not found"}), 404
 
@@ -50,19 +48,17 @@ def get_profile(current_user):
         }), 500
 
 
-# ───────────────────────────────────────────────
-# ✏️ Update User Profile
-# ───────────────────────────────────────────────
-@profile_bp.route("/profile/update", methods=["PUT"])
+# Update User Profile
+@profile_bp.route("/update", methods=["PUT"])
 @token_required
-def update_profile(current_user):
+def update_profile(decoded):
     """
     Update current user's profile fields dynamically.
     Only allows editing of basic info (not role or approval).
     """
     try:
         data = request.get_json() or {}
-        user = User.query.get(current_user.id)
+        user = User.query.get(decoded.get("user_id"))
 
         if not user:
             return jsonify({"status": "error", "message": "User not found"}), 404

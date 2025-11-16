@@ -45,7 +45,7 @@
             class="btn btn-outline-secondary btn-sm"
             @click.stop="$refs.fileInput.click()"
           >
-            <i class="bi bi-folder2-open"></i> Import Image/csv/xlsx
+            <i class="bi bi-folder2-open"></i> Import csv/xlsx
           </button>
         </div>
 
@@ -58,7 +58,6 @@
         </div>
 
         <div class="row g-3">
-          <!-- 🖼️ LEFT SIDE: IMAGE / POSTER -->
           <div class="col-md-6">
             <h6>Review and Post Your Content</h6>
             <div class="border rounded p-3 bg-light" style="min-height: 250px">
@@ -72,26 +71,9 @@
                   Image will be generated here
                 </div>
               </div>
-
               <div v-else class="text-center">
                 <div class="mb-2 fw-semibold">Generated Marketing Image</div>
-
-                <!-- ✅ Show Poster Image if available -->
                 <div
-                  v-if="posterUrl"
-                  class="rounded overflow-hidden mb-3 d-flex align-items-center justify-content-center"
-                  style="height: 150px; background-color: #f8f9fa"
-                >
-                  <img
-                    :src="posterUrl"
-                    alt="AI Poster"
-                    style="max-height: 100%; max-width: 100%; object-fit: cover"
-                  />
-                </div>
-
-                <!-- ⚙️ Fallback placeholder before AI image loads -->
-                <div
-                  v-else
                   class="bg-secondary rounded mb-3 d-flex align-items-center justify-content-center"
                   style="height: 150px"
                 >
@@ -99,12 +81,7 @@
                     ><i class="bi bi-palette-fill"></i
                   ></span>
                 </div>
-
-                <button
-                  v-if="posterUrl"
-                  class="btn btn-sm btn-outline-primary"
-                  @click="downloadPoster"
-                >
+                <button class="btn btn-sm btn-outline-primary">
                   <svg width="16" height="16" fill="currentColor" class="me-1">
                     <path
                       d="M8 2v12M2 8h12"
@@ -115,18 +92,10 @@
                   </svg>
                   Download Image
                 </button>
-                <button
-                  v-else
-                  class="btn btn-sm btn-outline-secondary"
-                  disabled
-                >
-                  <i class="bi bi-hourglass-split me-1"></i> Generating...
-                </button>
               </div>
             </div>
           </div>
 
-          <!-- ✍️ RIGHT SIDE: CAPTION -->
           <div class="col-md-6">
             <h6>&nbsp;</h6>
             <div class="border rounded p-3 bg-light" style="min-height: 250px">
@@ -144,15 +113,14 @@
               </div>
               <div v-else>
                 <h6>Product Name</h6>
-                <p class="small" v-if="aiCaption">{{ aiCaption }}</p>
-                <p class="small text-muted" v-else>
-                  Caption will appear here after AI processing...
+                <p class="small mb-2"><strong>AI-generated Caption:</strong></p>
+                <p class="small">
+                  Handwoven elegance! Our latest premium silk collection brings
+                  together traditional craft and modern design. Perfect for
+                  festive occasions. Limited stock available!
                 </p>
                 <div class="d-flex gap-2 mt-3">
-                  <button
-                    class="btn btn-sm btn-outline-secondary"
-                    @click="copyCaption"
-                  >
+                  <button class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-files"></i> Copy
                   </button>
                   <button class="btn btn-sm btn-outline-primary">
@@ -181,105 +149,26 @@
 
 <script setup>
 import { ref } from "vue";
-import api from "../../api/axios"; // ✅ shared API instance
 
-// ───────────────────────────────────────────────
-// Reactive state
-// ───────────────────────────────────────────────
 const uploadedFile = ref(null);
-const aiCaption = ref("");
-const previewUrl = ref("");
-const posterUrl = ref("");
-const posterPrompt = ref("");
-const loading = ref(false);
 
-// ───────────────────────────────────────────────
-// File Upload Handlers
-// ───────────────────────────────────────────────
-const handleFileUpload = async (event) => {
+const handleFileUpload = (event) => {
   const file = event.target.files[0];
   if (file) {
     uploadedFile.value = file;
-    resetOutputs();
-    await uploadToMarketingAPI(file);
+    setTimeout(() => {
+      console.log("File processed:", file.name);
+    }, 1000);
   }
 };
 
-const handleFileDrop = async (event) => {
-  event.preventDefault();
+const handleFileDrop = (event) => {
   const file = event.dataTransfer.files[0];
   if (file) {
     uploadedFile.value = file;
-    resetOutputs();
-    await uploadToMarketingAPI(file);
-  }
-};
-
-// ───────────────────────────────────────────────
-// Helper — Clear old outputs before a new upload
-// ───────────────────────────────────────────────
-const resetOutputs = () => {
-  aiCaption.value = "";
-  previewUrl.value = "";
-  posterUrl.value = "";
-  posterPrompt.value = "";
-};
-
-// ───────────────────────────────────────────────
-// Upload to Flask API → Get AI Caption + Poster
-// ───────────────────────────────────────────────
-const uploadToMarketingAPI = async (file) => {
-  try {
-    loading.value = true;
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("message", "Generate marketing caption");
-    formData.append("shop_id", "1");
-
-    const response = await api.post("/marketing/generate", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    const result = response.data?.result;
-    if (result) {
-      aiCaption.value = result.caption || "AI caption not available.";
-      previewUrl.value = result.preview || "";
-      posterUrl.value = result.poster || "";
-      posterPrompt.value = result.poster_prompt || "";
-
-      console.log("✅ AI Marketing Result:", result);
-    } else {
-      console.warn("⚠️ No AI result returned from backend.");
-    }
-  } catch (error) {
-    console.error("❌ Marketing Upload Error:", error);
-    alert("Failed to generate AI marketing content. Please try again.");
-  } finally {
-    loading.value = false;
-  }
-};
-
-// ───────────────────────────────────────────────
-// Copy / Download helpers (for caption & poster)
-// ───────────────────────────────────────────────
-const copyCaption = () => {
-  if (aiCaption.value) {
-    navigator.clipboard.writeText(aiCaption.value);
-    alert("✅ Caption copied to clipboard!");
-  }
-};
-
-const downloadPoster = () => {
-  if (posterUrl.value) {
-    const link = document.createElement("a");
-    link.href = posterUrl.value;
-    link.download = "AI_Marketing_Poster.png";
-    link.click();
   }
 };
 </script>
-
 
 <style scoped>
 .shop-marketing-tab {
@@ -294,7 +183,6 @@ const downloadPoster = () => {
     opacity: 0;
     transform: translateY(20px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -356,7 +244,6 @@ const downloadPoster = () => {
     opacity: 0;
     transform: translateX(-20px);
   }
-
   to {
     opacity: 1;
     transform: translateX(0);

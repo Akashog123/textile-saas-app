@@ -14,7 +14,9 @@ api.interceptors.request.use(cfg => {
     const user = JSON.parse(localStorage.getItem("user"));
     const token = user?.token || localStorage.getItem("token");
     if (token) cfg.headers.Authorization = `Bearer ${token}`;
-  } catch (e) {}
+  } catch (e) {
+    // ignore parse errors
+  }
   return cfg;
 });
 

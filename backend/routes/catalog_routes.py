@@ -6,9 +6,8 @@ import random
 
 catalog_bp = Blueprint("catalog", __name__)
 
-# -----------------------------
-# 📥 LOAD CATALOG INTO DATABASE
-# -----------------------------
+
+# LOAD CATALOG INTO DATABASE
 @catalog_bp.route("/load", methods=["POST"])
 def load_catalog():
     try:
@@ -61,9 +60,7 @@ def load_catalog():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# -----------------------------
-# 📤 VIEW CATALOG PRODUCTS
-# -----------------------------
+# VIEW CATALOG PRODUCTS
 @catalog_bp.route("/view", methods=["GET"])
 def view_catalog():
     try:
@@ -74,9 +71,7 @@ def view_catalog():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# -----------------------------
-# 🔍 SEARCH / FILTER PRODUCTS
-# -----------------------------
+#  SEARCH / FILTER PRODUCTS
 @catalog_bp.route("/search", methods=["GET"])
 def search_catalog():
     try:
@@ -89,6 +84,12 @@ def search_catalog():
         season = request.args.get("season")
         usage = request.args.get("usage")
         keyword = request.args.get("keyword")
+
+        if not keyword:
+            return jsonify({
+                "status": "error",
+                "message": "Query parameter 'keyword' is required to search the catalog"
+            }), 400
 
         if category:
             query = query.filter(ProductCatalog.category.ilike(f"%{category}%"))

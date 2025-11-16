@@ -16,9 +16,7 @@ INSTANCE_FOLDER = "instance"
 os.makedirs(INSTANCE_FOLDER, exist_ok=True)
 
 
-# ───────────────────────────────────────────────
-# 📊 AI-POWERED SHOP DASHBOARD + AUTO NEXT-MONTH FORECAST
-# ───────────────────────────────────────────────
+# GET: AI-POWERED SHOP DASHBOARD + AUTO NEXT-MONTH FORECAST
 @shop_bp.route("/dashboard", methods=["GET"])
 def shop_dashboard():
     """
@@ -50,9 +48,7 @@ def shop_dashboard():
         }), 200
 
     try:
-        # ============================
-        # 🧮 Load & Clean Data
-        # ============================
+        # Load & Clean Data
         df = pd.read_csv(sales_path)
         if "date" not in df.columns:
             return jsonify({"status": "error", "message": "Invalid sales file format."}), 400
@@ -62,9 +58,7 @@ def shop_dashboard():
         df["revenue"] = pd.to_numeric(df.get("revenue", 0), errors="coerce").fillna(0)
         df["quantity_sold"] = pd.to_numeric(df.get("quantity_sold", 0), errors="coerce").fillna(0)
 
-        # ============================
-        # ⏳ Time Windows
-        # ============================
+        # Time Windows
         now = datetime.now()
         last_7_days = df[df["date"] >= now - timedelta(days=7)]
         prev_week = df[
@@ -72,18 +66,14 @@ def shop_dashboard():
             (df["date"] >= now - timedelta(days=14))
         ]
 
-        # ============================
-        # 💰 Weekly Metrics
-        # ============================
+        # Weekly Metrics
         weekly_sales = last_7_days["revenue"].sum()
         prev_sales = prev_week["revenue"].sum()
         growth = ((weekly_sales - prev_sales) / prev_sales * 100) if prev_sales > 0 else 0
         total_orders = len(df)
         avg_order_value = weekly_sales / total_orders if total_orders else 0
 
-        # ============================
-        # 📈 Weekly Trend Chart
-        # ============================
+        # Weekly Trend Chart
         trend_chart = (
             last_7_days.groupby(last_7_days["date"].dt.day_name())["revenue"]
             .sum()
@@ -92,9 +82,7 @@ def shop_dashboard():
             .to_dict(orient="records")
         )
 
-        # ============================
-        # 🔮 Forecast & AI Insights
-        # ============================
+        # Forecast & AI Insights
         df_forecast = df[["date", "revenue"]].rename(columns={"date": "Date", "revenue": "Sales"})
         forecast_data = forecast_trends(df_forecast)
 
@@ -140,9 +128,7 @@ def shop_dashboard():
             },
         ]
 
-        # ============================
-        # 🧠 AI Demand Summary & Recommendations
-        # ============================
+        # AI Demand Summary & Recommendations
         demand_summary = generate_demand_summary(
             region_data=df.groupby("region")["revenue"].sum().to_dict() if "region" in df.columns else {},
             top_product=forecast[0].get("fabric_type", "Cotton") if forecast else "Cotton",
@@ -152,15 +138,11 @@ def shop_dashboard():
             trending_products=df.groupby("product_name")["revenue"].sum().sort_values(ascending=False).head(5).to_dict(),
         )
 
-        # ============================
-        # 🏭 AI Production Priorities
-        # ============================
+        # AI Production Priorities
         prod_df = df.rename(columns={"product_name": "Product", "revenue": "Sales", "region": "Region"})
         production_priorities, top_selling, underperforming = generate_production_priorities(prod_df)
 
-        # ============================
-        # 📦 Reorder Suggestions
-        # ============================
+        # Reorder Suggestions
         reorder_suggestions = (
             df.groupby("product_name")["quantity_sold"]
             .sum()
@@ -170,9 +152,7 @@ def shop_dashboard():
             .to_dict(orient="records")
         )
 
-        # ============================
-        # 📊 Auto-Generate Next Month Synthetic Forecast
-        # ============================
+        # Auto-Generate Next Month Synthetic Forecast
         last_date = df["date"].max()
         next_month = (last_date + pd.offsets.MonthBegin(1)).month
         next_year = (last_date + pd.offsets.MonthBegin(1)).year
@@ -196,9 +176,7 @@ def shop_dashboard():
 
         print(f"[AUTO] Synthetic next-month forecast appended for shop {shop_id}")
 
-        # ============================
-        # 🧾 Final Dashboard Data
-        # ============================
+        # Final Dashboard Data
         dashboard_data = {
             "weekly_sales": f"₹{int(weekly_sales):,}",
             "avg_order_value": f"₹{int(avg_order_value):,}",
@@ -226,9 +204,7 @@ def shop_dashboard():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 📤 Upload Sales CSV
-# ───────────────────────────────────────────────
+# Upload Sales CSV
 @shop_bp.route("/upload_sales_data", methods=["POST"])
 def upload_sales_data():
     try:
@@ -246,9 +222,7 @@ def upload_sales_data():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 📦 Export Sales Report
-# ───────────────────────────────────────────────
+# Export Sales Report
 @shop_bp.route("/sales/export", methods=["GET"])
 def export_sales():
     try:

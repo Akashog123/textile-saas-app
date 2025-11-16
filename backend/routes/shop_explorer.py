@@ -9,9 +9,7 @@ import requests
 shop_explorer_bp = Blueprint("shop_explorer", __name__, url_prefix="/api/v1/customer")
 
 
-# ───────────────────────────────────────────────
-# 🏬 GET: All Shops
-# ───────────────────────────────────────────────
+# GET: All Shops
 @shop_explorer_bp.route("/shops", methods=["GET"])
 def get_all_shops():
     """Fetch all registered shops with key summary details."""
@@ -40,9 +38,7 @@ def get_all_shops():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 🏪 GET: Single Shop Details (with Products)
-# ───────────────────────────────────────────────
+# GET: Single Shop Details (with Products)
 @shop_explorer_bp.route("/shop/<int:shop_id>", methods=["GET"])
 def get_shop_details(shop_id):
     """Fetch detailed shop info with all its listed fabrics."""
@@ -81,9 +77,7 @@ def get_shop_details(shop_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 🔍 GET: Search Shops & Fabrics
-# ───────────────────────────────────────────────
+# GET: Search Shops & Fabrics
 @shop_explorer_bp.route("/search", methods=["GET"])
 def search():
     """Search both shops and fabrics dynamically."""
@@ -126,9 +120,7 @@ def search():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 📍 GET: Nearby Shops (MapMyIndia)
-# ───────────────────────────────────────────────
+# GET: Nearby Shops (MapMyIndia)
 @shop_explorer_bp.route("/nearby-shops", methods=["GET"])
 def nearby_shops():
     """Find nearby textile shops using MapMyIndia API."""

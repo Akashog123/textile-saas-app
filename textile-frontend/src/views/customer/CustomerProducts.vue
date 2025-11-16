@@ -4,17 +4,23 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0">Browse All Fabrics</h5>
       <div class="d-flex gap-2 align-items-center">
-        <div class="input-group" style="max-width: 400px;">
-          <input 
-            type="text" 
-            class="form-control" 
+        <div class="input-group" style="max-width: 400px">
+          <input
+            type="text"
+            class="form-control"
             placeholder="Search for Shops and Fabrics..."
             v-model="searchQuery"
-          >
-          <button class="btn btn-outline-secondary"><i class="bi bi-mic-fill"></i></button>
-          <button class="btn btn-outline-secondary"><i class="bi bi-camera-fill"></i></button>
+          />
+          <button class="btn btn-outline-secondary">
+            <i class="bi bi-mic-fill"></i>
+          </button>
+          <button class="btn btn-outline-secondary">
+            <i class="bi bi-camera-fill"></i>
+          </button>
         </div>
-        <button class="btn btn-primary"><i class="bi bi-geo-alt-fill"></i> Nearby Shops</button>
+        <button class="btn btn-primary">
+          <i class="bi bi-geo-alt-fill"></i> Nearby Shops
+        </button>
       </div>
     </div>
 
@@ -37,12 +43,16 @@
 
     <!-- Products Grid with Carousel -->
     <div class="products-grid">
-      <div v-for="(product, idx) in products" :key="idx" class="product-carousel-item mb-4">
+      <div
+        v-for="(product, idx) in products"
+        :key="idx"
+        class="product-carousel-item mb-4"
+      >
         <div class="card">
           <div class="card-body">
             <div class="carousel-container">
-              <button 
-                class="carousel-btn prev" 
+              <button
+                class="carousel-btn prev"
                 @click="prevImage(idx)"
                 :disabled="currentImageIndex[idx] === 0"
               >
@@ -51,13 +61,14 @@
 
               <div class="product-main">
                 <div class="product-image-wrapper mb-3">
-                  <img 
-                    :src="product.imageUrls[currentImageIndex[idx]]" 
+                  <img
+                    :src="product.imageUrls[currentImageIndex[idx]]"
                     :alt="product.name"
                     class="product-image"
-                  >
+                  />
                   <div class="image-indicator">
-                    {{ currentImageIndex[idx] + 1 }} / {{ product.imageUrls.length }}
+                    {{ currentImageIndex[idx] + 1 }} /
+                    {{ product.imageUrls.length }}
                   </div>
                 </div>
 
@@ -65,11 +76,21 @@
                   <div class="col-md-8">
                     <h6 class="mb-2">{{ product.name }}</h6>
                     <div class="price mb-2">
-                      <strong class="text-primary">{{ product.price }}</strong>/m
+                      <strong class="text-primary">{{ product.price }}</strong
+                      >/m
                     </div>
-                    <p class="text-muted small mb-2">{{ product.description }}</p>
+                    <p class="text-muted small mb-2">
+                      {{ product.description }}
+                    </p>
                     <div class="rating mb-2">
-                      <span v-for="i in 5" :key="i" :class="i <= product.rating ? 'text-warning' : 'text-muted'">★</span>
+                      <span
+                        v-for="i in 5"
+                        :key="i"
+                        :class="
+                          i <= product.rating ? 'text-warning' : 'text-muted'
+                        "
+                        >★</span
+                      >
                     </div>
                   </div>
                   <div class="col-md-4 text-end">
@@ -79,10 +100,12 @@
                 </div>
               </div>
 
-              <button 
-                class="carousel-btn next" 
+              <button
+                class="carousel-btn next"
                 @click="nextImage(idx)"
-                :disabled="currentImageIndex[idx] === product.imageUrls.length - 1"
+                :disabled="
+                  currentImageIndex[idx] === product.imageUrls.length - 1
+                "
               >
                 ›
               </button>
@@ -100,102 +123,108 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive } from "vue";
 
-const searchQuery = ref('')
-const currentImageIndex = reactive({})
+const searchQuery = ref("");
+const currentImageIndex = reactive({});
 
 const products = ref([
   {
-    name: 'Handwoven Silk Brocade',
-    price: '₹1,850',
-    description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions. Features rich texture, vibrant colors, and exceptional durability.',
+    name: "Handwoven Silk Brocade",
+    price: "₹1,850",
+    description:
+      "Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions. Features rich texture, vibrant colors, and exceptional durability.",
     rating: 5,
     seller: "The Silk Emporium",
     imageUrls: [
-      'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800'
-    ]
+      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+    ],
   },
   {
-    name: 'Premium Cotton Batik Print',
-    price: '₹650',
-    description: 'Soft and breathable premium cotton with authentic batik patterns. Ideal for summer wear with excellent comfort. Eco-friendly and naturally dyed using traditional methods.',
+    name: "Premium Cotton Batik Print",
+    price: "₹650",
+    description:
+      "Soft and breathable premium cotton with authentic batik patterns. Ideal for summer wear with excellent comfort. Eco-friendly and naturally dyed using traditional methods.",
     rating: 4,
     seller: "Heritage Textile House",
     imageUrls: [
-      'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800'
-    ]
+      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+    ],
   },
   {
-    name: 'Luxury Georgette Floral',
-    price: '₹1,450',
-    description: 'Elegant georgette silk with beautiful floral prints and luxurious drape. Lightweight and flowing fabric perfect for sarees, dresses, and scarves. Premium quality with vivid colors.',
+    name: "Luxury Georgette Floral",
+    price: "₹1,450",
+    description:
+      "Elegant georgette silk with beautiful floral prints and luxurious drape. Lightweight and flowing fabric perfect for sarees, dresses, and scarves. Premium quality with vivid colors.",
     rating: 5,
     seller: "Artisan Fabric Gallery",
     imageUrls: [
-      'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800'
-    ]
+      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+    ],
   },
   {
-    name: 'Artisan Handloom Cotton',
-    price: '₹890',
-    description: 'Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship with modern appeal. Durable and comfortable for everyday use with natural texture.',
+    name: "Artisan Handloom Cotton",
+    price: "₹890",
+    description:
+      "Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship with modern appeal. Durable and comfortable for everyday use with natural texture.",
     rating: 4,
     seller: "Modern Textile Studio",
     imageUrls: [
-      'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800'
-    ]
+      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+    ],
   },
   {
-    name: 'Designer Silk Collection',
-    price: '₹2,150',
-    description: 'Exclusive designer silk fabric with contemporary patterns. Premium quality silk perfect for high-end fashion wear. Limited edition collection with unique artistic designs.',
+    name: "Designer Silk Collection",
+    price: "₹2,150",
+    description:
+      "Exclusive designer silk fabric with contemporary patterns. Premium quality silk perfect for high-end fashion wear. Limited edition collection with unique artistic designs.",
     rating: 5,
     seller: "The Silk Emporium",
     imageUrls: [
-      'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800'
-    ]
+      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+    ],
   },
   {
-    name: 'Traditional Block Print',
-    price: '₹780',
-    description: 'Authentic hand-block printed cotton fabric with traditional motifs. Eco-friendly dyes and sustainable production. Perfect for ethnic wear and home décor projects.',
+    name: "Traditional Block Print",
+    price: "₹780",
+    description:
+      "Authentic hand-block printed cotton fabric with traditional motifs. Eco-friendly dyes and sustainable production. Perfect for ethnic wear and home décor projects.",
     rating: 4,
     seller: "Heritage Textile House",
     imageUrls: [
-      'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800'
-    ]
-  }
-])
+      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
+    ],
+  },
+]);
 
 // Initialize image indices
-products.value.forEach((_, idx) => {
-  currentImageIndex[idx] = 0
-})
+for (const [idx] of products.value.entries()) {
+  currentImageIndex[idx] = 0;
+}
 
 const prevImage = (idx) => {
   if (currentImageIndex[idx] > 0) {
-    currentImageIndex[idx]--
+    currentImageIndex[idx]--;
   }
-}
+};
 
 const nextImage = (idx) => {
   if (currentImageIndex[idx] < products.value[idx].imageUrls.length - 1) {
-    currentImageIndex[idx]++
+    currentImageIndex[idx]++;
   }
-}
+};
 </script>
 
 <style scoped>
@@ -277,9 +306,9 @@ h5 {
 }
 
 .fw-semibold {
-  color: #4a5568;
+  color: #2d3748 !important;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 600 !important;
 }
 
 .filter-btn {
@@ -449,11 +478,6 @@ h5 {
   color: #718096 !important;
 }
 
-.fw-semibold {
-  font-weight: 600 !important;
-  color: #2d3748 !important;
-}
-
 /* Load More Button */
 .btn-outline-primary {
   border: 2px solid #667eea;
@@ -478,28 +502,28 @@ h5 {
   .customer-products-page {
     padding: 1rem;
   }
-  
+
   .products-grid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
-  
+
   .d-flex.justify-content-between {
     flex-direction: column;
     gap: 1rem;
     align-items: stretch !important;
   }
-  
+
   .input-group {
     max-width: 100% !important;
   }
-  
+
   .carousel-btn {
     width: 35px;
     height: 35px;
     font-size: 1.2rem;
   }
-  
+
   .filters-section {
     padding: 1rem;
   }

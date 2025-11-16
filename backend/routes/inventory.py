@@ -4,11 +4,9 @@ import pandas as pd
 from io import BytesIO
 from datetime import datetime
 
-inventory_bp = Blueprint("inventory", __name__, url_prefix="/api/v1/inventory")
+inventory_bp = Blueprint("inventory", __name__)
 
-# ───────────────────────────────────────────────
-# 🧾 Fetch Inventory Items for a Shop
-# ───────────────────────────────────────────────
+# Fetch Inventory Items for a Shop
 @inventory_bp.route("/", methods=["GET"])
 def get_inventory():
     """Fetch all inventory products for a given shop."""
@@ -39,7 +37,7 @@ def get_inventory():
                 "data": data
             }), 200
 
-        # fallback to SalesData-based generation
+        # fallback to Sales Data based generation
         sales = SalesData.query.filter_by(shop_id=shop_id).all()
         if not sales:
             return jsonify({"status": "success", "message": "No inventory data found.", "data": []}), 200
@@ -92,9 +90,7 @@ def get_inventory():
         return jsonify({"status": "error", "message": "Failed to fetch inventory.", "error": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 📤 Import Inventory via CSV or Excel
-# ───────────────────────────────────────────────
+# Import Inventory via CSV or Excel
 @inventory_bp.route("/import", methods=["POST"])
 def import_inventory():
     """Upload inventory via CSV/Excel for a shop."""
@@ -162,10 +158,7 @@ def import_inventory():
         print(f"[Error - Import Inventory] {e}")
         return jsonify({"status": "error", "message": "Failed to import inventory.", "error": str(e)}), 500
 
-
-# ───────────────────────────────────────────────
-# ✏️ Edit Inventory (price, stock)
-# ───────────────────────────────────────────────
+# Edit Inventory (price, stock)
 @inventory_bp.route("/edit", methods=["POST"])
 def edit_inventory():
     """Edit price or stock of a product."""
@@ -199,10 +192,7 @@ def edit_inventory():
         print(f"[Error - Edit Inventory] {e}")
         return jsonify({"status": "error", "message": "Failed to update inventory.", "error": str(e)}), 500
 
-
-# ───────────────────────────────────────────────
-# 🗑️ Delete Product — matches frontend `/delete?product_id=...`
-# ───────────────────────────────────────────────
+# Delete Product
 @inventory_bp.route("/delete", methods=["DELETE"])
 def delete_inventory():
     """Delete a product and its inventory entry."""
@@ -225,10 +215,7 @@ def delete_inventory():
         print(f"[Error - Delete Inventory] {e}")
         return jsonify({"status": "error", "message": "Failed to delete product.", "error": str(e)}), 500
 
-
-# ───────────────────────────────────────────────
-# 📦 Export Inventory as Excel
-# ───────────────────────────────────────────────
+# Export Inventory as Excel
 @inventory_bp.route("/export", methods=["GET"])
 def export_inventory():
     """Download all inventory for a shop as Excel."""

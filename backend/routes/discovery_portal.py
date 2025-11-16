@@ -10,9 +10,7 @@ import requests
 discovery_portal_bp = Blueprint("discovery_portal", __name__, url_prefix="/api/v1/customer")
 
 
-# ───────────────────────────────────────────────
-# 🗺️ Helper: Geocode Shop Location (MapMyIndia)
-# ───────────────────────────────────────────────
+# Helper: Geocode Shop Location (MapMyIndia)
 def geocode_address(address):
     """Fetch latitude and longitude for a given address using MapMyIndia API."""
     try:
@@ -28,13 +26,11 @@ def geocode_address(address):
             coords = data["copResults"][0]["geocode"]
             return float(coords["lat"]), float(coords["lng"])
     except Exception as e:
-        print("❌ Geocoding error:", e)
+        print("Geocoding error:", e)
     return None, None
 
 
-# ───────────────────────────────────────────────
-# 🔝 GET: Trending Fabrics (AI-enhanced captions)
-# ───────────────────────────────────────────────
+# GET: Trending Fabrics (AI-enhanced captions)
 @discovery_portal_bp.route("/trending-fabrics", methods=["GET"])
 def get_trending_fabrics():
     """Return top trending fabrics with AI-generated marketing captions."""
@@ -62,7 +58,7 @@ def get_trending_fabrics():
         }), 200
 
     except Exception as e:
-        print("❌ Error fetching trending fabrics:", e)
+        print("Error fetching trending fabrics:", e)
         return jsonify({
             "status": "error",
             "message": "Failed to load trending fabrics.",
@@ -70,9 +66,7 @@ def get_trending_fabrics():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 🌟 GET: Popular Shops
-# ───────────────────────────────────────────────
+# GET: Popular Shops
 @discovery_portal_bp.route("/popular-shops", methods=["GET"])
 def get_popular_shops():
     """Return popular shops with geolocation enrichment."""
@@ -105,7 +99,7 @@ def get_popular_shops():
         }), 200
 
     except Exception as e:
-        print("❌ Error fetching popular shops:", e)
+        print("Error fetching popular shops:", e)
         return jsonify({
             "status": "error",
             "message": "Failed to fetch popular shops.",
@@ -113,9 +107,7 @@ def get_popular_shops():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 📍 GET: Nearby Shops (based on coordinates)
-# ───────────────────────────────────────────────
+# GET: Nearby Shops (based on coordinates)
 @discovery_portal_bp.route("/nearby-shops", methods=["GET"])
 def get_nearby_shops():
     """Return shops located within a given radius from provided coordinates."""
@@ -154,9 +146,7 @@ def get_nearby_shops():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 🔍 GET: Search (Shops or Fabrics)
-# ───────────────────────────────────────────────
+# GET: Search (Shops or Fabrics)
 @discovery_portal_bp.route("/search", methods=["GET"])
 def search_items():
     """Search for fabrics or shops by keyword."""
