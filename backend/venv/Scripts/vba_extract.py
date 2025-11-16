@@ -1,4 +1,4 @@
-#!D:\Projects\SE-Textile-App\backend\venv\Scripts\python.exe
+#!C:\Users\acer\Desktop\SE-Textile-App-Backend\backend\venv\Scripts\python.exe
 
 ##############################################################################
 #

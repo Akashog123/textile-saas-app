@@ -68,8 +68,8 @@ def generate_production_plan(df, forecast_df):
 
 # POST: Generate AI Production Plan + Forecast
 @production_bp.route("/production-plan", methods=["POST"])
-@token_required
-def production_plan(current_user):
+# @token_required
+def production_plan():
     """Upload sales CSV and get AI-powered production planning insights."""
     try:
         file = request.files.get("file")
@@ -177,8 +177,8 @@ def production_plan(current_user):
 
 # GET: Export AI Production Plan as CSV
 @production_bp.route("/export-plan", methods=["GET"])
-@token_required
-def export_plan(current_user):
+# @token_required
+def export_plan():
     """Export a production plan CSV derived from live sales data."""
     try:
         window_start = datetime.utcnow().date().replace(day=1)
@@ -187,7 +187,7 @@ def export_plan(current_user):
             .filter(SalesData.date >= window_start)
             .all()
         )
-
+        
         if not sales_rows:
             return jsonify({
                 "status": "error",

@@ -57,7 +57,7 @@ def get_all_products():
                 "rating": round(p.rating or 4.0, 1),
                 "seller": shop.name if shop else "Independent Seller",
                 "location": shop.location if shop else "Unknown",
-                "image": p.image_url or f"https://picsum.photos/seed/{p.id}/800/600",
+                # "image": p.image_url or f"https://picsum.photos/seed/{p.id}/800/600",
                 "ai_caption": caption,
             })
 
@@ -90,7 +90,7 @@ def get_product_detail(product_id):
             "rating": round(product.rating or 4.0, 1),
             "seller": shop.name if shop else "Independent Seller",
             "address": shop.location if shop else "N/A",
-            "image": product.image_url or f"https://picsum.photos/seed/{product.id}/800/600",
+            # "image": product.image_url or f"https://picsum.photos/seed/{product.id}/800/600",
             "ai_caption": caption,
         }
 
