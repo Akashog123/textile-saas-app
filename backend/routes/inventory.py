@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, send_file
-from models.model import db, Product, Inventory, SalesData, ProductCatalog
+from models.model import db, Product, Inventory, SalesData, ProductCatalog,Shop
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
@@ -22,13 +22,12 @@ def get_inventory():
                 inv = Inventory.query.filter_by(product_id=p.id).first()
                 data.append({
                     "id": p.id,
-                    "name": p.name or "Unknown Product",
-                    "category": p.category or "General",
-                    "price": float(p.price or 0),
-                    "stock": inv.qty_available if inv else 0,
+                    "name": p.name,
+                    "category": p.category,
+                    "price": float(p.price),
+                    "stock": inv.qty_available,
                     "sku": p.sku or f"AUTO-{p.id}",
-                    "rating": round(p.rating or 4.0, 1),
-                    "image": p.image_url or "https://placehold.co/400x300?text=No+Image",
+                    "rating": round(p.rating, 1),
                     "shop_id": p.shop_id
                 })
             return jsonify({
@@ -96,9 +95,9 @@ def import_inventory():
     """Upload inventory via CSV/Excel for a shop."""
     try:
         file = request.files.get("file")
-        shop_id = request.form.get("shop_id")
+        shop_id_raw = request.form.get("shop_id")
 
-        if not file or not shop_id:
+        if not file or not shop_id_raw:
             return jsonify({"status": "error", "message": "Missing file or shop_id"}), 400
 
         filename = file.filename.lower()
@@ -109,29 +108,73 @@ def import_inventory():
         else:
             return jsonify({"status": "error", "message": "File must be .csv or .xlsx"}), 400
 
-        # Convert all columns to lowercase for validation
+        # Normalize columns to lowercase
         df.columns = [c.lower() for c in df.columns]
 
         required_cols = {"name", "category", "price", "stock", "sku"}
         if not required_cols.issubset(set(df.columns)):
             return jsonify({"status": "error", "message": f"File must contain columns: {', '.join(required_cols)}"}), 400
 
+        # ensure shop_id is an integer (used in queries and new products)
+        try:
+            shop_id = int(shop_id_raw)
+        except (ValueError, TypeError):
+            return jsonify({"status":"error","message":"invalid shop_id"}), 400
+
+        # try to determine default seller_id from the shop owner (if exists)
+        shop_obj = Shop.query.get(shop_id)
+        default_seller_id = shop_obj.owner_id if shop_obj and shop_obj.owner_id else 1
+
         added, updated = 0, 0
         for _, row in df.iterrows():
             sku = str(row.get("sku", "")).strip()
-            name = row.get("name", "Unnamed Product")
-            category = row.get("category", "General")
-            price = float(row.get("price", 0))
-            stock = int(row.get("stock", 0))
-
             if not sku:
+                # skip rows without SKU
                 continue
 
+            name = row.get("name", "Unnamed Product")
+            category = row.get("category", "General")
+
+            # make price and stock robust to bad values
+            try:
+                price = float(row.get("price", 0) or 0)
+            except (ValueError, TypeError):
+                price = 0.0
+            try:
+                stock = int(row.get("stock", 0) or 0)
+            except (ValueError, TypeError):
+                stock = 0
+
+            # resolve seller_id: CSV column -> form param -> shop owner -> fallback 1
+            seller_id = None
+            if "seller_id" in df.columns:
+                raw = row.get("seller_id")
+                if pd.notna(raw) and raw != "":
+                    try:
+                        seller_id = int(raw)
+                    except (ValueError, TypeError):
+                        seller_id = None
+
+            if not seller_id:
+                form_seller = request.form.get("seller_id")
+                if form_seller:
+                    try:
+                        seller_id = int(form_seller)
+                    except (ValueError, TypeError):
+                        seller_id = None
+
+            if not seller_id:
+                seller_id = default_seller_id
+
+            # try to find existing product for this shop + sku
             product = Product.query.filter_by(sku=sku, shop_id=shop_id).first()
             if product:
+                # update existing product
                 product.name = name
                 product.category = category
                 product.price = price
+                # ensure seller_id is set (update it if missing/different)
+                product.seller_id = seller_id
                 inv = Inventory.query.filter_by(product_id=product.id).first()
                 if inv:
                     inv.qty_available = stock
@@ -139,9 +182,24 @@ def import_inventory():
                     db.session.add(Inventory(product_id=product.id, qty_available=stock))
                 updated += 1
             else:
-                new_product = Product(name=name, category=category, price=price, sku=sku, shop_id=shop_id)
+                # create product with required seller_id and shop_id
+                new_product = Product(
+                    name=name,
+                    category=category,
+                    price=price,
+                    sku=sku,
+                    shop_id=shop_id,
+                    seller_id=seller_id
+                )
                 db.session.add(new_product)
-                db.session.flush()
+                try:
+                    db.session.flush()  # to get new_product.id; may raise IntegrityError
+                except Exception as e:
+                    db.session.rollback()
+                    # log and continue with next row
+                    print(f"[Import - product create failed] sku={sku} error={e}")
+                    continue
+
                 db.session.add(Inventory(product_id=new_product.id, qty_available=stock))
                 added += 1
 

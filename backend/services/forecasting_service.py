@@ -104,5 +104,5 @@ def top_trending_products(df: pd.DataFrame, top_n=5):
 
         return top_products.to_dict(orient='records')
     except Exception as e:
-        print(f"❌ Top Trending Products Error: {e}")
+        print(f"Top Trending Products Error: {e}")
         return []
