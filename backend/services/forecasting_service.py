@@ -12,7 +12,7 @@ def forecast_sales(df: pd.DataFrame):
     results = []
 
     if df.empty or not {'Date', 'Sales', 'Product'}.issubset(df.columns):
-        print("⚠️ Invalid or empty DataFrame for forecast_sales.")
+        print("[Warning] Invalid or empty DataFrame for forecast_sales.")
         return results
 
     for product in df['Product'].dropna().unique():
@@ -21,7 +21,7 @@ def forecast_sales(df: pd.DataFrame):
 
         # Skip if insufficient data
         if len(product_df) < 5:
-            print(f"⚠️ Not enough data for product '{product}' to forecast.")
+            print(f"[Warning] Not enough data for product '{product}' to forecast.")
             continue
 
         try:
@@ -41,7 +41,7 @@ def forecast_sales(df: pd.DataFrame):
                 ]
             })
         except Exception as e:
-            print(f"❌ Forecast error for {product}: {e}")
+            print(f"[Error] Forecast error for {product}: {e}")
 
     return results
 
@@ -53,7 +53,7 @@ def compute_regional_summary(df: pd.DataFrame):
     Expects columns: 'Region', 'Sales'
     """
     if df.empty or not {'Region', 'Sales'}.issubset(df.columns):
-        print("⚠️ Invalid or empty DataFrame for compute_regional_summary.")
+        print("[Warning] Invalid or empty DataFrame for compute_regional_summary.")
         return []
 
     try:
@@ -68,7 +68,7 @@ def compute_regional_summary(df: pd.DataFrame):
 
         return region_summary.to_dict(orient='records')
     except Exception as e:
-        print(f"❌ Regional Summary Error: {e}")
+        print(f"[Error] Regional Summary Error: {e}")
         return []
 
 
@@ -79,7 +79,7 @@ def top_trending_products(df: pd.DataFrame, top_n=5):
     Expects columns: 'Date', 'Product', 'Sales'
     """
     if df.empty or not {'Date', 'Product', 'Sales'}.issubset(df.columns):
-        print("⚠️ Invalid or empty DataFrame for top_trending_products.")
+        print("[Warning] Invalid or empty DataFrame for top_trending_products.")
         return []
 
     try:
@@ -87,7 +87,7 @@ def top_trending_products(df: pd.DataFrame, top_n=5):
         monthly = df.groupby(['Month', 'Product'], as_index=False)['Sales'].sum()
 
         if len(monthly['Month'].unique()) < 2:
-            print("⚠️ Not enough months of data to compute MoM growth.")
+            print("[Warning] Not enough months of data to compute MoM growth.")
             return []
 
         current_month = monthly['Month'].max()

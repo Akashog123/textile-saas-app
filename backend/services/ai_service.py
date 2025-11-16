@@ -6,20 +6,17 @@ from PIL import Image
 import google.generativeai as genai
 from google.generativeai import GenerativeModel, configure
 
-# =========================
-# 🌐 GEMINI CONFIGURATION
-# =========================
+
+# GEMINI CONFIGURATION
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 if not GEMINI_KEY:
-    print("⚠️ Warning: GEMINI_API_KEY not found in environment. Gemini AI features will not function.")
+    print("Warning: GEMINI_API_KEY not found in environment. Gemini AI features will not function.")
 else:
     configure(api_key=GEMINI_KEY)
     genai.configure(api_key=GEMINI_KEY)
-    print("✅ Gemini API key configured successfully.")
+    print("Gemini API key configured successfully.")
 
-# =========================
-# 🔤 Default Text Responses
-# =========================
+# Default Text Responses
 DEFAULT_CAPTION = "Elegant design for every occasion!"
 DEFAULT_SUMMARY = "Steady growth observed across key regions with strong fabric demand."
 DEFAULT_RECOMMENDATION = "Maintain higher silk stock in northern regions; expand cotton offerings in the east."
@@ -29,24 +26,20 @@ DEFAULT_PRIORITIES = [
     {"title": "Reduce low-selling SKUs", "detail": "Optimize resources by limiting underperformers.", "level": "reduce"},
 ]
 
-# =========================
-# 🧠 GEMINI MODEL HANDLER
-# =========================
+# GEMINI MODEL HANDLER
 def get_model():
-    """Return the latest Gemini 2.5 Pro model (text + vision)."""
+    """Return the latest Gemini 2.5 Flash model (text + vision)."""
     try:
-        model_name = "gemini-2.5-pro"
+        model_name = "gemini-2.5-flash"
         model = GenerativeModel(model_name)
-        print(f"✅ Using Gemini model: {model_name}")
+        print(f"Using Gemini model: {model_name}")
         return model
     except Exception as e:
-        print(f"❌ Gemini Model Load Error: {e}")
+        print(f"Gemini Model Load Error: {e}")
         raise
 
 
-# =========================
-# 🧠 HELPER: SAFE PROMPT RUNNER
-# =========================
+# HELPER: SAFE PROMPT RUNNER
 def run_gemini_prompt(prompt: str, fallback: str) -> str:
     """Safely generate text from Gemini with fallback on failure."""
     try:
@@ -56,19 +49,17 @@ def run_gemini_prompt(prompt: str, fallback: str) -> str:
             return response.text.strip()
         return fallback
     except Exception as e:
-        print(f"❌ Gemini API Error: {e}")
+        print(f"Gemini API Error: {e}")
         return fallback
 
 
-# =========================
-# 🛍️ AI CAPTION GENERATION
-# =========================
+# AI CAPTION GENERATION
 def generate_ai_caption(product_name: str, category: str = "", price: float = 0.0, image_path: str = None) -> str:
     """Generate a short, catchy marketing caption using Gemini (supports text + vision)."""
     try:
         model = get_model()
 
-        # 🌆 Vision captioning (for uploaded image)
+        # Vision captioning (for uploaded image)
         if image_path and os.path.exists(image_path):
             prompt = (
                 "Generate a short, catchy marketing caption (under 25 words) "
@@ -82,7 +73,7 @@ def generate_ai_caption(product_name: str, category: str = "", price: float = 0.
                 return response.text.strip()
             return DEFAULT_CAPTION
 
-        # 🧾 Text-based caption (for CSV/XLSX input)
+        # Text-based caption (for CSV/XLSX input)
         product_name = str(product_name or "").strip()
         category = str(category or "").strip()
         price = str(price or "N/A")
@@ -98,17 +89,15 @@ def generate_ai_caption(product_name: str, category: str = "", price: float = 0.
         return run_gemini_prompt(prompt, DEFAULT_CAPTION)
 
     except Exception as e:
-        print("❌ AI Caption Generation Error:", e)
+        print("AI Caption Generation Error:", e)
         return DEFAULT_CAPTION
 
 
-# =========================
-# 🎨 MARKETING POSTER GENERATION
-# =========================
+# MARKETING POSTER GENERATION
 def generate_marketing_poster(image_path: str, product_name: str = None):
     """Analyze image → create prompt → generate AI poster."""
     if not os.path.exists(image_path):
-        print("❌ Image path not found:", image_path)
+        print("Image path not found:", image_path)
         return None, None
 
     try:
@@ -131,10 +120,10 @@ def generate_marketing_poster(image_path: str, product_name: str = None):
         if product_name:
             banner_prompt = f"{banner_prompt} featuring '{product_name}'."
 
-        print("🧠 Poster prompt generated:", banner_prompt)
+        print("Poster prompt generated:", banner_prompt)
 
     except Exception as e:
-        print("❌ Prompt Generation Error:", e)
+        print("Prompt Generation Error:", e)
         banner_prompt = "Elegant textile poster background with premium lighting."
 
     # Generate Poster (if quota allows)
@@ -147,23 +136,21 @@ def generate_marketing_poster(image_path: str, product_name: str = None):
             if hasattr(part, "inline_data") and hasattr(part.inline_data, "data"):
                 with open(output_path, "wb") as f:
                     f.write(part.inline_data.data)
-                print(f"✅ Poster image saved at {output_path}")
+                print(f"Poster image saved at {output_path}")
                 return banner_prompt, output_path
 
-        print("⚠️ No image data found in Gemini response.")
+        print("No image data found in Gemini response.")
         return banner_prompt, None
 
     except Exception as e:
         if "quota" in str(e).lower():
-            print("⚠️ Gemini quota limit reached. Poster not generated.")
+            print("Gemini quota limit reached. Poster not generated.")
             return banner_prompt, None
-        print("❌ Poster Image Generation Error:", e)
+        print("Poster Image Generation Error:", e)
         return banner_prompt, None
 
 
-# =========================
-# 📈 SALES FORECASTING
-# =========================
+# SALES FORECASTING
 def forecast_trends(df: pd.DataFrame):
     """Generate 30-day sales forecast using Prophet."""
     try:
@@ -185,13 +172,11 @@ def forecast_trends(df: pd.DataFrame):
         return trend.to_dict(orient="records")
 
     except Exception as e:
-        print("❌ Forecasting Error:", e)
+        print("Forecasting Error:", e)
         return []
 
 
-# =========================
-# 📊 DISTRIBUTOR INSIGHTS
-# =========================
+# DISTRIBUTOR INSIGHTS
 def generate_demand_summary(region_data, top_product):
     """Generate concise AI-powered regional demand summary."""
     try:
@@ -211,7 +196,7 @@ def generate_demand_summary(region_data, top_product):
         """
         return run_gemini_prompt(prompt, DEFAULT_SUMMARY)
     except Exception as e:
-        print("❌ AI Summary Generation Error:", e)
+        print("AI Summary Generation Error:", e)
         return DEFAULT_SUMMARY
 
 
@@ -233,13 +218,11 @@ def generate_recommendation(region_data, trending_products):
         """
         return run_gemini_prompt(prompt, DEFAULT_RECOMMENDATION)
     except Exception as e:
-        print("❌ AI Recommendation Error:", e)
+        print("AI Recommendation Error:", e)
         return DEFAULT_RECOMMENDATION
 
 
-# =========================
-# 🏭 PRODUCTION PLANNING
-# =========================
+# PRODUCTION PLANNING
 def generate_production_priorities(df: pd.DataFrame):
     """AI-driven production scaling suggestions."""
     try:
@@ -273,13 +256,11 @@ def generate_production_priorities(df: pd.DataFrame):
         return DEFAULT_PRIORITIES, top_selling, underperforming
 
     except Exception as e:
-        print("❌ Production Priority Generation Error:", e)
+        print("Production Priority Generation Error:", e)
         return DEFAULT_PRIORITIES, [], []
 
 
-# =========================
-# 🧠 FABRIC INQUIRY ANALYSIS
-# =========================
+# FABRIC INQUIRY ANALYSIS
 def analyze_fabric_inquiry(image_path: str, user_message: str = ""):
     """
     Analyze uploaded fabric image + user message using Gemini Vision.
@@ -287,7 +268,7 @@ def analyze_fabric_inquiry(image_path: str, user_message: str = ""):
     """
     try:
         if not os.path.exists(image_path):
-            print("❌ Image file not found for analysis:", image_path)
+            print("Image file not found for analysis:", image_path)
             return {
                 "name": None,
                 "material": None,
@@ -341,7 +322,7 @@ def analyze_fabric_inquiry(image_path: str, user_message: str = ""):
 
     except Exception as e:
         if "quota" in str(e).lower():
-            print("⚠️ Gemini API quota reached.")
+            print("Gemini API quota reached.")
             return {
                 "name": "Cotton Blend",
                 "material": "Cotton",
@@ -351,7 +332,7 @@ def analyze_fabric_inquiry(image_path: str, user_message: str = ""):
                 "note": "Default fallback due to quota limit."
             }
 
-        print("❌ Fabric Inquiry Analysis Error:", e)
+        print("Fabric Inquiry Analysis Error:", e)
         return {
             "error": str(e),
             "name": None,

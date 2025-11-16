@@ -5,10 +5,12 @@ import numpy as np
 import io
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import cosine_similarity
+from config import Config
 
 image_bp = Blueprint("images", __name__, url_prefix="/compare-images")
 
-STORE_IMAGES_DIR = os.path.join(os.getcwd(), "data", "store_images")
+STORE_IMAGES_DIR = os.path.join(Config.BASE_DIR, "data", "store_images")
+os.makedirs(STORE_IMAGES_DIR, exist_ok=True)
 
 def extract_image_features(img_bytes):
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")

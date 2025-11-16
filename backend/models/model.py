@@ -33,8 +33,6 @@ class User(db.Model, TimestampMixin):
     # Relationships
     shops = db.relationship("Shop", backref="owner", lazy="dynamic", cascade="all, delete-orphan")
     products = db.relationship("Product", backref="seller", lazy="dynamic", cascade="all, delete-orphan")
-    service_requests = db.relationship("ServiceRequest", foreign_keys="ServiceRequest.user_id", backref="requester", lazy="dynamic")
-    assigned_requests = db.relationship("ServiceRequest", foreign_keys="ServiceRequest.pro_id", backref="professional", lazy="dynamic")
     notifications = db.relationship("Notification", backref="user", lazy="dynamic", cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -232,40 +230,6 @@ class Review(db.Model, TimestampMixin):
     body = db.Column(db.Text)
     is_verified_purchase = db.Column(db.Boolean, default=False)
 
-class Category(db.Model):
-    __tablename__ = "categories"
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
-    description = db.Column(db.Text)
-    created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    services = db.relationship("Service", backref="category", lazy="dynamic", cascade="all, delete-orphan")
-
-
-class Service(db.Model):
-    __tablename__ = "services"
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(150), nullable=False)
-    description = db.Column(db.Text)
-    price = db.Column(db.Numeric(10, 2))
-    time_required = db.Column(db.String(80))
-    category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
-
-    service_requests = db.relationship("ServiceRequest", backref="service", lazy="dynamic", cascade="all, delete-orphan")
-
-
-class ServiceRequest(db.Model, TimestampMixin):
-    __tablename__ = "service_requests"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=True)
-    service_type = db.Column(db.String(120))
-    description = db.Column(db.Text)
-    service_status = db.Column(db.String(50), default="Requested", index=True)
-    remarks = db.Column(db.Text)
-    pro_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    scheduled_for = db.Column(db.DateTime)
 
 class Upload(db.Model, TimestampMixin):
     __tablename__ = "uploads"

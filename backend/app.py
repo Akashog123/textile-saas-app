@@ -15,9 +15,9 @@ sys.path.insert(0, BASE_DIR)
 
 # Gemini API Key verification
 if not os.getenv("GEMINI_API_KEY"):
-    print("⚠️ [Warning] GEMINI_API_KEY not found in .env file.")
+    print("[Warning] GEMINI_API_KEY not found in .env file.")
 else:
-    print("✅ GEMINI_API_KEY loaded successfully.")
+    print("GEMINI_API_KEY loaded successfully.")
 
 # Import Blueprints
 from routes.auth_routes import auth_bp
@@ -33,7 +33,6 @@ from routes.stores_routes import stores_bp
 from routes.product_routes import product_bp
 from routes.inquiry import inquiry_bp
 from routes.discovery_portal import discovery_portal_bp
-from routes.service_explorer import service_explorer_bp
 from routes.shop_explorer import shop_explorer_bp
 from routes.marketing_routes import marketing_bp
 from routes.distributor_routes import distributor_bp
@@ -75,7 +74,6 @@ app.register_blueprint(product_bp, url_prefix="/api/v1/products")
 app.register_blueprint(inquiry_bp, url_prefix="/api/v1/inquiry")
 app.register_blueprint(discovery_portal_bp, url_prefix="/api/v1/customer/discovery")
 app.register_blueprint(shop_explorer_bp, url_prefix="/api/v1/customer/shops")
-app.register_blueprint(service_explorer_bp, url_prefix="/api/v1/customer/services")
 app.register_blueprint(marketing_bp, url_prefix="/api/v1/marketing")
 app.register_blueprint(distributor_bp, url_prefix="/api/v1/distributor")
 app.register_blueprint(production_bp, url_prefix="/api/v1/production")

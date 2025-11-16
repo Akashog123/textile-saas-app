@@ -5,6 +5,7 @@ from models.model import db, Shop, Product
 from config import Config
 from services.ai_service import generate_ai_caption
 import requests
+from math import cos, radians
 
 shop_explorer_bp = Blueprint("shop_explorer", __name__, url_prefix="/api/v1/customer")
 
@@ -43,34 +44,41 @@ def get_all_shops():
 def get_shop_details(shop_id):
     """Fetch detailed shop info with all its listed fabrics."""
     try:
-        shop = Shop.query.get_or_404(shop_id)
-        products = Product.query.filter_by(shop_id=shop.id).all()
+        shop = Shop.query.filter_by(id=shop_id).first()
+        if not shop:
+            return jsonify({
+                "status": "error",
+                "message": f"Shop with id {shop_id} not found"
+            }), 404
 
+        products = Product.query.filter_by(shop_id=shop.id).all()
         product_data = []
-        for p in products:
-            caption = generate_ai_caption(p.name, p.category, p.price)
+
+        for product in products:
+            price = _to_float(product.price)
+            caption = generate_ai_caption(product.name, product.category, price)
             product_data.append({
-                "id": p.id,
-                "name": p.name,
-                "price": f"₹{p.price:,.0f}",
-                "description": p.description or "Premium textile fabric.",
-                "category": p.category,
-                "rating": round(p.rating or 4.0, 1),
-                "image": p.image_url or f"https://picsum.photos/seed/{p.id}/600/400",
+                "id": product.id,
+                "name": product.name,
+                "price": f"₹{price:,.0f}",
+                "description": product.description or "Premium textile fabric.",
+                "category": product.category,
+                "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
+                "image": _resolve_product_image(product),
                 "ai_caption": caption
             })
 
-        data = {
+        shop_data = {
             "id": shop.id,
             "name": shop.name,
             "description": shop.description or "",
-            "rating": round(shop.rating or 4.3, 1),
+            "rating": round(getattr(shop, "rating", 4.3) or 4.3, 1),
             "location": shop.location or "N/A",
             "image": shop.image_url or f"https://picsum.photos/seed/{shop.id}/600/400",
             "products": product_data
         }
 
-        return jsonify({"status": "success", "shop": data}), 200
+        return jsonify({"status": "success", "shop": shop_data}), 200
 
     except Exception as e:
         print("[Error - Shop Details]", e)
@@ -125,35 +133,90 @@ def search():
 def nearby_shops():
     """Find nearby textile shops using MapMyIndia API."""
     try:
-        lat = request.args.get("lat")
-        lon = request.args.get("lon")
-        if not (lat and lon):
+        lat_raw = request.args.get("lat")
+        lon_raw = request.args.get("lon")
+        radius_raw = request.args.get("radius")
+
+        if not (lat_raw and lon_raw):
             return jsonify({"status": "error", "message": "Missing coordinates"}), 400
 
-        url = "https://atlas.mapmyindia.com/api/places/nearby/json"
-        headers = {"Authorization": f"Bearer {Config.MAPMYINDIA_KEY}"}
-        params = {"keywords": "fabric,textile,shop", "refLocation": f"{lat},{lon}", "radius": 3000}
+        try:
+            lat = float(lat_raw)
+            lon = float(lon_raw)
+            radius_meters = float(radius_raw) if radius_raw else 3000.0
+        except ValueError:
+            return jsonify({
+                "status": "error",
+                "message": "Coordinates and radius must be numeric"
+            }), 400
 
-        response = requests.get(url, headers=headers, params=params)
-        if response.status_code != 200:
-            return jsonify({"status": "error", "message": "MapMyIndia API error"}), 500
+        api_results = []
+        if Config.MAPMYINDIA_KEY:
+            url = "https://atlas.mapmyindia.com/api/places/nearby/json"
+            headers = {"Authorization": f"Bearer {Config.MAPMYINDIA_KEY}"}
+            params = {
+                "keywords": "fabric,textile,shop",
+                "refLocation": f"{lat},{lon}",
+                "radius": int(radius_meters)
+            }
 
-        data = response.json()
-        shops = [{
-            "name": place.get("placeName", "Fabric Shop"),
-            "address": place.get("placeAddress", "Unknown"),
-            "lat": place.get("latitude"),
-            "lon": place.get("longitude"),
-            "rating": 4.2,
-            "shortName": place.get("placeName", "Shop")[:10],
-        } for place in data.get("suggestedLocations", [])]
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=4)
+                if response.status_code == 200:
+                    data = response.json()
+                    api_results = [{
+                        "name": place.get("placeName", "Fabric Shop"),
+                        "address": place.get("placeAddress", "Unknown"),
+                        "lat": place.get("latitude"),
+                        "lon": place.get("longitude"),
+                        "rating": 4.2,
+                        "shortName": place.get("placeName", "Shop")[:10],
+                    } for place in data.get("suggestedLocations", [])]
+            except Exception as exc:
+                print("[MapMyIndia Nearby Shops]", exc)
+
+        if not api_results:
+            nearby_shops = _query_local_nearby_shops(lat, lon, radius_meters)
+            return jsonify({
+                "status": "success",
+                "count": len(nearby_shops),
+                "nearby_shops": nearby_shops
+            }), 200
 
         return jsonify({
             "status": "success",
-            "count": len(shops),
-            "nearby_shops": shops
+            "count": len(api_results),
+            "nearby_shops": api_results
         }), 200
 
     except Exception as e:
         print("[Error - Nearby Shops]", e)
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _query_local_nearby_shops(lat: float, lon: float, radius_meters: float):
+    # Convert meters to approximate degrees. Adjust longitude delta by latitude to reduce distortion.
+    radius_degrees_lat = radius_meters / 111_000.0
+    radius_degrees_lon = radius_degrees_lat / max(cos(radians(lat)), 0.1)
+
+    query = (
+        Shop.query
+        .filter(Shop.lat.isnot(None), Shop.lon.isnot(None))
+        .filter(Shop.lat.between(lat - radius_degrees_lat, lat + radius_degrees_lat))
+        .filter(Shop.lon.between(lon - radius_degrees_lon, lon + radius_degrees_lon))
+        .order_by(Shop.rating.desc())
+        .limit(20)
+    )
+
+    shops = []
+    for shop in query.all():
+        shops.append({
+            "name": shop.name,
+            "address": shop.location or shop.address or "Unknown",
+            "lat": shop.lat,
+            "lon": shop.lon,
+            "rating": round(shop.rating or 4.0, 1),
+            "shortName": (shop.name or "Shop")[:10],
+        })
+
+    return shops

@@ -158,7 +158,7 @@ def login():
         if user.role.lower() == "professional" and not user.approved:
             return jsonify({"status": "error", "message": "Account awaiting admin approval."}), 403
 
-        # 🏬 Include shop_id if user is a shop_owner
+        # Include shop_id if user is a shop_owner
         shop_id = None
         if user.role.lower() == "shop_owner":
             shop = Shop.query.filter_by(owner_id=user.id).first()
@@ -192,7 +192,7 @@ def login():
 
 # Session Validation (JWT based)
 @auth_bp.route("/session", methods=["GET"])
-@token_required
+# @token_required
 def session_check(decoded):
     try:
         user = User.query.get(decoded.get("user_id"))
