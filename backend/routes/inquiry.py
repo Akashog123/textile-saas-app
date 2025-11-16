@@ -7,16 +7,12 @@ from services.ai_service import generate_ai_caption, analyze_fabric_inquiry
 
 inquiry_bp = Blueprint("inquiry", __name__, url_prefix="/api/v1/inquiry")
 
-# ───────────────────────────────────────────────
 # Configuration
-# ───────────────────────────────────────────────
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf"}
 UPLOAD_SUBFOLDER = "inquiries"
 
 
-# ───────────────────────────────────────────────
 # Helpers
-# ───────────────────────────────────────────────
 def allowed_file(filename):
     """Validate allowed file types."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -38,9 +34,7 @@ def save_inquiry_file(file):
     return filepath
 
 
-# ───────────────────────────────────────────────
-# 1️⃣ POST: Submit + Analyze Fabric Inquiry (AI + Save)
-# ───────────────────────────────────────────────
+# POST: Submit + Analyze Fabric Inquiry (AI + Save)
 @inquiry_bp.route("/submit", methods=["POST"])
 def submit_inquiry():
     """
@@ -77,7 +71,7 @@ def submit_inquiry():
         ai_result = None
         if file_path:
             ai_result = analyze_fabric_inquiry(file_path, message)
-            print("🧠 AI Inquiry Result:", ai_result)
+            print("AI Inquiry Result:", ai_result)
         else:
             ai_result = {"analysis": "No image uploaded, only text message received."}
 
@@ -112,7 +106,7 @@ def submit_inquiry():
         }), 201
 
     except Exception as e:
-        print("❌ Inquiry submission error:", e)
+        print("Inquiry submission error:", e)
         db.session.rollback()
         return jsonify({
             "status": "error",
@@ -121,9 +115,7 @@ def submit_inquiry():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 2️⃣ GET: Inquiry History for Shop/User (No JWT)
-# ───────────────────────────────────────────────
+# GET: Inquiry History for Shop/User (No JWT)
 @inquiry_bp.route("/history", methods=["GET"])
 def inquiry_history():
     """Fetch all inquiries (notifications) made by a given user or shop."""
@@ -166,7 +158,7 @@ def inquiry_history():
         }), 200
 
     except Exception as e:
-        print("❌ Inquiry history fetch error:", e)
+        print("Inquiry history fetch error:", e)
         return jsonify({
             "status": "error",
             "message": "Failed to fetch inquiry history",

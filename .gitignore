@@ -30,6 +30,15 @@ coverage
 
 .eslintcache
 
+# Virtual environments & dotenv files
+.env
+.env.*
+.venv/
+venv/
+env/
+backend/venv/
+*.pyc
+
 # Cypress
 /cypress/videos/
 /cypress/screenshots/

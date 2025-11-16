@@ -6,6 +6,10 @@
 </template>
 
 <script setup>
+defineOptions({
+  name: "DistributorLayout",
+});
+
 // Container component for distributor routes
 </script>
 

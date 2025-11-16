@@ -1,6 +1,6 @@
 # routes/auth_routes.py
 from flask import Blueprint, request, jsonify
-from models.model import db, User, Shop   # 👈 added Shop here
+from models.model import db, User, Shop
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import jwt, os
@@ -8,15 +8,12 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from sqlalchemy import or_
 
-# ───────────────────────────────────────────────
-# 🌍 Environment Setup
-# ───────────────────────────────────────────────
+
+# Environment Setup
 load_dotenv()
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/v1/auth")
 
-# ───────────────────────────────────────────────
-# 🔐 JWT Utility Functions (kept for token verify)
-# ───────────────────────────────────────────────
+# JWT Utility Functions (kept for token verify)
 def generate_jwt(user):
     secret_key = os.getenv("SECRET_KEY", "default-secret-key")
     payload = {
@@ -38,9 +35,7 @@ def decode_jwt(token):
         return None
 
 
-# ───────────────────────────────────────────────
-# 🔒 Token Required Decorator
-# ───────────────────────────────────────────────
+# Token Required Decorator
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -57,9 +52,7 @@ def token_required(f):
     return decorated
 
 
-# ───────────────────────────────────────────────
-# 🧾 Register (Sign Up)
-# ───────────────────────────────────────────────
+# Register (Sign Up)
 @auth_bp.route("/register", methods=["POST"])
 def register():
     """Register new users for all roles, auto-creates Shop for shop_owners."""
@@ -104,9 +97,7 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        # ───────────────────────────────────────────────
-        # 🏬 Auto-create Shop for Shop Owners
-        # ───────────────────────────────────────────────
+        # Auto-create Shop for Shop Owners
         if new_user.role.lower() == "shop_owner":
             shop_name = f"{new_user.full_name or new_user.username}'s Shop"
             location = new_user.city or "Unspecified"
@@ -142,9 +133,7 @@ def register():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 🔑 Login (Sign In)
-# ───────────────────────────────────────────────
+# Login (Sign In)
 @auth_bp.route("/login", methods=["POST"])
 def login():
     """Simple login (supports username or email)."""
@@ -176,9 +165,12 @@ def login():
             if shop:
                 shop_id = shop.id
 
+        token = generate_jwt(user)
+
         return jsonify({
             "status": "success",
             "message": "Login successful",
+            "token": token,
             "user": {
                 "id": user.id,
                 "username": user.username,
@@ -198,14 +190,7 @@ def login():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# Remaining endpoints (session_check, verify_token, logout)
-# ───────────────────────────────────────────────
-# (Keep unchanged)
-
-# ───────────────────────────────────────────────
-# 🧠 Session Validation (JWT based)
-# ───────────────────────────────────────────────
+# Session Validation (JWT based)
 @auth_bp.route("/session", methods=["GET"])
 @token_required
 def session_check(decoded):
@@ -230,9 +215,7 @@ def session_check(decoded):
         return jsonify({"status": "error", "message": "Session validation failed.", "error": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# ✅ Token Verification
-# ───────────────────────────────────────────────
+# Token Verification
 @auth_bp.route("/verify_token", methods=["POST", "OPTIONS"])
 def verify_token():
     if request.method == "OPTIONS":
@@ -269,9 +252,7 @@ def verify_token():
         return jsonify({"status": "error", "message": "Token verification failed.", "error": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 🚪 Logout
-# ───────────────────────────────────────────────
+# Logout
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
     return jsonify({"status": "success", "message": "Logout successful. Please clear token on client."}), 200

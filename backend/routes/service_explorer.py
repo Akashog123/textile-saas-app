@@ -9,9 +9,7 @@ import requests
 
 service_explorer_bp = Blueprint("service_explorer", __name__, url_prefix="/api/v1/customer")
 
-# ───────────────────────────────────────────────
-# 🧾 GET: All Available Services (Filtered)
-# ───────────────────────────────────────────────
+# GET: All Available Services (Filtered)
 @service_explorer_bp.route("/services", methods=["GET"])
 def get_all_services():
     """
@@ -76,7 +74,7 @@ def get_all_services():
         }), 200
 
     except Exception as e:
-        print("❌ Error fetching services:", e)
+        print("Error fetching services:", e)
         return jsonify({
             "status": "error",
             "message": "Failed to load services.",
@@ -84,9 +82,7 @@ def get_all_services():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 📍 GET: Nearby Professionals (MapMyIndia / Fallback)
-# ───────────────────────────────────────────────
+# GET: Nearby Professionals (MapMyIndia / Fallback)
 @service_explorer_bp.route("/nearby-professionals", methods=["GET"])
 def get_nearby_professionals():
     """
@@ -99,7 +95,7 @@ def get_nearby_professionals():
         if not (lat and lon):
             return jsonify({"status": "error", "message": "Missing coordinates"}), 400
 
-        # ── MapMyIndia API Integration ──
+        # MapMyIndia API Integration
         if Config.MAPMYINDIA_KEY:
             url = "https://atlas.mapmyindia.com/api/places/nearby/json"
             headers = {"Authorization": f"Bearer {Config.MAPMYINDIA_KEY}"}
@@ -130,7 +126,7 @@ def get_nearby_professionals():
             else:
                 print("⚠️ MapMyIndia API fallback triggered.")
 
-        # ── Local Database Fallback ──
+        # Local Database Fallback
         local_pros = User.query.filter_by(role="professional", approved=True).limit(5).all()
         pros_data = [{
             "name": p.username,
@@ -147,7 +143,7 @@ def get_nearby_professionals():
         }), 200
 
     except Exception as e:
-        print("❌ Error fetching nearby professionals:", e)
+        print("Error fetching nearby professionals:", e)
         return jsonify({
             "status": "error",
             "message": "Unable to fetch nearby professionals.",

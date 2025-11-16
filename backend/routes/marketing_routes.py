@@ -4,9 +4,7 @@ from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 from services.ai_service import generate_ai_caption, forecast_trends, generate_marketing_poster
 
-# ───────────────────────────────────────────────
 # Blueprint Setup
-# ───────────────────────────────────────────────
 marketing_bp = Blueprint("marketing", __name__)
 
 UPLOAD_FOLDER = "./uploads/marketing"
@@ -14,17 +12,13 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {"csv", "xlsx", "png", "jpg", "jpeg"}
 
 
-# ───────────────────────────────────────────────
 # Helper: File Validation
-# ───────────────────────────────────────────────
 def allowed_file(filename: str) -> bool:
     """Check if the uploaded file has an allowed extension."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-# ───────────────────────────────────────────────
-# 📤 POST: Upload CSV/Image → Generate AI Marketing Insights + Poster
-# ───────────────────────────────────────────────
+# POST: Upload CSV/Image → Generate AI Marketing Insights + Poster
 @marketing_bp.route("/generate", methods=["POST"])
 def generate_marketing_content():
     """
@@ -50,7 +44,7 @@ def generate_marketing_content():
         result = {"filename": filename}
         ai_captions, trend_data = [], []
 
-        # ──────────────── CASE 1: CSV / XLSX Upload ────────────────
+        # CASE 1: CSV / XLSX Upload
         if filename.endswith((".csv", ".xlsx")):
             df = pd.read_csv(filepath) if filename.endswith(".csv") else pd.read_excel(filepath)
 
@@ -87,7 +81,7 @@ def generate_marketing_content():
                 "analyst": "Guest User"
             })
 
-        # ──────────────── CASE 2: Image Upload ────────────────
+        # CASE 2: Image Upload
         elif filename.endswith((".png", ".jpg", ".jpeg")):
             # Step 1: AI Caption from Image
             caption = generate_ai_caption(
@@ -109,8 +103,8 @@ def generate_marketing_content():
                 "analyst": "Guest User"
             })
 
-        # ──────────────── SUCCESS RESPONSE ────────────────
-        print(f"✅ [Marketing AI] Processed file: {filename}")
+        # SUCCESS RESPONSE
+        print(f"[Marketing AI] Processed file: {filename}")
         return jsonify({
             "status": "success",
             "message": "AI marketing content generated successfully!",
@@ -118,7 +112,7 @@ def generate_marketing_content():
         }), 200
 
     except Exception as e:
-        print("❌ [Marketing AI Error]:", e)
+        print("[Marketing AI Error]:", e)
         return jsonify({
             "status": "error",
             "message": "Failed to process marketing content.",
@@ -126,9 +120,7 @@ def generate_marketing_content():
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 📜 GET: Allowed File Extensions
-# ───────────────────────────────────────────────
+# GET: Allowed File Extensions
 @marketing_bp.route("/allowed-extensions", methods=["GET"])
 def get_allowed_extensions():
     """Return allowed file types for upload."""

@@ -2,7 +2,9 @@
   <div class="production-planning-page">
     <!-- Header with Export -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i> Production Planning</h5>
+      <h5 class="mb-0">
+        <i class="bi bi-clipboard-check me-2"></i> Production Planning
+      </h5>
       <button class="btn btn-success">
         <i class="bi bi-download me-2"></i> Export Production Plan (CSV)
       </button>
@@ -15,10 +17,16 @@
           <div class="d-flex align-items-center gap-2">
             <span class="fw-semibold">Filter ▼</span>
           </div>
-          
+
           <div class="filter-group">
-            <label class="small text-muted mb-1">Date Picker</label>
-            <select class="form-select form-select-sm" v-model="selectedMonth">
+            <label class="small text-muted mb-1" for="planning-date-picker"
+              >Date Picker</label
+            >
+            <select
+              id="planning-date-picker"
+              class="form-select form-select-sm"
+              v-model="selectedMonth"
+            >
               <option value="November 2025">November 2025</option>
               <option value="October 2025">October 2025</option>
               <option value="September 2025">September 2025</option>
@@ -26,15 +34,27 @@
           </div>
 
           <div class="filter-group">
-            <label class="small text-muted mb-1">Location</label>
-            <button class="btn btn-outline-secondary btn-sm">
+            <label class="small text-muted mb-1" for="planning-location"
+              >Location</label
+            >
+            <button
+              id="planning-location"
+              class="btn btn-outline-secondary btn-sm"
+              type="button"
+            >
               <i class="bi bi-geo-alt-fill me-1"></i> All Regions
             </button>
           </div>
 
           <div class="filter-group">
-            <label class="small text-muted mb-1">Time Period</label>
-            <select class="form-select form-select-sm" v-model="timePeriod">
+            <label class="small text-muted mb-1" for="planning-time-period"
+              >Time Period</label
+            >
+            <select
+              id="planning-time-period"
+              class="form-select form-select-sm"
+              v-model="timePeriod"
+            >
               <option value="Monthly">Monthly</option>
               <option value="Quarterly">Quarterly</option>
               <option value="Yearly">Yearly</option>
@@ -47,15 +67,22 @@
     <!-- AI-Generated Production Priorities -->
     <div class="card ai-priorities-card mb-4">
       <div class="card-body">
-        <h6 class="mb-3"><i class="bi bi-stars me-2"></i>AI-Generated Production Priorities for December 2025</h6>
+        <h6 class="mb-3">
+          <i class="bi bi-stars me-2"></i>AI-Generated Production Priorities for
+          December 2025
+        </h6>
         <div class="priorities-list">
           <div class="priority-item increase">
             <div class="priority-icon">
               <i class="bi bi-arrow-up-circle-fill"></i>
             </div>
             <div class="priority-content">
-              <strong>Increase Production:</strong> Handwoven Silk Brocade & Premium Cotton Batik
-              <div class="text-muted small mt-1">Demand up 32% in Northern & Eastern Regions due to festive season</div>
+              <strong>Increase Production:</strong> Handwoven Silk Brocade &
+              Premium Cotton Batik
+              <div class="text-muted small mt-1">
+                Demand up 32% in Northern & Eastern Regions due to festive
+                season
+              </div>
             </div>
           </div>
           <div class="priority-item maintain">
@@ -63,8 +90,11 @@
               <i class="bi bi-dash-circle-fill"></i>
             </div>
             <div class="priority-content">
-              <strong>Maintain Production:</strong> Designer Silk Collection & Georgette Floral
-              <div class="text-muted small mt-1">Stable demand with consistent sales velocity across all regions</div>
+              <strong>Maintain Production:</strong> Designer Silk Collection &
+              Georgette Floral
+              <div class="text-muted small mt-1">
+                Stable demand with consistent sales velocity across all regions
+              </div>
             </div>
           </div>
           <div class="priority-item reduce">
@@ -72,8 +102,11 @@
               <i class="bi bi-arrow-down-circle-fill"></i>
             </div>
             <div class="priority-content">
-              <strong>Reduce Production:</strong> Heavy Velvet & Winter Wool Blends
-              <div class="text-muted small mt-1">Seasonal decline down 28% as winter demand subsides</div>
+              <strong>Reduce Production:</strong> Heavy Velvet & Winter Wool
+              Blends
+              <div class="text-muted small mt-1">
+                Seasonal decline down 28% as winter demand subsides
+              </div>
             </div>
           </div>
         </div>
@@ -83,12 +116,22 @@
     <!-- Top-Selling Products by Region -->
     <div class="card mb-4">
       <div class="card-body">
-        <h6 class="mb-3"><i class="bi bi-trophy-fill me-2"></i>Top-Selling Products by Region</h6>
-        
+        <h6 class="mb-3">
+          <i class="bi bi-trophy-fill me-2"></i>Top-Selling Products by Region
+        </h6>
+
         <div class="products-grid">
-          <div v-for="(product, idx) in topSellingProducts" :key="idx" class="product-card">
+          <div
+            v-for="(product, idx) in topSellingProducts"
+            :key="idx"
+            class="product-card"
+          >
             <div class="product-image-wrapper mb-2">
-              <img :src="product.image" :alt="product.name" class="product-image">
+              <img
+                :src="product.image"
+                :alt="product.name"
+                class="product-image"
+              />
               <div class="rank-badge">#{{ idx + 1 }}</div>
             </div>
             <div class="product-info">
@@ -116,65 +159,181 @@
       <div class="col-md-6">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3"><i class="bi bi-pie-chart-fill me-2"></i>Performance by Product Line</h6>
-            <div class="chart-container d-flex justify-content-center align-items-center" style="height: 280px;">
+            <h6 class="mb-3">
+              <i class="bi bi-pie-chart-fill me-2"></i>Performance by Product
+              Line
+            </h6>
+            <div
+              class="chart-container d-flex justify-content-center align-items-center"
+              style="height: 280px"
+            >
               <!-- Enhanced Pie Chart SVG -->
               <svg viewBox="0 0 240 240" width="240" height="240">
                 <defs>
-                  <linearGradient id="gradSilk" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                  <linearGradient
+                    id="gradSilk"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #667eea; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #764ba2; stop-opacity: 1"
+                    />
                   </linearGradient>
-                  <linearGradient id="gradCotton" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#f093fb;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#f5576c;stop-opacity:1" />
+                  <linearGradient
+                    id="gradCotton"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #f093fb; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #f5576c; stop-opacity: 1"
+                    />
                   </linearGradient>
-                  <linearGradient id="gradGeorgette" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+                  <linearGradient
+                    id="gradGeorgette"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #4facfe; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #00f2fe; stop-opacity: 1"
+                    />
                   </linearGradient>
-                  <linearGradient id="gradOthers" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#43e97b;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#38f9d7;stop-opacity:1" />
+                  <linearGradient
+                    id="gradOthers"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #43e97b; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #38f9d7; stop-opacity: 1"
+                    />
                   </linearGradient>
                 </defs>
                 <!-- Silk - 35% -->
-                <path d="M 120 120 L 120 30 A 90 90 0 0 1 198 75 Z" 
-                      fill="url(#gradSilk)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 120 30 A 90 90 0 0 1 198 75 Z"
+                  fill="url(#gradSilk)"
+                  class="pie-slice"
+                />
                 <!-- Cotton - 30% -->
-                <path d="M 120 120 L 198 75 A 90 90 0 0 1 198 165 Z" 
-                      fill="url(#gradCotton)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 198 75 A 90 90 0 0 1 198 165 Z"
+                  fill="url(#gradCotton)"
+                  class="pie-slice"
+                />
                 <!-- Georgette - 25% -->
-                <path d="M 120 120 L 198 165 A 90 90 0 0 1 60 180 Z" 
-                      fill="url(#gradGeorgette)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 198 165 A 90 90 0 0 1 60 180 Z"
+                  fill="url(#gradGeorgette)"
+                  class="pie-slice"
+                />
                 <!-- Others - 10% -->
-                <path d="M 120 120 L 60 180 A 90 90 0 0 1 120 30 Z" 
-                      fill="url(#gradOthers)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 60 180 A 90 90 0 0 1 120 30 Z"
+                  fill="url(#gradOthers)"
+                  class="pie-slice"
+                />
                 <!-- Center circle -->
                 <circle cx="120" cy="120" r="50" fill="white" />
-                <text x="120" y="115" text-anchor="middle" font-size="14" font-weight="600" fill="#4a5568">Total</text>
-                <text x="120" y="135" text-anchor="middle" font-size="18" font-weight="700" fill="#667eea">85.2K</text>
+                <text
+                  x="120"
+                  y="115"
+                  text-anchor="middle"
+                  font-size="14"
+                  font-weight="600"
+                  fill="#4a5568"
+                >
+                  Total
+                </text>
+                <text
+                  x="120"
+                  y="135"
+                  text-anchor="middle"
+                  font-size="18"
+                  font-weight="700"
+                  fill="#667eea"
+                >
+                  85.2K
+                </text>
               </svg>
             </div>
             <div class="legend-container mt-3">
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #667eea 0%,
+                      #764ba2 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Silk Products (35%)</span>
               </div>
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #f093fb 0%,
+                      #f5576c 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Cotton Products (30%)</span>
               </div>
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #4facfe 0%,
+                      #00f2fe 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Georgette Products (25%)</span>
               </div>
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #43e97b 0%,
+                      #38f9d7 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Others (10%)</span>
               </div>
             </div>
@@ -185,12 +344,19 @@
       <div class="col-md-6">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3"><i class="bi bi-graph-down-arrow me-2"></i>Bottom 5 Underperforming Products</h6>
+            <h6 class="mb-3">
+              <i class="bi bi-graph-down-arrow me-2"></i>Bottom 5
+              Underperforming Products
+            </h6>
             <div class="underperforming-list">
-              <div v-for="(item, idx) in underperformingProducts" :key="idx" class="underperforming-item">
+              <div
+                v-for="(item, idx) in underperformingProducts"
+                :key="idx"
+                class="underperforming-item"
+              >
                 <div class="item-rank">{{ idx + 1 }}</div>
                 <div class="item-image">
-                  <img :src="item.image" :alt="item.name">
+                  <img :src="item.image" :alt="item.name" />
                 </div>
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
@@ -210,86 +376,96 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from "vue";
 
-const selectedMonth = ref('November 2025')
-const timePeriod = ref('Monthly')
+const selectedMonth = ref("November 2025");
+const timePeriod = ref("Monthly");
 
 const topSellingProducts = ref([
-  { 
-    name: 'Handwoven Silk Brocade',
-    image: 'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+32% MoM',
-    region: 'Northern Region',
-    volume: '2,450 meters'
+  {
+    name: "Handwoven Silk Brocade",
+    image:
+      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+32% MoM",
+    region: "Northern Region",
+    volume: "2,450 meters",
   },
-  { 
-    name: 'Premium Cotton Batik',
-    image: 'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+28% MoM',
-    region: 'Eastern Region',
-    volume: '3,120 meters'
+  {
+    name: "Premium Cotton Batik",
+    image:
+      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+28% MoM",
+    region: "Eastern Region",
+    volume: "3,120 meters",
   },
-  { 
-    name: 'Luxury Georgette Floral',
-    image: 'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+24% MoM',
-    region: 'Southern Region',
-    volume: '1,890 meters'
+  {
+    name: "Luxury Georgette Floral",
+    image:
+      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+24% MoM",
+    region: "Southern Region",
+    volume: "1,890 meters",
   },
-  { 
-    name: 'Designer Silk Collection',
-    image: 'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+22% MoM',
-    region: 'Western Region',
-    volume: '1,650 meters'
+  {
+    name: "Designer Silk Collection",
+    image:
+      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+22% MoM",
+    region: "Western Region",
+    volume: "1,650 meters",
   },
-  { 
-    name: 'Traditional Block Print',
-    image: 'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+19% MoM',
-    region: 'Central Region',
-    volume: '2,280 meters'
-  }
-])
+  {
+    name: "Traditional Block Print",
+    image:
+      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+19% MoM",
+    region: "Central Region",
+    volume: "2,280 meters",
+  },
+]);
 
 const underperformingProducts = ref([
   {
-    name: 'Heavy Velvet Fabric',
-    image: 'https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200',
-    region: 'All Regions',
-    decline: '-28%',
-    volume: '420'
+    name: "Heavy Velvet Fabric",
+    image:
+      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200",
+    region: "All Regions",
+    decline: "-28%",
+    volume: "420",
   },
   {
-    name: 'Winter Wool Blend',
-    image: 'https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200',
-    region: 'Northern Region',
-    decline: '-22%',
-    volume: '580'
+    name: "Winter Wool Blend",
+    image:
+      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200",
+    region: "Northern Region",
+    decline: "-22%",
+    volume: "580",
   },
   {
-    name: 'Thick Denim Cotton',
-    image: 'https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200',
-    region: 'Western Region',
-    decline: '-18%',
-    volume: '650'
+    name: "Thick Denim Cotton",
+    image:
+      "https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200",
+    region: "Western Region",
+    decline: "-18%",
+    volume: "650",
   },
   {
-    name: 'Dark Paisley Print',
-    image: 'https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200',
-    region: 'Southern Region',
-    decline: '-15%',
-    volume: '720'
+    name: "Dark Paisley Print",
+    image:
+      "https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200",
+    region: "Southern Region",
+    decline: "-15%",
+    volume: "720",
   },
   {
-    name: 'Vintage Linen Blend',
-    image: 'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200',
-    region: 'Eastern Region',
-    decline: '-12%',
-    volume: '890'
-  }
-])
+    name: "Vintage Linen Blend",
+    image:
+      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=200",
+    region: "Eastern Region",
+    decline: "-12%",
+    volume: "890",
+  },
+]);
 </script>
 
 <style scoped>
@@ -313,7 +489,8 @@ const underperformingProducts = ref([
 }
 
 /* ===== Typography ===== */
-h5, h6 {
+h5,
+h6 {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -322,23 +499,28 @@ h5, h6 {
 }
 
 /* ===== Cards ===== */
-.filters-card, .card {
+.filters-card,
+.card {
   border: none;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
 }
 
 /* ===== AI Priorities Card ===== */
 .ai-priorities-card {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   border: 2px solid rgba(102, 126, 234, 0.15);
 }
 
@@ -361,7 +543,7 @@ h5, h6 {
 
 .priority-item:hover {
   transform: translateX(5px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .priority-item.increase {
@@ -432,7 +614,7 @@ h5, h6 {
 }
 
 .product-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -482,7 +664,7 @@ h5, h6 {
   border-radius: 20px;
   font-weight: 700;
   font-size: 0.85rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .product-info {
@@ -541,7 +723,7 @@ h5, h6 {
 
 /* ===== Chart Styles ===== */
 .chart-container svg {
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.1));
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
 }
 
 .pie-slice {
@@ -600,7 +782,7 @@ h5, h6 {
 
 .underperforming-item:hover {
   background: white;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transform: translateX(3px);
 }
 

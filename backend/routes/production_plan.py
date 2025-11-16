@@ -3,19 +3,21 @@
 import os
 import io
 import pandas as pd
+from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
 from prophet import Prophet
 from google.generativeai import configure, GenerativeModel
 from routes.auth_routes import token_required
+from models.model import Product, SalesData
 
 production_bp = Blueprint("production", __name__)
 
 # Load Gemini API key from environment
 configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
-# ───────────────────────────────────────────────
-# 🤖 Gemini Helper: AI-Generated Production Insight
-# ───────────────────────────────────────────────
+
+# Gemini Helper: AI-Generated Production Insight
+
 def generate_production_plan(df, forecast_df):
     """Generate structured AI-based production plan recommendations using Gemini."""
     try:
@@ -63,9 +65,8 @@ def generate_production_plan(df, forecast_df):
         return "Unable to generate AI insights currently."
 
 
-# ───────────────────────────────────────────────
-# 📤 POST: Generate AI Production Plan + Forecast
-# ───────────────────────────────────────────────
+
+# POST: Generate AI Production Plan + Forecast
 @production_bp.route("/production-plan", methods=["POST"])
 @token_required
 def production_plan(current_user):
@@ -75,19 +76,34 @@ def production_plan(current_user):
         if not file:
             return jsonify({"status": "error", "message": "No file uploaded"}), 400
 
-        df = pd.read_csv(file)
+        filename = (file.filename or "").lower()
+        if filename.endswith(".csv"):
+            df = pd.read_csv(file)
+        elif filename.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(file)
+        else:
+            return jsonify({"status": "error", "message": "File must be .csv or .xlsx"}), 400
+
+        if df.empty:
+            return jsonify({"status": "error", "message": "Uploaded file has no rows"}), 400
 
         # Validate columns
         required_cols = {"Date", "Product", "Sales"}
         if not required_cols.issubset(df.columns):
+            missing = required_cols - set(df.columns)
             return jsonify({
                 "status": "error",
-                "message": f"CSV must contain columns: {', '.join(required_cols)}"
+                "message": f"File must contain columns: {', '.join(sorted(required_cols))}",
+                "missing": sorted(missing)
             }), 400
 
         # Prophet Forecast
-        df["ds"] = pd.to_datetime(df["Date"])
-        df["y"] = df["Sales"]
+        df["ds"] = pd.to_datetime(df["Date"], errors="coerce")
+        df["y"] = pd.to_numeric(df["Sales"], errors="coerce")
+        df.dropna(subset=["ds", "y"], inplace=True)
+
+        if df.empty:
+            return jsonify({"status": "error", "message": "No valid Date/Sales rows after parsing"}), 400
 
         model = Prophet()
         model.fit(df[["ds", "y"]])
@@ -159,27 +175,54 @@ def production_plan(current_user):
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 📦 GET: Export AI Production Plan as CSV
-# ───────────────────────────────────────────────
+# GET: Export AI Production Plan as CSV
 @production_bp.route("/export-plan", methods=["GET"])
 @token_required
 def export_plan(current_user):
-    """Export a sample AI production plan as CSV."""
+    """Export a production plan CSV derived from live sales data."""
     try:
-        data = [
-            ["Increase Production", "Silk Brocade, Cotton Batik", "High festive demand"],
-            ["Maintain Production", "Linen, Georgette", "Stable metro demand"],
-            ["Reduce Production", "Wool, Velvet", "Seasonal slowdown"],
-        ]
-        plan_df = pd.DataFrame(data, columns=["Priority", "Products", "Reason"])
+        window_start = datetime.utcnow().date().replace(day=1)
+        sales_rows = (
+            SalesData.query
+            .filter(SalesData.date >= window_start)
+            .all()
+        )
 
-        buf = io.BytesIO()
-        plan_df.to_csv(buf, index=False)
-        buf.seek(0)
+        if not sales_rows:
+            return jsonify({
+                "status": "error",
+                "message": "No sales data available for export this month."
+            }), 404
+
+        product_ids = {row.product_id for row in sales_rows if row.product_id}
+        products = Product.query.filter(Product.id.in_(product_ids)).all()
+        product_lookup = {p.id: p for p in products}
+
+        rows = []
+        for entry in sales_rows:
+            product = product_lookup.get(entry.product_id)
+            rows.append({
+                "Product": product.name if product else f"Product #{entry.product_id}",
+                "Category": product.category if product else "Unknown",
+                "Region": entry.region or "Unknown",
+                "Revenue": float(entry.revenue or 0),
+                "UnitsSold": entry.quantity_sold or 0
+            })
+
+        df = pd.DataFrame(rows)
+        summary = (
+            df.groupby(["Product", "Category"])
+            .agg({"Revenue": "sum", "UnitsSold": "sum"})
+            .reset_index()
+            .sort_values("Revenue", ascending=False)
+        )
+
+        csv_buf = io.StringIO()
+        summary.to_csv(csv_buf, index=False)
+        csv_buf.seek(0)
 
         return send_file(
-            buf,
+            io.BytesIO(csv_buf.getvalue().encode()),
             mimetype="text/csv",
             as_attachment=True,
             download_name="production_plan.csv",

@@ -4,17 +4,13 @@ from sqlalchemy import event, Index, func
 
 db = SQLAlchemy()
 
-# --------------------
+
 # Utility / mixins
-# --------------------
 class TimestampMixin:
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
 
 
-# --------------------
-# User
-# --------------------
 class User(db.Model, TimestampMixin):
     __tablename__ = "users"
 
@@ -44,10 +40,6 @@ class User(db.Model, TimestampMixin):
     def __repr__(self):
         return f"<User {self.username} ({self.role})>"
 
-
-# --------------------
-# Shop
-# --------------------
 class Shop(db.Model, TimestampMixin):
     __tablename__ = "shops"
 
@@ -73,10 +65,6 @@ class Shop(db.Model, TimestampMixin):
     def __repr__(self):
         return f"<Shop {self.name}>"
 
-
-# --------------------
-# Sales / Orders
-# --------------------
 class SaleOrder(db.Model, TimestampMixin):
     __tablename__ = "sale_orders"
 
@@ -107,10 +95,6 @@ class SalesLineItem(db.Model):
     def __repr__(self):
         return f"<SalesLineItem order={self.order_id} product={self.product_id} qty={self.quantity}>"
 
-
-# --------------------
-# Product / Fabric
-# --------------------
 class Product(db.Model, TimestampMixin):
     __tablename__ = "products"
 
@@ -160,10 +144,6 @@ class ProductEmbedding(db.Model):
     model = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-
-# --------------------
-# Inventory & Stock Transfer
-# --------------------
 class Inventory(db.Model):
     __tablename__ = "inventory"
 
@@ -187,10 +167,6 @@ class StockTransfer(db.Model):
     initiated_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-
-# --------------------
-# SalesData (Forecasting & Dashboard)
-# --------------------
 class SalesData(db.Model):
     __tablename__ = "sales_data"
 
@@ -210,9 +186,6 @@ class SalesData(db.Model):
         return f"<SalesData {self.date} shop={self.shop_id} product={self.product_id} qty={self.quantity_sold}>"
 
 
-# --------------------
-# 🆕 Product Catalog (from fashion dataset)
-# --------------------
 class ProductCatalog(db.Model):
     __tablename__ = "product_catalog"
 
@@ -247,10 +220,6 @@ class ProductCatalog(db.Model):
             "price": self.price,
         }
 
-
-# --------------------
-# Review
-# --------------------
 class Review(db.Model, TimestampMixin):
     __tablename__ = "reviews"
 
@@ -263,10 +232,6 @@ class Review(db.Model, TimestampMixin):
     body = db.Column(db.Text)
     is_verified_purchase = db.Column(db.Boolean, default=False)
 
-
-# --------------------
-# Service & Requests
-# --------------------
 class Category(db.Model):
     __tablename__ = "categories"
     id = db.Column(db.Integer, primary_key=True)
@@ -302,10 +267,6 @@ class ServiceRequest(db.Model, TimestampMixin):
     pro_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     scheduled_for = db.Column(db.DateTime)
 
-
-# --------------------
-# Uploads / Logs / Notifications
-# --------------------
 class Upload(db.Model, TimestampMixin):
     __tablename__ = "uploads"
     id = db.Column(db.Integer, primary_key=True)
@@ -350,10 +311,6 @@ class Notification(db.Model):
     is_read = db.Column(db.Boolean, default=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# -------------------------------------------------------------------
-# MERGED MODELS FROM models2.py (Renamed to avoid conflict)
-# -------------------------------------------------------------------
-
 class StoreRegion(db.Model):
     __tablename__ = 'store_regions'
 
@@ -368,7 +325,6 @@ class StoreRegion(db.Model):
 
     def __repr__(self):
         return f"<StoreRegion {self.StoreName}>"
-
 
 
 class ExternalProduct(db.Model):
@@ -410,9 +366,8 @@ class ExternalSalesDataItem(db.Model):
     def __repr__(self):
         return f"<ExternalSalesDataItem Order={self.OrderId}, Product={self.ProductID}>"
 
-# --------------------
+
 # DB Setup
-# --------------------
 def init_db(app):
     db.init_app(app)
     with app.app_context():

@@ -3,15 +3,14 @@
 from flask import Blueprint, jsonify, request
 from models.model import db, Product, Shop, SalesData
 from sqlalchemy import or_
+from werkzeug.exceptions import NotFound
 from services.ai_service import generate_ai_caption
 from services.forecasting_service import top_trending_products
 import pandas as pd
 
 product_bp = Blueprint("product", __name__)
 
-# ───────────────────────────────────────────────
-# 🧵 GET: All Products (Dynamic + Filtered)
-# ───────────────────────────────────────────────
+# GET: All Products (Dynamic + Filtered)
 @product_bp.route("/", methods=["GET"])
 def get_all_products():
     """
@@ -73,9 +72,7 @@ def get_all_products():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 🪡 GET: Single Product Details
-# ───────────────────────────────────────────────
+# GET: Single Product Details
 @product_bp.route("/<int:product_id>", methods=["GET"])
 def get_product_detail(product_id):
     """Fetch detailed product information, including AI caption."""
@@ -102,14 +99,17 @@ def get_product_detail(product_id):
             "product": product_data
         }), 200
 
+    except NotFound:
+        return jsonify({
+            "status": "error",
+            "message": f"Product with id {product_id} not found."
+        }), 404
     except Exception as e:
         print("[Error - Product Detail]", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "Failed to fetch product details."}), 500
 
 
-# ───────────────────────────────────────────────
-# 🤖 AI-Driven Trending Product Recommendations
-# ───────────────────────────────────────────────
+# AI-Driven Trending Product Recommendations
 @product_bp.route("/suggested", methods=["GET"])
 def get_suggested_products():
     """

@@ -1,6 +1,8 @@
 <template>
   <div class="navbar-wrapper">
-    <nav class="navbar navbar-expand-lg navbar-light bg-gradient-primary shadow-elegant">
+    <nav
+      class="navbar navbar-expand-lg navbar-light bg-gradient-primary shadow-elegant"
+    >
       <div class="container-fluid px-4">
         <div class="navbar-brand fw-bold brand-logo" to="/">
           <i class="bi bi-scissors brand-icon"></i>
@@ -21,7 +23,10 @@
 
         <div class="collapse navbar-collapse" id="mainNav">
           <!-- Right: user & logout -->
-          <div class="d-flex align-items-center gap-3 ms-auto" v-if="isLoggedIn">
+          <div
+            class="d-flex align-items-center gap-3 ms-auto"
+            v-if="isLoggedIn"
+          >
             <div class="user-profile-badge">
               <i class="bi bi-person-circle user-avatar"></i>
               <span class="username-text">{{ username }}</span>
@@ -35,14 +40,21 @@
       </div>
     </nav>
 
-    <!-- Shop Manager Sub-Navigation -->
-    <div v-if="isLoggedIn && isShopRole" class="sub-nav-container bg-gradient-light">
+    <!-- Shop Manager Sub-Navigation (visible only for shop_owner role) -->
+    <div
+      v-if="isLoggedIn && isShopRole"
+      class="sub-nav-container bg-gradient-light"
+    >
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
-              :class="{ active: $route.path.includes('/shop/dashboard') || $route.path === '/shop' }"
+            <router-link
+              class="nav-link-modern"
+              :class="{
+                active:
+                  $route.path.includes('/shop/dashboard') ||
+                  $route.path === '/shop',
+              }"
               to="/shop/dashboard"
             >
               <i class="bi bi-speedometer2 nav-icon"></i>
@@ -50,8 +62,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/shop/inventory') }"
               to="/shop/inventory"
             >
@@ -60,8 +72,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/shop/marketing') }"
               to="/shop/marketing"
             >
@@ -70,8 +82,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/shop/inquiry') }"
               to="/shop/inquiry"
             >
@@ -83,14 +95,21 @@
       </div>
     </div>
 
-    <!-- Customer Sub-Navigation -->
-    <div v-if="isLoggedIn && isCustomerRole" class="sub-nav-container bg-gradient-light">
+    <!-- Customer Sub-Navigation (visible only for customer role) -->
+    <div
+      v-if="isLoggedIn && isCustomerRole"
+      class="sub-nav-container bg-gradient-light"
+    >
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
-              :class="{ active: $route.path.includes('/customer/home') || $route.path === '/customer' }"
+            <router-link
+              class="nav-link-modern"
+              :class="{
+                active:
+                  $route.path.includes('/customer/home') ||
+                  $route.path === '/customer',
+              }"
               to="/customer/home"
             >
               <i class="bi bi-house nav-icon"></i>
@@ -98,8 +117,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/customer/shops') }"
               to="/customer/shops"
             >
@@ -108,8 +127,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/customer/products') }"
               to="/customer/products"
             >
@@ -118,8 +137,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/customer/profile') }"
               to="/customer/profile"
             >
@@ -131,14 +150,21 @@
       </div>
     </div>
 
-    <!-- Distributor/Manufacturer Sub-Navigation -->
-    <div v-if="isLoggedIn && isDistributorRole" class="sub-nav-container bg-gradient-light">
+    <!-- Distributor/Manufacturer Sub-Navigation (visible only for distributor/manufacturer role) -->
+    <div
+      v-if="isLoggedIn && isDistributorRole"
+      class="sub-nav-container bg-gradient-light"
+    >
       <div class="container-fluid px-4">
         <ul class="nav nav-tabs-modern border-0 pt-2">
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
-              :class="{ active: $route.path.includes('/distributor/demand') || $route.path === '/distributor' }"
+            <router-link
+              class="nav-link-modern"
+              :class="{
+                active:
+                  $route.path.includes('/distributor/demand') ||
+                  $route.path === '/distributor',
+              }"
               to="/distributor/demand"
             >
               <i class="bi bi-graph-up-arrow nav-icon"></i>
@@ -146,8 +172,8 @@
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link 
-              class="nav-link-modern" 
+            <router-link
+              class="nav-link-modern"
               :class="{ active: $route.path.includes('/distributor/planning') }"
               to="/distributor/planning"
             >
@@ -162,66 +188,66 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { useRouter, useRoute } from "vue-router";
 
 // ---- state
-const router = useRouter()
-const route = useRoute()
-const isLoggedIn = ref(false)
-const username = ref('')
-const role = ref('')
+const router = useRouter();
+const route = useRoute();
+const isLoggedIn = ref(false);
+const username = ref("");
+const role = ref("");
 
-// ✅ role-based helpers
-const isShopRole = computed(() => role.value === 'shop_owner' || role.value === 'manager')
-const isCustomerRole = computed(() => role.value === 'customer')
-const isDistributorRole = computed(() => role.value === 'distributor' || role.value === 'manufacturer')
+// role-based helpers
+const isShopRole = computed(() => role.value === "shop_owner" || role.value === "manager");
+const isCustomerRole = computed(() => role.value === "customer");
+const isDistributorRole = computed(() => role.value === "distributor" || role.value === "manufacturer");
 
-// ✅ Simplified hydrate (no JWT verification)
+// Simplified hydrate (no remote verification)
 const hydrateFromStorage = () => {
-  const storedRole = localStorage.getItem('role')
-  const storedName = localStorage.getItem('username')
+  const storedRole = localStorage.getItem("role");
+  const storedName = localStorage.getItem("username");
 
   if (storedRole && storedName) {
-    isLoggedIn.value = true
-    username.value = storedName
-    role.value = storedRole
+    isLoggedIn.value = true;
+    username.value = storedName;
+    role.value = storedRole;
   } else {
-    isLoggedIn.value = false
-    username.value = ''
-    role.value = ''
+    isLoggedIn.value = false;
+    username.value = "";
+    role.value = "";
   }
-}
+};
 
-// ✅ On login event or route change, rehydrate
 const handleUserLogin = async () => {
-  await nextTick()
-  hydrateFromStorage()
-}
+  await nextTick();
+  hydrateFromStorage();
+};
 
 onMounted(() => {
-  hydrateFromStorage()
-  window.addEventListener('user-logged-in', handleUserLogin)
-})
+  hydrateFromStorage();
+  window.addEventListener("user-logged-in", handleUserLogin);
+});
 
 onBeforeUnmount(() => {
-  window.removeEventListener('user-logged-in', handleUserLogin)
-})
+  window.removeEventListener("user-logged-in", handleUserLogin);
+});
 
-watch(() => route.path, hydrateFromStorage)
+watch(() => route.path, () => {
+  hydrateFromStorage();
+});
 
-// ✅ Logout
 const logout = () => {
-  localStorage.clear()
-  isLoggedIn.value = false
-  role.value = ''
-  username.value = ''
-  router.push('/login')
-}
+  localStorage.clear();
+  isLoggedIn.value = false;
+  role.value = "";
+  username.value = "";
+  router.push("/login");
+};
 </script>
 
 <style scoped>
-/* ✅ your existing CSS unchanged */
+
 .bg-gradient-primary {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -247,8 +273,13 @@ const logout = () => {
 }
 
 @keyframes rotate {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(10deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
 }
 
 .brand-text {
@@ -339,7 +370,7 @@ const logout = () => {
 }
 
 .nav-link-modern::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -388,7 +419,7 @@ const logout = () => {
 }
 
 .navbar-nav .nav-link::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -412,18 +443,18 @@ const logout = () => {
   .user-profile-badge {
     margin-top: 1rem;
   }
-  
+
   .btn-logout {
     width: 100%;
     justify-content: center;
     margin-top: 0.5rem;
   }
-  
+
   .nav-tabs-modern {
     flex-direction: column;
     gap: 0.25rem;
   }
-  
+
   .nav-link-modern {
     border-radius: 8px;
   }
@@ -431,7 +462,9 @@ const logout = () => {
 
 /* Smooth Transitions */
 * {
-  transition: color 0.2s ease, background-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 </style>

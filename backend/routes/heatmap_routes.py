@@ -2,32 +2,14 @@ from flask import Blueprint, jsonify
 from models.model import ExternalSalesDataItem, StoreRegion
 from models.model import db
 import pandas as pd
-import numpy as np
 
-heatmap_bp = Blueprint("heatmap", __name__, url_prefix="/region-demand-heatmap")
+heatmap_bp = Blueprint("heatmap", __name__)
+
 
 @heatmap_bp.route('/', methods=['GET'])
 def region_demand_heatmap():
-    """
-    As a distributor, visualize which regions have rising or falling fabric demand
-    using a JSON-based heatmap API.
-
-    Output:
-    [
-        {
-            "RegionName": "...",
-            "Latitude": ...,
-            "Longitude": ...,
-            "Month": "January 2024",
-            "UnitsSold": 1234,
-            "DemandTrend": "Upward / Downward / Stable",
-            "HeatmapScore": 0.83
-        }
-    ]
-    """
-
+    """Return regional demand heatmap points with basic trend analysis."""
     try:
-        # STEP 1 — Join Region + Sales Data
         data = (
             db.session.query(
                 StoreRegion.RegionName,
@@ -41,9 +23,11 @@ def region_demand_heatmap():
         )
 
         if not data:
-            return jsonify({"error": "No demand/sales data found"}), 404
+            return jsonify({
+                "status": "error",
+                "message": "No demand/sales data found"
+            }), 404
 
-        # STEP 2 — Convert to DataFrame
         df = pd.DataFrame([{
             "RegionName": d.RegionName,
             "Latitude": d.Latitude,
@@ -53,48 +37,56 @@ def region_demand_heatmap():
         } for d in data])
 
         df["SaleDate"] = pd.to_datetime(df["SaleDate"], errors='coerce')
-        df["Month"] = df["SaleDate"].dt.strftime("%B %Y")
+        df.dropna(subset=["SaleDate"], inplace=True)
+        if df.empty:
+            return jsonify({
+                "status": "success",
+                "points": [],
+                "message": "Sales dates were invalid."
+            }), 200
 
-        # STEP 3 — Aggregate monthly sales per region
+        df["Month"] = df["SaleDate"].dt.to_period('M').dt.to_timestamp()
+
         grouped = (
-            df.groupby(["RegionName", "Latitude", "Longitude", "Month"])
+            df.groupby(["RegionName", "Latitude", "Longitude", "Month"], as_index=False)
             .agg({"UnitsSold": "sum"})
-            .reset_index()
+            .sort_values("Month")
         )
 
-        # STEP 4 — Determine trend (Upward / Downward / Stable)
-        region_trends = []
+        if grouped.empty:
+            return jsonify({
+                "status": "success",
+                "points": []
+            }), 200
 
-        for region in grouped["RegionName"].unique():
-            r_df = grouped[grouped["RegionName"] == region].sort_values("Month")
+        grouped["Prev"] = grouped.groupby("RegionName")["UnitsSold"].shift(1)
+        grouped["DemandTrend"] = grouped.apply(
+            lambda row: (
+                "Upward" if pd.notnull(row["Prev"]) and row["UnitsSold"] > row["Prev"]
+                else "Downward" if pd.notnull(row["Prev"]) and row["UnitsSold"] < row["Prev"]
+                else "Stable"
+            ),
+            axis=1
+        )
 
-            r_df["Prev"] = r_df["UnitsSold"].shift(1)
-            r_df["Trend"] = r_df.apply(
-                lambda x: (
-                    "Upward" if pd.notnull(x["Prev"]) and x["UnitsSold"] > x["Prev"]
-                    else "Downward" if pd.notnull(x["Prev"]) and x["UnitsSold"] < x["Prev"]
-                    else "Stable"
-                ),
-                axis=1
-            )
+        min_val = grouped["UnitsSold"].min()
+        max_val = grouped["UnitsSold"].max()
+        grouped["HeatmapScore"] = (
+            (grouped["UnitsSold"] - min_val) / (max_val - min_val + 1e-9)
+        )
 
-            region_trends.append(r_df)
-
-        trend_df = pd.concat(region_trends)
-
-        # STEP 5 — Normalize UnitsSold to 0–1 for heatmap
-        min_val = trend_df["UnitsSold"].min()
-        max_val = trend_df["UnitsSold"].max()
-        trend_df["HeatmapScore"] = (trend_df["UnitsSold"] - min_val) / (max_val - min_val + 1e-9)
-
-        # STEP 6 — Final JSON output
-        json_output = trend_df.to_dict(orient="records")
+        grouped["Month"] = grouped["Month"].dt.strftime("%B %Y")
 
         return jsonify({
             "status": "success",
-            "points": json_output
-        })
+            "points": grouped.drop(columns=["Prev"]).to_dict(orient="records")
+        }), 200
 
     except Exception as e:
-        return jsonify({"error": f"Heatmap processing failed: {str(e)}"}), 500
+        print("[Heatmap Error]", e)
+        return jsonify({
+            "status": "error",
+            "message": "Heatmap processing failed.",
+            "error": str(e)
+        }), 500
 

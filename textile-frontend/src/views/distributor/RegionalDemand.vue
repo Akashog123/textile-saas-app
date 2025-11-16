@@ -2,7 +2,9 @@
   <div class="regional-demand-page">
     <!-- Header with Filters -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h5 class="mb-0"><i class="bi bi-bar-chart-fill me-2"></i> Regional Demand Analysis</h5>
+      <h5 class="mb-0">
+        <i class="bi bi-bar-chart-fill me-2"></i> Regional Demand Analysis
+      </h5>
       <button class="btn btn-success">
         <i class="bi bi-download me-2"></i> Download Full Report (PDF)
       </button>
@@ -15,10 +17,16 @@
           <div class="d-flex align-items-center gap-2">
             <span class="fw-semibold">Filter ▼</span>
           </div>
-          
+
           <div class="filter-group">
-            <label class="small text-muted mb-1">Date Picker</label>
-            <select class="form-select form-select-sm" v-model="selectedMonth">
+            <label class="small text-muted mb-1" for="filter-date-picker"
+              >Date Picker</label
+            >
+            <select
+              id="filter-date-picker"
+              class="form-select form-select-sm"
+              v-model="selectedMonth"
+            >
               <option value="November 2025">November 2025</option>
               <option value="October 2025">October 2025</option>
               <option value="September 2025">September 2025</option>
@@ -26,15 +34,27 @@
           </div>
 
           <div class="filter-group">
-            <label class="small text-muted mb-1">Location</label>
-            <button class="btn btn-outline-secondary btn-sm">
+            <label class="small text-muted mb-1" for="filter-location"
+              >Location</label
+            >
+            <button
+              id="filter-location"
+              class="btn btn-outline-secondary btn-sm"
+              type="button"
+            >
               <i class="bi bi-geo-alt-fill me-1"></i> All Regions
             </button>
           </div>
 
           <div class="filter-group">
-            <label class="small text-muted mb-1">Time Period</label>
-            <select class="form-select form-select-sm" v-model="timePeriod">
+            <label class="small text-muted mb-1" for="filter-time-period"
+              >Time Period</label
+            >
+            <select
+              id="filter-time-period"
+              class="form-select form-select-sm"
+              v-model="timePeriod"
+            >
               <option value="Monthly">Monthly</option>
               <option value="Quarterly">Quarterly</option>
               <option value="Yearly">Yearly</option>
@@ -47,18 +67,28 @@
     <!-- AI-Generated Summary -->
     <div class="card ai-summary-card mb-4">
       <div class="card-body">
-        <h6 class="mb-3"><i class="bi bi-stars me-2"></i>AI-Generated Summary for November 2025</h6>
+        <h6 class="mb-3">
+          <i class="bi bi-stars me-2"></i>AI-Generated Summary for November 2025
+        </h6>
         <div class="summary-content">
           <div class="summary-highlight">
             <i class="bi bi-graph-up-arrow"></i>
             <p class="mb-0">
-              Demand for <strong>Handwoven Silk Brocade</strong> in the <strong>Northern Region</strong> surged by <span class="highlight-number">32%</span> this month, primarily driven by festive season purchases and wedding ceremonies. <strong>Premium Cotton Batik</strong> continues to show strong performance with consistent growth across all metropolitan areas.
+              Demand for <strong>Handwoven Silk Brocade</strong> in the
+              <strong>Northern Region</strong> surged by
+              <span class="highlight-number">32%</span> this month, primarily
+              driven by festive season purchases and wedding ceremonies.
+              <strong>Premium Cotton Batik</strong> continues to show strong
+              performance with consistent growth across all metropolitan areas.
             </p>
           </div>
           <div class="summary-recommendation">
             <i class="bi bi-lightbulb-fill"></i>
             <p class="mb-0">
-              <strong>Recommendation:</strong> Increase inventory of silk-based fabrics and traditional designs for retailers in Northern and Eastern regions. Consider promotional campaigns for Georgette collections to capitalize on the upcoming party season.
+              <strong>Recommendation:</strong> Increase inventory of silk-based
+              fabrics and traditional designs for retailers in Northern and
+              Eastern regions. Consider promotional campaigns for Georgette
+              collections to capitalize on the upcoming party season.
             </p>
           </div>
         </div>
@@ -68,16 +98,27 @@
     <!-- Top 5 Trending Products -->
     <div class="card mb-4">
       <div class="card-body">
-        <h6 class="mb-3"><i class="bi bi-fire me-2"></i>Top 5 Trending Products in Selected Regions</h6>
-        
+        <h6 class="mb-3">
+          <i class="bi bi-fire me-2"></i>Top 5 Trending Products in Selected
+          Regions
+        </h6>
+
         <div class="row g-3">
-          <div v-for="(product, idx) in topProducts" :key="idx" class="col-md-6">
+          <div
+            v-for="(product, idx) in topProducts"
+            :key="idx"
+            class="col-md-6"
+          >
             <div class="product-chart-card">
               <div class="row g-0">
                 <!-- Left Side: Image and Details -->
                 <div class="col-5 d-flex flex-column">
                   <div class="product-image-wrapper">
-                    <img :src="product.image" :alt="product.name" class="product-image">
+                    <img
+                      :src="product.image"
+                      :alt="product.name"
+                      class="product-image"
+                    />
                     <div class="rank-badge">#{{ idx + 1 }}</div>
                   </div>
                   <div class="product-details-left mt-auto pt-3">
@@ -94,7 +135,7 @@
                     </div>
                   </div>
                 </div>
-                
+
                 <!-- Right Side: Chart -->
                 <div class="col-7">
                   <div class="chart-section">
@@ -103,9 +144,9 @@
                       <span class="chart-subtitle">Last 4 Weeks</span>
                     </div>
                     <div class="bar-chart">
-                      <div style="height: 200px;">
-                        <Bar 
-                          :data="getChartData(product.chartData)" 
+                      <div style="height: 200px">
+                        <Bar
+                          :data="getChartData(product.chartData)"
                           :options="getChartOptions()"
                         />
                       </div>
@@ -124,65 +165,180 @@
       <div class="col-md-6">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3"><i class="bi bi-pie-chart-fill me-2"></i>Demand by Category</h6>
-            <div class="chart-container d-flex justify-content-center align-items-center" style="height: 280px;">
+            <h6 class="mb-3">
+              <i class="bi bi-pie-chart-fill me-2"></i>Demand by Category
+            </h6>
+            <div
+              class="chart-container d-flex justify-content-center align-items-center"
+              style="height: 280px"
+            >
               <!-- Enhanced Donut Chart SVG -->
               <svg viewBox="0 0 240 240" width="240" height="240">
                 <defs>
-                  <linearGradient id="gradSilk2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                  <linearGradient
+                    id="gradSilk2"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #667eea; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #764ba2; stop-opacity: 1"
+                    />
                   </linearGradient>
-                  <linearGradient id="gradCotton2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#f093fb;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#f5576c;stop-opacity:1" />
+                  <linearGradient
+                    id="gradCotton2"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #f093fb; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #f5576c; stop-opacity: 1"
+                    />
                   </linearGradient>
-                  <linearGradient id="gradGeorgette2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+                  <linearGradient
+                    id="gradGeorgette2"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #4facfe; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #00f2fe; stop-opacity: 1"
+                    />
                   </linearGradient>
-                  <linearGradient id="gradOthers2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#43e97b;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#38f9d7;stop-opacity:1" />
+                  <linearGradient
+                    id="gradOthers2"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style="stop-color: #43e97b; stop-opacity: 1"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #38f9d7; stop-opacity: 1"
+                    />
                   </linearGradient>
                 </defs>
                 <!-- Silk - 38% -->
-                <path d="M 120 120 L 120 30 A 90 90 0 0 1 205 88 Z" 
-                      fill="url(#gradSilk2)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 120 30 A 90 90 0 0 1 205 88 Z"
+                  fill="url(#gradSilk2)"
+                  class="pie-slice"
+                />
                 <!-- Cotton - 32% -->
-                <path d="M 120 120 L 205 88 A 90 90 0 0 1 195 172 Z" 
-                      fill="url(#gradCotton2)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 205 88 A 90 90 0 0 1 195 172 Z"
+                  fill="url(#gradCotton2)"
+                  class="pie-slice"
+                />
                 <!-- Georgette - 22% -->
-                <path d="M 120 120 L 195 172 A 90 90 0 0 1 50 165 Z" 
-                      fill="url(#gradGeorgette2)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 195 172 A 90 90 0 0 1 50 165 Z"
+                  fill="url(#gradGeorgette2)"
+                  class="pie-slice"
+                />
                 <!-- Others - 8% -->
-                <path d="M 120 120 L 50 165 A 90 90 0 0 1 120 30 Z" 
-                      fill="url(#gradOthers2)" 
-                      class="pie-slice" />
+                <path
+                  d="M 120 120 L 50 165 A 90 90 0 0 1 120 30 Z"
+                  fill="url(#gradOthers2)"
+                  class="pie-slice"
+                />
                 <!-- Center circle -->
                 <circle cx="120" cy="120" r="50" fill="white" />
-                <text x="120" y="115" text-anchor="middle" font-size="14" font-weight="600" fill="#4a5568">Demand</text>
-                <text x="120" y="135" text-anchor="middle" font-size="18" font-weight="700" fill="#667eea">92.5K</text>
+                <text
+                  x="120"
+                  y="115"
+                  text-anchor="middle"
+                  font-size="14"
+                  font-weight="600"
+                  fill="#4a5568"
+                >
+                  Demand
+                </text>
+                <text
+                  x="120"
+                  y="135"
+                  text-anchor="middle"
+                  font-size="18"
+                  font-weight="700"
+                  fill="#667eea"
+                >
+                  92.5K
+                </text>
               </svg>
             </div>
             <div class="legend-container mt-3">
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #667eea 0%,
+                      #764ba2 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Silk Fabrics (38%)</span>
               </div>
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #f093fb 0%,
+                      #f5576c 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Cotton Fabrics (32%)</span>
               </div>
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #4facfe 0%,
+                      #00f2fe 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Georgette (22%)</span>
               </div>
               <div class="legend-item">
-                <span class="legend-color" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></span>
+                <span
+                  class="legend-color"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #43e97b 0%,
+                      #38f9d7 100%
+                    );
+                  "
+                ></span>
                 <span class="legend-label">Others (8%)</span>
               </div>
             </div>
@@ -193,26 +349,56 @@
       <div class="col-md-6">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3"><i class="bi bi-map-fill me-2"></i>Regional Demand Heatmap</h6>
+            <h6 class="mb-3">
+              <i class="bi bi-map-fill me-2"></i>Regional Demand Heatmap
+            </h6>
             <div class="heatmap-container position-relative">
               <!-- Enhanced Gradient Heatmap with SVG -->
-              <svg viewBox="0 0 400 280" class="heatmap-svg" style="width: 100%; height: 280px;">
+              <svg
+                viewBox="0 0 400 280"
+                class="heatmap-svg"
+                style="width: 100%; height: 280px"
+              >
                 <defs>
                   <radialGradient id="hotspot1" cx="50%" cy="50%">
-                    <stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.8" />
-                    <stop offset="100%" style="stop-color:#ef4444;stop-opacity:0" />
+                    <stop
+                      offset="0%"
+                      style="stop-color: #ef4444; stop-opacity: 0.8"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #ef4444; stop-opacity: 0"
+                    />
                   </radialGradient>
                   <radialGradient id="hotspot2" cx="50%" cy="50%">
-                    <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:0.7" />
-                    <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:0" />
+                    <stop
+                      offset="0%"
+                      style="stop-color: #f59e0b; stop-opacity: 0.7"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #f59e0b; stop-opacity: 0"
+                    />
                   </radialGradient>
                   <radialGradient id="hotspot3" cx="50%" cy="50%">
-                    <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.6" />
-                    <stop offset="100%" style="stop-color:#10b981;stop-opacity:0" />
+                    <stop
+                      offset="0%"
+                      style="stop-color: #10b981; stop-opacity: 0.6"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #10b981; stop-opacity: 0"
+                    />
                   </radialGradient>
                   <radialGradient id="hotspot4" cx="50%" cy="50%">
-                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.7" />
-                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0" />
+                    <stop
+                      offset="0%"
+                      style="stop-color: #3b82f6; stop-opacity: 0.7"
+                    />
+                    <stop
+                      offset="100%"
+                      style="stop-color: #3b82f6; stop-opacity: 0"
+                    />
                   </radialGradient>
                 </defs>
                 <!-- Background -->
@@ -223,22 +409,34 @@
                 <circle cx="280" cy="200" r="55" fill="url(#hotspot3)" />
                 <circle cx="90" cy="220" r="50" fill="url(#hotspot4)" />
               </svg>
-              
+
               <!-- Location Labels -->
               <div class="heatmap-labels">
-                <div class="location-label high" style="position: absolute; top: 20%; left: 15%;">
+                <div
+                  class="location-label high"
+                  style="position: absolute; top: 20%; left: 15%"
+                >
                   <div class="label-name">Northern Region</div>
                   <div class="label-metric">High Demand</div>
                 </div>
-                <div class="location-label medium" style="position: absolute; top: 15%; right: 15%;">
+                <div
+                  class="location-label medium"
+                  style="position: absolute; top: 15%; right: 15%"
+                >
                   <div class="label-name">Eastern Region</div>
                   <div class="label-metric">Medium-High</div>
                 </div>
-                <div class="location-label moderate" style="position: absolute; bottom: 22%; right: 18%;">
+                <div
+                  class="location-label moderate"
+                  style="position: absolute; bottom: 22%; right: 18%"
+                >
                   <div class="label-name">Southern Region</div>
                   <div class="label-metric">Moderate</div>
                 </div>
-                <div class="location-label medium" style="position: absolute; bottom: 18%; left: 12%;">
+                <div
+                  class="location-label medium"
+                  style="position: absolute; bottom: 18%; left: 12%"
+                >
                   <div class="label-name">Western Region</div>
                   <div class="label-metric">Medium</div>
                 </div>
@@ -252,125 +450,145 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { Bar } from 'vue-chartjs'
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
+import { ref } from "vue";
+import { Bar } from "vue-chartjs";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+);
 
-const selectedMonth = ref('November 2025')
-const timePeriod = ref('Monthly')
+const selectedMonth = ref("November 2025");
+const timePeriod = ref("Monthly");
 
 const topProducts = ref([
   {
-    name: 'Handwoven Silk Brocade',
-    image: 'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+32% MoM',
-    region: 'Northern Region',
-    volume: '2,850 m',
-    chartData: [30, 50, 70, 95]  // Dramatic upward trend
+    name: "Handwoven Silk Brocade",
+    image:
+      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+32% MoM",
+    region: "Northern Region",
+    volume: "2,850 m",
+    chartData: [30, 50, 70, 95], // Dramatic upward trend
   },
   {
-    name: 'Premium Cotton Batik',
-    image: 'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+28% MoM',
-    region: 'Eastern Region',
-    volume: '3,420 m',
-    chartData: [85, 90, 75, 95]  // High with dip pattern
+    name: "Premium Cotton Batik",
+    image:
+      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+28% MoM",
+    region: "Eastern Region",
+    volume: "3,420 m",
+    chartData: [85, 90, 75, 95], // High with dip pattern
   },
   {
-    name: 'Luxury Georgette Floral',
-    image: 'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+24% MoM',
-    region: 'Southern Region',
-    volume: '2,180 m',
-    chartData: [25, 40, 60, 85]  // Aggressive growth curve
+    name: "Luxury Georgette Floral",
+    image:
+      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+24% MoM",
+    region: "Southern Region",
+    volume: "2,180 m",
+    chartData: [25, 40, 60, 85], // Aggressive growth curve
   },
   {
-    name: 'Designer Silk Collection',
-    image: 'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+22% MoM',
-    region: 'Western Region',
-    volume: '1,920 m',
-    chartData: [70, 45, 65, 80]  // V-shaped recovery
+    name: "Designer Silk Collection",
+    image:
+      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+22% MoM",
+    region: "Western Region",
+    volume: "1,920 m",
+    chartData: [70, 45, 65, 80], // V-shaped recovery
   },
   {
-    name: 'Traditional Block Print',
-    image: 'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400',
-    growth: '+19% MoM',
-    region: 'Central Region',
-    volume: '2,560 m',
-    chartData: [55, 50, 70, 75]  // Stable with moderate growth
-  }
-])
+    name: "Traditional Block Print",
+    image:
+      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
+    growth: "+19% MoM",
+    region: "Central Region",
+    volume: "2,560 m",
+    chartData: [55, 50, 70, 75], // Stable with moderate growth
+  },
+]);
 
 const getChartOptions = () => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      display: false
+      display: false,
     },
     tooltip: {
-      backgroundColor: 'rgba(102, 126, 234, 0.9)',
+      backgroundColor: "rgba(102, 126, 234, 0.9)",
       padding: 12,
       titleFont: {
-        size: 13
+        size: 13,
       },
       bodyFont: {
-        size: 12
+        size: 12,
       },
       callbacks: {
-        label: function(context) {
-          return `Demand: ${context.parsed.y}%`
-        }
-      }
-    }
+        label: function (context) {
+          return `Demand: ${context.parsed.y}%`;
+        },
+      },
+    },
   },
   scales: {
     x: {
       grid: {
-        display: false
+        display: false,
       },
       ticks: {
-        color: '#2d3748',
+        color: "#2d3748",
         font: {
           size: 11,
-          weight: '700'
-        }
-      }
+          weight: "700",
+        },
+      },
     },
     y: {
       display: false,
       beginAtZero: true,
-      max: 100
-    }
-  }
-})
+      max: 100,
+    },
+  },
+});
 
 const getChartData = (chartData) => ({
-  labels: ['W1', 'W2', 'W3', 'W4'],
+  labels: ["W1", "W2", "W3", "W4"],
   datasets: [
     {
       data: chartData,
       backgroundColor: [
-        'rgba(102, 126, 234, 0.8)',
-        'rgba(118, 75, 162, 0.8)',
-        'rgba(102, 126, 234, 0.8)',
-        'rgba(118, 75, 162, 0.8)'
+        "rgba(102, 126, 234, 0.8)",
+        "rgba(118, 75, 162, 0.8)",
+        "rgba(102, 126, 234, 0.8)",
+        "rgba(118, 75, 162, 0.8)",
       ],
       borderColor: [
-        'rgba(102, 126, 234, 1)',
-        'rgba(118, 75, 162, 1)',
-        'rgba(102, 126, 234, 1)',
-        'rgba(118, 75, 162, 1)'
+        "rgba(102, 126, 234, 1)",
+        "rgba(118, 75, 162, 1)",
+        "rgba(102, 126, 234, 1)",
+        "rgba(118, 75, 162, 1)",
       ],
       borderWidth: 2,
       borderRadius: 4,
-      barThickness: 35
-    }
-  ]
-})
+      barThickness: 35,
+    },
+  ],
+});
 </script>
 
 <style scoped>
@@ -394,7 +612,8 @@ const getChartData = (chartData) => ({
 }
 
 /* ===== Typography ===== */
-h5, h6 {
+h5,
+h6 {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -403,23 +622,28 @@ h5, h6 {
 }
 
 /* ===== Cards ===== */
-.filters-card, .card {
+.filters-card,
+.card {
   border: none;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
 }
 
 /* ===== AI Summary Card ===== */
 .ai-summary-card {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   border: 2px solid rgba(102, 126, 234, 0.15);
 }
 
@@ -429,7 +653,8 @@ h5, h6 {
   gap: 1rem;
 }
 
-.summary-highlight, .summary-recommendation {
+.summary-highlight,
+.summary-recommendation {
   display: flex;
   gap: 1rem;
   padding: 1rem;
@@ -447,8 +672,9 @@ h5, h6 {
   border-left-color: #f59e0b;
 }
 
-.summary-highlight:hover, .summary-recommendation:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+.summary-highlight:hover,
+.summary-recommendation:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateX(3px);
 }
 
@@ -466,7 +692,8 @@ h5, h6 {
   margin-top: 0.25rem;
 }
 
-.summary-highlight p, .summary-recommendation p {
+.summary-highlight p,
+.summary-recommendation p {
   color: #4a5568;
   line-height: 1.6;
   font-size: 0.95rem;
@@ -507,7 +734,7 @@ h5, h6 {
 }
 
 .product-chart-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -557,7 +784,7 @@ h5, h6 {
   border-radius: 20px;
   font-weight: 700;
   font-size: 0.85rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Left side product details */
@@ -603,7 +830,11 @@ h5, h6 {
   gap: 0.25rem;
   padding: 0.5rem;
   border-radius: 6px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   border: 1px solid rgba(102, 126, 234, 0.1);
   font-size: 0.75rem;
 }
@@ -625,7 +856,11 @@ h5, h6 {
   display: flex;
   flex-direction: column;
   padding: 0.5rem;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.02) 0%,
+    rgba(118, 75, 162, 0.02) 100%
+  );
   border-radius: 8px;
   border-left: 2px solid rgba(102, 126, 234, 0.1);
 }
@@ -675,7 +910,7 @@ h5, h6 {
 
 /* ===== Pie Chart ===== */
 .chart-container svg {
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.1));
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
 }
 
 .pie-slice {
@@ -738,7 +973,7 @@ h5, h6 {
   backdrop-filter: blur(10px);
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   pointer-events: all;
   cursor: pointer;
@@ -746,7 +981,7 @@ h5, h6 {
 
 .location-label:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 .location-label.high {
@@ -835,12 +1070,14 @@ h5, h6 {
     flex-wrap: wrap;
   }
 
-  .summary-highlight, .summary-recommendation {
+  .summary-highlight,
+  .summary-recommendation {
     flex-direction: column;
     gap: 0.5rem;
   }
 
-  .summary-highlight i, .summary-recommendation i {
+  .summary-highlight i,
+  .summary-recommendation i {
     font-size: 1.25rem;
   }
 }

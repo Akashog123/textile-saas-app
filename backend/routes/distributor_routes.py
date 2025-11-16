@@ -14,14 +14,14 @@ from services.ai_service import (
 )
 from routes.pdf_service import generate_pdf_report
 from routes.auth_routes import token_required
+from models.model import Product, SalesData
 import io
 
 distributor_bp = Blueprint("distributor", __name__)
 
-# ───────────────────────────────────────────────
-# 🔮 POST: Regional Demand & AI Forecast Insights
-# ───────────────────────────────────────────────
-@distributor_bp.route("/api/v1/distributor/regional-demand", methods=["POST"])
+
+# POST: Regional Demand & AI Forecast Insights
+@distributor_bp.route("/regional-demand", methods=["POST"])
 @token_required
 def get_regional_demand(current_user):
     """
@@ -85,10 +85,8 @@ def get_regional_demand(current_user):
         }), 500
 
 
-# ───────────────────────────────────────────────
-# 📊 GET: Sample Input Format for Distributor CSV
-# ───────────────────────────────────────────────
-@distributor_bp.route("/api/v1/distributor/sample-format", methods=["GET"])
+# GET: Sample Input Format for Distributor CSV
+@distributor_bp.route("/sample-format", methods=["GET"])
 def get_sample_format():
     """
     Provide a downloadable example structure for distributor uploads.
@@ -111,10 +109,8 @@ def get_sample_format():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 🧾 GET: Regional Demand Report PDF (AI Summary)
-# ───────────────────────────────────────────────
-@distributor_bp.route("/api/v1/distributor/regional-report", methods=["GET"])
+# GET: Regional Demand Report PDF (AI Summary)
+@distributor_bp.route("/regional-report", methods=["GET"])
 @token_required
 def generate_regional_report(current_user):
     """
@@ -138,10 +134,8 @@ def generate_regional_report(current_user):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 🏭 POST: Production Planning (AI Recommendations)
-# ───────────────────────────────────────────────
-@distributor_bp.route("/api/v1/distributor/production-plan", methods=["POST"])
+# POST: Production Planning (AI Recommendations)
+@distributor_bp.route("/production-plan", methods=["POST"])
 @token_required
 def generate_production_plan(current_user):
     """
@@ -176,25 +170,60 @@ def generate_production_plan(current_user):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ───────────────────────────────────────────────
-# 📤 GET: Export AI Production Plan as CSV
-# ───────────────────────────────────────────────
-@distributor_bp.route("/api/v1/distributor/export-plan", methods=["GET"])
+# GET: Export AI Production Plan as CSV
+@distributor_bp.route("/export-plan", methods=["GET"])
 @token_required
 def export_production_plan(current_user):
     """
-    Export AI production recommendations in CSV format.
+    Export AI production recommendations in CSV format using live sales data.
     """
     try:
-        sample_plan = [
-            {"Product": "Silk Brocade", "Action": "Increase Production", "Priority": "High"},
-            {"Product": "Cotton Batik", "Action": "Maintain Levels", "Priority": "Medium"},
-            {"Product": "Georgette Floral", "Action": "Reduce Output", "Priority": "Low"},
-        ]
+        window_start = datetime.utcnow().date().replace(day=1)
 
-        df = pd.DataFrame(sample_plan)
+        sales_rows = (
+            SalesData.query
+            .filter(SalesData.date >= window_start)
+            .all()
+        )
+
+        if not sales_rows:
+            return jsonify({
+                "status": "error",
+                "message": "No sales data available for export. Upload distributor CSV first."
+            }), 404
+
+        product_ids = {row.product_id for row in sales_rows if row.product_id}
+        products = Product.query.filter(Product.id.in_(product_ids)).all()
+        product_lookup = {p.id: p for p in products}
+
+        records = []
+        for row in sales_rows:
+            product = product_lookup.get(row.product_id)
+            records.append({
+                "date": row.date.isoformat(),
+                "product": product.name if product else row.product_id,
+                "category": product.category if product else "Unknown",
+                "shop_id": row.shop_id,
+                "region": row.region or "Unknown",
+                "sales": float(row.revenue or 0),
+                "quantity": row.quantity_sold or 0
+            })
+
+        df = pd.DataFrame(records)
+        summary = (
+            df.groupby(["product", "category"])
+            .agg({"sales": "sum", "quantity": "sum"})
+            .reset_index()
+            .sort_values("sales", ascending=False)
+        )
+
         csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
+        summary.rename(columns={
+            "product": "Product",
+            "category": "Category",
+            "sales": "TotalSales",
+            "quantity": "UnitsSold"
+        }).to_csv(csv_buffer, index=False)
         csv_buffer.seek(0)
 
         return send_file(
