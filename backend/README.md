@@ -28,7 +28,7 @@ backend/
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11
 - pip / virtualenv
 - (Optional) Access keys for Gemini, MapMyIndia, or OpenAI services if you plan to exercise AI-backed endpoints.
 

@@ -33,14 +33,19 @@ coverage
 
 # Virtual environments
 venv/
+backend/venv
 backend/venv/
 .venv/
 env/
 ENV/
+**/venv/
+**/.venv/
+**/env/
+**/ENV/
 
 # Python cache
 *.pyc
-__pycache__/
+**/__pycache__/
 
 
 # Cypress
@@ -48,4 +53,4 @@ __pycache__/
 /cypress/screenshots/
 
 # Vitest
-__screenshots__/
+**/__screenshots__/

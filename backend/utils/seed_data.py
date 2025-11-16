@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import random
 import re
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any, Tuple
 
@@ -26,6 +27,8 @@ from models.model import (
     Inventory,
     StoreRegion,
     SalesData,
+    ExternalProduct,
+    ExternalSalesDataItem,
 )
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
@@ -41,6 +44,8 @@ SHOP_SALES_PATH = os.path.join(INSTANCE_DIR, "sales_shop_1.csv")
 MAX_PRODUCTS = 25
 MAX_STORES = 7
 MAX_SALES = 40
+MAX_EXTERNAL_PRODUCTS = 120
+MAX_EXTERNAL_SALES = 250
 
 
 def _slugify(value: str) -> str:
@@ -54,9 +59,22 @@ def _safe_read_csv(path: str, nrows: int = 40) -> pd.DataFrame | None:
         return None
     try:
         return pd.read_csv(path, nrows=nrows)
-    except Exception as exc:  # pragma: no cover - best effort seed helper
+    except Exception as exc:
         print(f"[Seed] Could not read {path}: {exc}")
         return None
+
+
+def _resolve_store_image(path: Any) -> str:
+    if path is None or (isinstance(path, float) and pd.isna(path)):
+        return ""
+    normalized = str(path).strip().replace("\\", "/")
+    if not normalized:
+        return ""
+    if normalized.startswith("http"):
+        return normalized
+    if normalized.startswith("/"):
+        return normalized
+    return f"/{normalized}"
 
 
 def _ensure_demo_owner() -> tuple[User, Shop]:
@@ -125,6 +143,49 @@ def _seed_store_regions() -> int:
         created += 1
         if existing + created >= MAX_STORES:
             break
+    return created
+
+
+def _seed_shops_from_store_regions(owner: User) -> int:
+    df = _safe_read_csv(STORE_REGIONS_PATH, nrows=MAX_STORES)
+    if df is None or df.empty:
+        print(f"[Seed] Skipping Shop seed; dataset missing at {STORE_REGIONS_PATH}")
+        return 0
+
+    created = 0
+
+    for _, row in df.iterrows():
+        name = str(row.get("StoreName") or "").strip()
+        if not name or Shop.query.filter_by(name=name).first():
+            continue
+
+        city = str(row.get("City") or "").strip()
+        region = str(row.get("RegionName") or "").strip()
+        description = str(row.get("Product_description") or "Trusted textile retailer.").strip()
+
+        latitude = row.get("Latitude")
+        longitude = row.get("Longitude")
+
+        shop = Shop(
+            name=name,
+            description=description,
+            image_url=_resolve_store_image(row.get("ImagePath")),
+            address=city,
+            city=city,
+            state=region or owner.state or "Kerala",
+            location=", ".join(filter(None, [city, region])),
+            lat=float(latitude) if pd.notna(latitude) else None,
+            lon=float(longitude) if pd.notna(longitude) else None,
+            rating=round(random.uniform(4.0, 4.9), 1),
+            is_popular=True,
+            owner_id=owner.id,
+        )
+
+        db.session.add(shop)
+        created += 1
+        if created >= MAX_STORES:
+            break
+
     return created
 
 
@@ -222,6 +283,8 @@ def _seed_sales_data(shop: Shop, product_lookup: Dict[int, Tuple[Product, Dict[s
 
     created = 0
     sales_payloads = []
+    month_start = datetime.utcnow().date().replace(day=1)
+    has_recent_sales = SalesData.query.filter(SalesData.date >= month_start).count() > 0
 
     sales_df = _safe_read_csv(SALES_DATA_PATH, nrows=200)
     if sales_df is not None and not sales_df.empty:
@@ -274,6 +337,135 @@ def _seed_sales_data(shop: Shop, product_lookup: Dict[int, Tuple[Product, Dict[s
         )
         db.session.add(entry)
         created += 1
+        if not has_recent_sales and entry.date >= month_start:
+            has_recent_sales = True
+
+    if not has_recent_sales and product_lookup:
+        recent_entries = []
+        available_products = list(product_lookup.values())
+        random.shuffle(available_products)
+        for idx, (product, meta) in enumerate(available_products):
+            if existing + created + len(recent_entries) >= MAX_SALES or idx >= 5:
+                break
+            seed_date = month_start + timedelta(days=min(idx * 3, 27))
+            recent_entries.append(SalesData(
+                date=seed_date,
+                product_id=product.id,
+                shop_id=shop.id,
+                region=meta.get("category") or "Central",
+                fabric_type=meta.get("material"),
+                quantity_sold=random.randint(6, 18),
+                revenue=Decimal(random.randint(9000, 18000)),
+            ))
+
+        for entry in recent_entries:
+            db.session.add(entry)
+            created += 1
+        if recent_entries:
+            has_recent_sales = True
+
+    return created
+
+
+def _seed_external_products() -> int:
+    existing_count = ExternalProduct.query.count()
+    if existing_count >= MAX_EXTERNAL_PRODUCTS:
+        return 0
+
+    df = _safe_read_csv(PRODUCTS_PATH, nrows=400)
+    if df is None or df.empty:
+        print(f"[Seed] Skipping external_product seed; dataset missing at {PRODUCTS_PATH}")
+        return 0
+
+    existing_ids = {
+        pid for (pid,) in db.session.query(ExternalProduct.ProductID).all()
+    }
+
+    created = 0
+    for _, row in df.iterrows():
+        dataset_pid = row.get("Productid")
+        if pd.isna(dataset_pid):
+            continue
+        dataset_pid = int(dataset_pid)
+        if dataset_pid in existing_ids:
+            continue
+
+        product = ExternalProduct(
+            ProductID=dataset_pid,
+            ProductCategory=row.get("ProductCategory") or "General",
+            Occasion=row.get("Occasion"),
+            Material=row.get("Material"),
+            Karigari=row.get("Karigari"),
+            Karigari_description=row.get("Karigari_description"),
+            Product_description=row.get("Product_description"),
+        )
+        db.session.add(product)
+        existing_ids.add(dataset_pid)
+        created += 1
+
+        if existing_count + created >= MAX_EXTERNAL_PRODUCTS:
+            break
+
+    return created
+
+
+def _seed_external_sales_data() -> int:
+    existing_count = ExternalSalesDataItem.query.count()
+    if existing_count >= MAX_EXTERNAL_SALES:
+        return 0
+
+    df = _safe_read_csv(SALES_DATA_PATH, nrows=500)
+    if df is None or df.empty:
+        print(f"[Seed] Skipping external_sales_data seed; dataset missing at {SALES_DATA_PATH}")
+        return 0
+
+    df["SaleDate"] = pd.to_datetime(df.get("SaleDate"), errors="coerce")
+    df.dropna(subset=["SaleDate"], inplace=True)
+
+    existing_pairs = {
+        (item.ProductID, item.OrderId)
+        for item in ExternalSalesDataItem.query.with_entities(
+            ExternalSalesDataItem.ProductID, ExternalSalesDataItem.OrderId
+        )
+    }
+
+    known_products = {
+        pid for (pid,) in db.session.query(ExternalProduct.ProductID).all()
+    }
+
+    created = 0
+    for _, row in df.iterrows():
+        product_id = row.get("Productid")
+        order_id = row.get("OrderId")
+        if pd.isna(product_id) or pd.isna(order_id):
+            continue
+
+        product_id = int(product_id)
+        order_id = int(order_id)
+
+        if product_id not in known_products:
+            continue
+
+        key = (product_id, order_id)
+        if key in existing_pairs:
+            continue
+
+        sale_entry = ExternalSalesDataItem(
+            ProductID=product_id,
+            OrderId=order_id,
+            UnitsSold=int(row.get("UnitsSold", 0) or 0),
+            Sales=float(row.get("Sales", 0) or 0),
+            SaleDate=pd.to_datetime(row.get("SaleDate"), errors="coerce").date(),
+            Store=row.get("Store") or "Unknown",
+            Region=row.get("Region") or "Unknown",
+        )
+
+        db.session.add(sale_entry)
+        existing_pairs.add(key)
+        created += 1
+
+        if existing_count + created >= MAX_EXTERNAL_SALES:
+            break
 
     return created
 
@@ -281,7 +473,15 @@ def _seed_sales_data(shop: Shop, product_lookup: Dict[int, Tuple[Product, Dict[s
 def seed_minimal_data() -> Dict[str, Any]:
     """Seed a tiny slice of demo data for local testing using Textile datasets."""
 
-    summary = {"users": 0, "shops": 0, "products": 0, "stores": 0, "sales": 0}
+    summary = {
+        "users": 0,
+        "shops": 0,
+        "products": 0,
+        "stores": 0,
+        "sales": 0,
+        "external_products": 0,
+        "external_sales": 0,
+    }
     owner_before = User.query.filter_by(username="demo_owner").first()
     shop_before = None
     if owner_before:
@@ -294,9 +494,12 @@ def seed_minimal_data() -> Dict[str, Any]:
         summary["shops"] = 1
 
     summary["stores"] = _seed_store_regions()
+    summary["shops"] += _seed_shops_from_store_regions(owner)
     product_map = _seed_products(owner, shop)
     summary["products"] = len(product_map)
     summary["sales"] = _seed_sales_data(shop, product_map)
+    summary["external_products"] = _seed_external_products()
+    summary["external_sales"] = _seed_external_sales_data()
 
     db.session.commit()
     return summary

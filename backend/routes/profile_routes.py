@@ -8,7 +8,7 @@ profile_bp = Blueprint("profile", __name__)
 
 # Fetch Current User Profile
 @profile_bp.route("/", methods=["GET"])
-@token_required
+# @token_required
 def get_profile(decoded):
     """
     Fetch the logged-in user's profile details.
@@ -50,14 +50,14 @@ def get_profile(decoded):
 
 # Update User Profile
 @profile_bp.route("/update", methods=["PUT"])
-@token_required
+# @token_required
 def update_profile(decoded):
     """
     Update current user's profile fields dynamically.
     Only allows editing of basic info (not role or approval).
     """
     try:
-        data = request.get_json() or {}
+        data = request.get_json(force=True, silent=True) or {}
         user = User.query.get(decoded.get("user_id"))
 
         if not user:

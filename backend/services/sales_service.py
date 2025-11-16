@@ -22,9 +22,7 @@ except ImportError:
     top_trending_products = lambda df: []
 
 
-# ───────────────────────────────────────────────
-# 📊 Dashboard Metrics
-# ───────────────────────────────────────────────
+# Dashboard Metrics
 def get_dashboard_metrics(shop_id):
     """Generate dynamic dashboard analytics for a shop (used in shop dashboard)."""
     shop = Shop.query.get(shop_id)
@@ -33,7 +31,7 @@ def get_dashboard_metrics(shop_id):
 
     last_30_days = datetime.utcnow() - timedelta(days=30)
 
-    # ✅ Correct join and filter (use Product.shop_id, not SalesData.fabric)
+    # Correct join and filter (use Product.shop_id, not SalesData.fabric)
     sales_records = (
         db.session.query(SalesData, Product)
         .join(Product, SalesData.product_id == Product.id)
@@ -54,7 +52,7 @@ def get_dashboard_metrics(shop_id):
             "reorder_suggestions": []
         }
 
-    # ✅ Flatten SalesData + Product
+    # Flatten SalesData + Product
     data = []
     for s, p in sales_records:
         data.append({
@@ -132,9 +130,7 @@ def get_dashboard_metrics(shop_id):
     }
 
 
-# ───────────────────────────────────────────────
-# 📤 Upload Sales Data (CSV)
-# ───────────────────────────────────────────────
+# Upload Sales Data (CSV)
 def upload_sales_data(file, shop_id):
     """Parse and insert sales records from uploaded CSV."""
     try:
@@ -175,7 +171,7 @@ def upload_sales_data(file, shop_id):
 
 
 # ───────────────────────────────────────────────
-# 📦 Export Sales Report (Excel)
+# Export Sales Report (Excel)
 # ───────────────────────────────────────────────
 def export_sales_report(shop_id):
     """Generate Excel export for shop sales data."""

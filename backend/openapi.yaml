@@ -1,7 +1,91 @@
 openapi: 3.0.3
 info:
   title: SE-Textile Backend API
-  description: Dynamically generated OpenAPI spec built from registered Flask routes.
+  description: |
+    Dynamically generated OpenAPI spec built from registered Flask routes.
+
+    ### API Catalogue (grouped by domain)
+
+    **Auth & Session Management**
+    - `POST /api/v1/auth/login` – authenticate via username/email + password, returns JWT and user profile.
+    - `POST /api/v1/auth/logout` – acknowledges logout so clients clear stored tokens.
+    - `POST /api/v1/auth/register` – registers new users across roles, auto-creates shop for shop owners.
+    - `GET /api/v1/auth/session` – fetch current authenticated user details.
+    - `POST /api/v1/auth/verify_token` – validates JWTs for clients.
+
+    **AI Store Discovery & Image Match**
+    - `POST /api/v1/ai-find-stores/` – finds stores via text or voice input using AI matching.
+    - `POST /api/v1/compare-images/` – compares uploaded image against reference catalog to suggest similar fabrics.
+
+    **Catalog Browsing**
+    - `POST /api/v1/catalog/load` – refresh product catalog data.
+    - `GET /api/v1/catalog/search` – keyword + filter search over catalog with AI captions.
+    - `GET /api/v1/catalog/view` – paginated catalog browsing.
+
+    **Customer Discovery & Shop Explorer**
+    - `GET /api/v1/customer/discovery/*` – customer-facing discovery feeds and AI marketing captions.
+    - `GET /api/v1/customer/shops/*` – detailed shop lookup with AI narratives.
+
+    **Distributor Operations**
+    - `POST /api/v1/distributor/production-plan` – upload sales CSV/XLSX to get Prophet forecasts, Gemini AI insights, and priority actions.
+    - `GET /api/v1/distributor/export-plan` – download production-plan CSV derived from live sales data.
+    - `POST /api/v1/distributor/regional-demand` – combines forecasting and AI summaries for regional demand intelligence.
+    - `GET /api/v1/distributor/regional-report` – download AI-driven regional report PDF.
+    - `GET /api/v1/distributor/sample-format` – provides example input template.
+
+    **Inquiry Management**
+    - `GET /api/v1/inquiry/history` – fetches inquiries for a user/shop.
+    - `POST /api/v1/inquiry/submit` – submit fabric inquiries with optional image upload.
+
+    **Inventory Management**
+    - `GET /api/v1/inventory/` – list inventory by shop.
+    - `DELETE /api/v1/inventory/delete` – remove inventory entry.
+    - `POST /api/v1/inventory/edit` – update inventory item.
+    - `GET /api/v1/inventory/export` – export inventory sheet.
+    - `POST /api/v1/inventory/import` – bulk import inventory via CSV/XLSX.
+
+    **Marketing Automation**
+    - `GET /api/v1/marketing/allowed-extensions` – lists supported file types.
+    - `POST /api/v1/marketing/generate` – AI-generates captions, posters, and sales trends from uploaded assets.
+
+    **PDF Services**
+    - `POST /api/v1/pdf/generate` – builds structured PDF reports.
+
+    **Product Insights**
+    - `GET /api/v1/products/` – filterable product list with AI captions.
+    - `GET /api/v1/products/{product_id}` – detailed product info.
+    - `GET /api/v1/products/suggested` – AI-driven product suggestions.
+
+    **Profile Management**
+    - `GET /api/v1/profile/` – fetch current user profile.
+    - `PUT /api/v1/profile/update` – update non-privileged profile fields.
+
+    **Analytics & Reporting**
+    - `GET /api/v1/region-demand-heatmap/` – regional demand heatmap data.
+    - `GET /api/v1/shop/dashboard` – AI analytics dashboard per shop.
+    - `GET /api/v1/shop/sales/export` – export shop sales.
+    - `POST /api/v1/shop/upload_sales_data` – ingest monthly sales files.
+    - `GET /api/v1/top-selling-products/` – top external product sales by year.
+    - `GET /api/v1/trending-shops/` – trending shops with AI insights.
+
+    **Static/Utility Endpoints**
+    - `GET /datasets/{filename}` and `GET /uploads/{filename}` – serve static assets.
+    - `GET /docs` – serve Swagger UI.
+    - `GET /health` – health check.
+    - `GET /openapi.yaml` – return the specification.
+
+    ### API Support for User Stories
+
+    1. **Weekly sales upload + AI summary (Shop Manager)** – use `/api/v1/distributor/production-plan` for forecasts and `/api/v1/shop/upload_sales_data` to store uploads.
+    2. **Reorder suggestions grouped by distributor (Shop Owner)** – `/api/v1/distributor/export-plan` plus `/api/v1/distributor/regional-demand` guide cost-efficient reorders.
+    3. **Quarterly demand forecasts (Shop Manager)** – forecasting via `/api/v1/distributor/regional-demand` and visualization from `/api/v1/shop/dashboard`.
+    4. **Upload fabric photo and send inquiries (Shop Manager)** – `/api/v1/inquiry/submit` handles image uploads and distributor outreach.
+    5. **Instant marketing images & captions (Shop Manager)** – `/api/v1/marketing/generate` with allowed formats from `/api/v1/marketing/allowed-extensions`.
+    6. **Photo-based nearby shop search (Customer)** – combine `/api/v1/compare-images/` with `/api/v1/customer/shops/nearby-shops`.
+    7. **AI-enabled map via chat/voice (Customer)** – `/api/v1/ai-find-stores/` for conversational search and `/api/v1/customer/discovery/search` for map overlays.
+    8. **Review shops & see trending patterns (Customer)** – `/api/v1/customer/discovery/trending-fabrics`, `/api/v1/customer/discovery/popular-shops`, and `/api/v1/customer/discovery/nearby-shops` provide insight.
+    9. **Distributor heatmap for promotions (Distributor)** – `/api/v1/distributor/regional-demand` plus `/api/v1/region-demand-heatmap/` highlight high-potential regions.
+    10. **Manufacturer top-selling reports (Manufacturer)** – `/api/v1/top-selling-products/` and `/api/v1/distributor/export-plan` drive production planning.
   version: 2.0.0
 servers:
 - url: http://127.0.0.1:5001
@@ -486,88 +570,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericError'
-  /api/v1/customer/services/nearby-professionals:
-    get:
-      tags:
-      - service_explorer
-      summary: Fetch professionals near a given latitude and longitude.
-      description: Uses MapMyIndia API if available; falls back to local DB if not.
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericSuccess'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-      parameters:
-      - name: lat
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: lon
-        in: query
-        required: false
-        schema:
-          type: string
-  /api/v1/customer/services/services:
-    get:
-      tags:
-      - service_explorer
-      summary: Fetch all available services dynamically with optional filters.
-      description: Includes AI-generated captions for customer-facing presentation.
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericSuccess'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-      parameters:
-      - name: category
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: price_max
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: price_min
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
   /api/v1/customer/shops/nearby-shops:
     get:
       tags:
@@ -635,7 +637,7 @@ paths:
         required: false
         schema:
           type: string
-  /api/v1/customer/shops/shop/<int:shop_id>:
+  /api/v1/customer/shops/shop/{shop_id}:
     get:
       tags:
       - shop_explorer
@@ -665,7 +667,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          type: integer
   /api/v1/customer/shops/shops:
     get:
       tags:
@@ -691,39 +693,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericError'
-  /api/v1/distributor/export-plan:
-    get:
-      tags:
-      - distributor
-      summary: Export AI production recommendations in CSV format using live sales
-        data.
-      description: Export AI production recommendations in CSV format using live sales
-        data.
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericSuccess'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
   /api/v1/distributor/production-plan:
     post:
       tags:
       - distributor
-      summary: Analyze uploaded CSV and generate AI-based production priorities.
-      description: Analyze uploaded CSV and generate AI-based production priorities.
+      summary: Upload sales CSV and get AI-powered production planning insights.
+      description: Runs Prophet forecasting and Gemini AI summarisation directly within the distributor service.
       responses:
         '200':
           description: Successful response
@@ -744,15 +719,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/GenericError'
       requestBody:
-        required: false
+        required: true
         content:
           multipart/form-data:
             schema:
               type: object
+              required:
+              - file
               properties:
                 file:
                   type: string
                   format: binary
+  /api/v1/distributor/export-plan:
+    get:
+      tags:
+      - distributor
+      summary: Export AI production recommendations in CSV format using live sales
+        data.
+      description: Exports the distributor-managed production plan as a CSV derived from live sales data.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '404':
+          description: No production data available for the requested period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
   /api/v1/distributor/regional-demand:
     post:
       tags:
@@ -1188,66 +1198,6 @@ paths:
                 title:
                   type: string
           application/x-www-form-urlencoded: *id006
-  /api/v1/production/export-plan:
-    get:
-      tags:
-      - production
-      summary: Export a production plan CSV derived from live sales data.
-      description: Export a production plan CSV derived from live sales data.
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericSuccess'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-  /api/v1/production/production-plan:
-    post:
-      tags:
-      - production
-      summary: Upload sales CSV and get AI-powered production planning insights.
-      description: Upload sales CSV and get AI-powered production planning insights.
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericSuccess'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
-      requestBody:
-        required: false
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
   /api/v1/products/:
     get:
       tags:
@@ -1294,7 +1244,7 @@ paths:
         required: false
         schema:
           type: string
-  /api/v1/products/<int:product_id>:
+  /api/v1/products/{product_id}:
     get:
       tags:
       - product
@@ -1324,7 +1274,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          type: integer
   /api/v1/products/suggested:
     get:
       tags:
@@ -1603,7 +1553,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericError'
-  /datasets/<path:filename>:
+  /datasets/{filename}:
     get:
       tags:
       - serve_dataset_file
@@ -1710,7 +1660,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericError'
-  /uploads/<path:filename>:
+  /uploads/{filename}:
     get:
       tags:
       - serve_upload

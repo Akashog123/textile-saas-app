@@ -79,7 +79,7 @@ def import_sales_data():
 DATA_FILE = os.path.join(BASE_DIR, 'data', 'Textile-2', 'products.csv')  # or .xlsx
 
 def import_products():
-    # ✅ Read the file (supports CSV or Excel)
+    # Read the file (supports CSV or Excel)
     if DATA_FILE.endswith('.xlsx') or DATA_FILE.endswith('.xls'):
         df = pd.read_excel(DATA_FILE)
     elif DATA_FILE.endswith('.csv'):
@@ -87,7 +87,7 @@ def import_products():
     else:
         raise ValueError("Unsupported file format. Use .xlsx or .csv")
 
-    print(f"📦 Importing {len(df)} products from {DATA_FILE}")
+    print(f"Importing {len(df)} products from {DATA_FILE}")
 
     with app.app_context():
         for _, row in df.iterrows():
@@ -103,10 +103,10 @@ def import_products():
                 )
                 db.session.add(product)
             except Exception as e:
-                print(f"⚠️ Skipped row due to error: {e}")
+                print(f"Skipped row due to error: {e}")
 
         db.session.commit()
-        print(f"✅ Successfully imported {len(df)} products!")
+        print(f"Successfully imported {len(df)} products!")
 
 if __name__ == "__main__":
     import_regions()

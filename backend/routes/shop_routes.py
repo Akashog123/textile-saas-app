@@ -10,10 +10,10 @@ from services.ai_service import (
     generate_recommendation,
     generate_production_priorities,
 )
+from config import Config
 
 shop_bp = Blueprint("shop", __name__)
-INSTANCE_FOLDER = "instance"
-os.makedirs(INSTANCE_FOLDER, exist_ok=True)
+INSTANCE_FOLDER = Config.DATA_DIR
 
 
 # GET: AI-POWERED SHOP DASHBOARD + AUTO NEXT-MONTH FORECAST
@@ -215,7 +215,7 @@ def upload_sales_data():
 
         save_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
         file.save(save_path)
-        print(f"[UPLOAD] ✅ Sales file saved: {save_path}")
+        print(f"[UPLOAD] Sales file saved: {save_path}")
         return jsonify({"status": "success", "message": "Sales data uploaded successfully!"}), 200
     except Exception as e:
         print(f"[UPLOAD ERROR] {e}")

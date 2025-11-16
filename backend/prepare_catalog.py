@@ -32,5 +32,5 @@ df["image_url"] = df["product_id"].apply(lambda x: f"/datasets/fashion-dataset/i
 
 # Save the processed catalog
 df.to_csv(output_path, index=False)
-print(f"✅ Catalog generated at: {output_path}")
+print(f"Catalog generated at: {output_path}")
 print(f"Total products: {len(df)}")

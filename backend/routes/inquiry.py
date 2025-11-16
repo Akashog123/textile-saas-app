@@ -42,8 +42,8 @@ def submit_inquiry():
     Automatically runs Gemini-based AI analysis on the uploaded fabric image.
     """
     try:
-        print("🔹 Received form data:", request.form)
-        print("🔹 Received files:", request.files)
+        print("[Info] Received form data:", request.form)
+        print("[Info] Received files:", request.files)
 
         data = request.form or request.get_json(silent=True) or {}
 
@@ -120,7 +120,7 @@ def submit_inquiry():
 def inquiry_history():
     """Fetch all inquiries (notifications) made by a given user or shop."""
     try:
-        print("🔹 Incoming query params:", request.args)
+        print("[Info] Incoming query params:", request.args)
 
         user_id = request.args.get("user_id")
         role = request.args.get("role", "user")
