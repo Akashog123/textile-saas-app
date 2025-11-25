@@ -8,6 +8,11 @@ from fpdf import FPDF
 from datetime import datetime
 import os
 
+# Constants for text truncation
+MAX_LINE_LENGTH = 100
+MAX_ITEM_LENGTH = 50
+
+
 class TestingReportPDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 12)
@@ -39,7 +44,7 @@ class TestingReportPDF(FPDF):
         self.set_font('Courier', '', 9)
         self.set_fill_color(240, 240, 240)
         for line in code.split('\n'):
-            self.cell(0, 5, line[:100], 0, 1, 'L', True)
+            self.cell(0, 5, line[:MAX_LINE_LENGTH], 0, 1, 'L', True)
         self.ln(3)
 
     def add_table_row(self, data, widths, is_header=False):
@@ -53,7 +58,7 @@ class TestingReportPDF(FPDF):
             self.set_text_color(0, 0, 0)
         
         for i, (item, width) in enumerate(zip(data, widths)):
-            self.cell(width, 8, str(item)[:50], 1, 0, 'L', True)
+            self.cell(width, 8, str(item)[:MAX_ITEM_LENGTH], 1, 0, 'L', True)
         self.ln()
         self.set_text_color(0, 0, 0)
 
