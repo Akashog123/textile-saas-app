@@ -82,11 +82,69 @@ def trending_shops():
     ai_json = {}
     if not trend_df.empty and ai_provider:
         try:
-            ai_text = ai_provider.generate_text(
-                f"Analyze textile shop trends:\n{trend_df.head(50).to_string()}"
-            )
-            match = re.search(r'\{.*\}', ai_text, re.DOTALL)
-            ai_json = json.loads(match.group(0)) if match else {}
+            # ai_text = ai_provider.generate_text(
+            #     f"Analyze textile shop trends:\n{trend_df.head(50).to_string()}"
+            # )
+            # match = re.search(r'\{.*\}', ai_text, re.DOTALL)
+            # ai_json = json.loads(match.group(0)) if match else {}
+
+            ai_json = {}
+            if not trend_df.empty and ai_provider:
+                try:
+                    prompt = f"""
+                    You are a textile retail analyst.
+                    Analyze the following sales trends and respond ONLY in valid JSON.
+
+                    Format strictly like this:
+                    {{
+                    "summary": {{
+                        "overall_trend": "",
+                        "top_performing_city": "",
+                        "lowest_performing_city": "",
+                        "best_month_overall": "",
+                        "weak_month_pattern": ""
+                    }},
+                    "key_insights": [],
+                    "recommendations": []
+                    }}
+
+                    DATA:
+                    {trend_df.to_string()}
+                    """
+                    ai_text = ai_provider.generate_text(prompt)
+
+                    # Remove markdown formatting if AI wraps response in ```json
+                    clean_text = re.sub(r"```json|```", "", ai_text).strip()
+
+                    try:
+                        parsed = json.loads(clean_text)
+
+                        ai_json = {
+                            "summary": parsed.get("summary", {
+                                "overall_trend": "AI response not in valid JSON",
+                                "top_performing_city": "",
+                                "lowest_performing_city": "",
+                                "best_month_overall": "",
+                                "weak_month_pattern": ""
+                            }),
+                            "recommendations": parsed.get("recommendations", [])
+                        }
+
+                    except Exception:
+                        ai_json = {
+                            "summary": {
+                                "overall_trend": "AI response not in valid JSON",
+                                "top_performing_city": "",
+                                "lowest_performing_city": "",
+                                "best_month_overall": "",
+                                "weak_month_pattern": ""
+                            },
+                            "recommendations": []
+                        }
+                except Exception as exc:
+                    print(f"[Trending Shops AI] {ai_provider.__class__.__name__} error:", exc)
+                    ai_json = {}
+
         except Exception as exc:
             print(f"[Trending Shops AI] {ai_provider.__class__.__name__} error:", exc)
             ai_json = {}
