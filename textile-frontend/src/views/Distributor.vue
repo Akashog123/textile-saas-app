@@ -1,21 +1,17 @@
 <template>
-  <div class="distributor-container">
-    <!-- Child route components render here -->
-    <router-view />
+  <div class="distributor-layout">
+    <router-view :key="$route.fullPath" />
   </div>
 </template>
 
 <script setup>
-defineOptions({
-  name: "DistributorLayout",
-});
-
-// Container component for distributor routes
+// Distributor portal layout wrapper
+// All navigation handled by NavBar.vue
 </script>
 
 <style scoped>
-.distributor-container {
-  min-height: calc(100vh - 60px);
-  background: #f8f9fa;
+.distributor-layout {
+  min-height: calc(100vh - 120px);
+  background: transparent;
 }
 </style>

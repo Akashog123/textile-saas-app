@@ -352,7 +352,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/api/axios";
 
@@ -429,16 +429,21 @@ const handleLogin = async () => {
       } else {
         localStorage.removeItem("token");
       }
-      window.dispatchEvent(new Event("user-logged-in"));
 
       const roleRoutes = {
         customer: "/customer",
-        manufacturer: "/manufacturer",
+        manufacturer: "/distributor",
         shop_owner: "/shop",
         manager: "/shop",
         distributor: "/distributor",
       };
-      router.push(roleRoutes[user.role] || "/");
+      
+      // Wait for navigation to complete before finishing
+      await router.push(roleRoutes[user.role] || "/");
+      
+      // Force event dispatch after navigation completes
+      await nextTick();
+      window.dispatchEvent(new Event("user-logged-in"));
     } else {
       loginError.value = data.message || "Login failed. Please try again.";
     }
@@ -563,13 +568,12 @@ const handleRegister = async () => {
 <style scoped>
 .auth-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-bg-alt) 0%, var(--color-bg) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .auth-wrapper {
@@ -577,19 +581,20 @@ const handleRegister = async () => {
   grid-template-columns: 1fr 1fr;
   max-width: 1200px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  min-height: 600px;
+  min-height: 650px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 /* Left Side - Branding */
 .auth-left {
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-  color: white;
-  padding: 3rem 2rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: #4A4A4A;
+  padding: 4rem 3rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -604,8 +609,8 @@ const handleRegister = async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-  opacity: 0.3;
+  background: radial-gradient(circle at top right, rgba(255,255,255,0.4), transparent 60%);
+  pointer-events: none;
 }
 
 .brand-section {
@@ -615,55 +620,64 @@ const handleRegister = async () => {
 
 .brand-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
 }
 
 .brand-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 4rem;
-  height: 4rem;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  margin-bottom: 1rem;
+  width: 5rem;
+  height: 5rem;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  margin-bottom: 1.5rem;
   backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  transform: rotate(-5deg);
+  transition: transform 0.3s ease;
+}
+
+.brand-icon:hover {
+  transform: rotate(0deg) scale(1.05);
 }
 
 .icon-sparkle {
-  width: 2rem;
-  height: 2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   color: white;
 }
 
 .brand-title {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: 3rem;
+  font-weight: 800;
   margin: 0 0 0.5rem 0;
-  background: linear-gradient(45deg, #ffffff, #e0e7ff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  letter-spacing: -1px;
 }
 
 .brand-subtitle {
-  font-size: 1.1rem;
-  opacity: 0.9;
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.9);
   margin: 0 0 2rem 0;
-  font-weight: 300;
+  font-weight: 500;
 }
 
 .features-list {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 20px;
+  backdrop-filter: blur(5px);
 }
 
 .feature-item {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.5rem 0;
 }
 
 .feature-icon {
@@ -672,8 +686,8 @@ const handleRegister = async () => {
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   flex-shrink: 0;
 }
 
@@ -684,80 +698,78 @@ const handleRegister = async () => {
 }
 
 .feature-item span {
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Right Side - Auth Forms */
 .auth-right {
-  padding: 3rem 2rem;
+  padding: 4rem 3rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: white;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .auth-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 440px;
   margin: 0 auto;
 }
 
 /* Tab Navigation */
 .auth-tabs {
   display: flex;
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 2rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #f1f5f9;
+  border-radius: 16px;
+  padding: 6px;
+  margin-bottom: 2.5rem;
+  position: relative;
 }
 
 .tab-button {
   flex: 1;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
-  color: #6c757d;
+  color: #64748b;
   transition: all 0.3s ease;
   cursor: pointer;
+  z-index: 1;
 }
 
 .tab-button.active {
   background: white;
-  color: #0d6efd;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Form Styles */
-.auth-form {
-  width: 100%;
+  color: var(--color-text-dark);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .form-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 .form-header h2 {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--color-text-dark);
   margin: 0 0 0.5rem 0;
+  letter-spacing: -0.5px;
 }
 
 .form-header p {
-  color: #6c757d;
+  color: var(--color-text-muted);
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .form-content {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .form-group {
@@ -768,45 +780,29 @@ const handleRegister = async () => {
 
 .form-label {
   font-weight: 600;
-  color: #374151;
-  font-size: 0.875rem;
+  color: var(--color-text-dark);
+  font-size: 0.9rem;
   margin-bottom: 0;
 }
 
-.form-control {
-  padding: 0.75rem 1rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  background: #fafafa;
+.form-control, .form-select {
+  padding: 0.875rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: white;
+  color: var(--color-text-dark);
 }
 
-.form-control:focus {
+.form-control:focus, .form-select:focus {
   outline: none;
-  border-color: #0d6efd;
-  background: white;
-  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(242, 190, 209, 0.15);
 }
 
 .form-control::placeholder {
-  color: #9ca3af;
-}
-
-.form-select {
-  padding: 0.75rem 1rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  background: #fafafa;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: #0d6efd;
-  background: white;
-  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+  color: #94a3b8;
 }
 
 .form-options {

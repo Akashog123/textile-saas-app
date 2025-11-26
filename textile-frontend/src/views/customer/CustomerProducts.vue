@@ -1,28 +1,11 @@
 <template>
   <div class="customer-products-page">
-    <!-- Header with Search and Filters -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">Browse All Fabrics</h5>
-      <div class="d-flex gap-2 align-items-center">
-        <div class="input-group" style="max-width: 400px">
-          <input
-            type="text"
-            class="form-control"
-            placeholder="Search for Shops and Fabrics..."
-            v-model="searchQuery"
-          />
-          <button class="btn btn-outline-secondary">
-            <i class="bi bi-mic-fill"></i>
-          </button>
-          <button class="btn btn-outline-secondary">
-            <i class="bi bi-camera-fill"></i>
-          </button>
-        </div>
-        <button class="btn btn-primary">
-          <i class="bi bi-geo-alt-fill"></i> Nearby Shops
-        </button>
-      </div>
-    </div>
+    <!-- Search Bar -->
+    <SearchBar 
+      v-model="searchQuery"
+      placeholder="Search fabrics and products..."
+      @nearby-search="handleNearbySearch"
+    />
 
     <!-- Filters -->
     <div class="filters-section mb-4 d-flex gap-3 align-items-center">
@@ -123,96 +106,98 @@
 </template>
 
 <script setup>
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted, watch } from 'vue';
+import { getProducts } from '@/api/apiProducts';
+import SearchBar from '@/components/SearchBar.vue';
 
-const searchQuery = ref("");
+const searchQuery = ref('');
 const currentImageIndex = reactive({});
 
-const products = ref([
-  {
-    name: "Handwoven Silk Brocade",
-    price: "₹1,850",
-    description:
-      "Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions. Features rich texture, vibrant colors, and exceptional durability.",
-    rating: 5,
-    seller: "The Silk Emporium",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    name: "Premium Cotton Batik Print",
-    price: "₹650",
-    description:
-      "Soft and breathable premium cotton with authentic batik patterns. Ideal for summer wear with excellent comfort. Eco-friendly and naturally dyed using traditional methods.",
-    rating: 4,
-    seller: "Heritage Textile House",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    name: "Luxury Georgette Floral",
-    price: "₹1,450",
-    description:
-      "Elegant georgette silk with beautiful floral prints and luxurious drape. Lightweight and flowing fabric perfect for sarees, dresses, and scarves. Premium quality with vivid colors.",
-    rating: 5,
-    seller: "Artisan Fabric Gallery",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    name: "Artisan Handloom Cotton",
-    price: "₹890",
-    description:
-      "Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship with modern appeal. Durable and comfortable for everyday use with natural texture.",
-    rating: 4,
-    seller: "Modern Textile Studio",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    name: "Designer Silk Collection",
-    price: "₹2,150",
-    description:
-      "Exclusive designer silk fabric with contemporary patterns. Premium quality silk perfect for high-end fashion wear. Limited edition collection with unique artistic designs.",
-    rating: 5,
-    seller: "The Silk Emporium",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    name: "Traditional Block Print",
-    price: "₹780",
-    description:
-      "Authentic hand-block printed cotton fabric with traditional motifs. Eco-friendly dyes and sustainable production. Perfect for ethnic wear and home décor projects.",
-    rating: 4,
-    seller: "Heritage Textile House",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-]);
+// Loading and error states
+const loading = ref(false);
+const error = ref('');
 
-// Initialize image indices
-for (const [idx] of products.value.entries()) {
-  currentImageIndex[idx] = 0;
-}
+// Filter states
+const filters = reactive({
+  category: '',
+  price_min: null,
+  price_max: null,
+  search: ''
+});
+
+// Products data from backend
+const products = ref([]);
+
+/**
+ * Fetch products from backend with filters
+ */
+const fetchProducts = async () => {
+  loading.value = true;
+  error.value = '';
+  try {
+    const params = {
+      ...filters,
+      search: searchQuery.value || filters.search
+    };
+    
+    const response = await getProducts(params);
+    if (response.data && response.data.products) {
+      products.value = response.data.products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price ? `₹${parseFloat(p.price).toLocaleString()}` : 'Price not available',
+        description: p.ai_caption || p.description || 'No description available',
+        rating: p.rating || 4,
+        seller: p.shop_name || 'Unknown Seller',
+        imageUrls: p.images && p.images.length > 0 
+          ? p.images.map(img => img.url || img)
+          : [p.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(p.name)}`]
+      }));
+      
+      // Initialize image indices
+      for (const [idx] of products.value.entries()) {
+        currentImageIndex[idx] = 0;
+      }
+    }
+  } catch (err) {
+    console.error('[Products Error]', err);
+    error.value = err.response?.data?.message || 'Failed to load products';
+    // Fallback to demo data
+    products.value = getFallbackProducts();
+    for (const [idx] of products.value.entries()) {
+      currentImageIndex[idx] = 0;
+    }
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
+ * Fallback demo data
+ */
+const getFallbackProducts = () => [
+  {
+    name: 'Handwoven Silk Brocade',
+    price: '₹1,850',
+    description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear.',
+    rating: 5,
+    seller: 'The Silk Emporium',
+    imageUrls: [
+      'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+    ],
+  },
+  {
+    name: 'Premium Cotton Batik Print',
+    price: '₹650',
+    description: 'Soft and breathable premium cotton with authentic batik patterns. Ideal for summer wear.',
+    rating: 4,
+    seller: 'Heritage Textile House',
+    imageUrls: [
+      'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+    ],
+  },
+];
 
 const prevImage = (idx) => {
   if (currentImageIndex[idx] > 0) {
@@ -225,19 +210,79 @@ const nextImage = (idx) => {
     currentImageIndex[idx]++;
   }
 };
+
+// Handle nearby search from SearchBar
+const handleNearbySearch = async () => {
+  try {
+    loading.value = true;
+    error.value = '';
+    
+    // Import the MapmyIndia service
+    const { getNearbyShopsAuto, formatDistance } = await import('@/services/mapmyindiaService');
+    
+    // Get nearby shops (automatically gets user location)
+    const result = await getNearbyShopsAuto(5000); // 5km radius
+    
+    if (result.shops && result.shops.length > 0) {
+      // Transform nearby shops to product format
+      products.value = result.shops.map((shop, index) => ({
+        id: shop.id || `nearby-${index}`,
+        name: shop.name,
+        price: 'Visit Shop',
+        description: `${shop.address} • ${formatDistance(shop.distance)} away`,
+        rating: 4,
+        seller: shop.name,
+        imageUrls: [`https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`],
+        distance: shop.distance,
+        location: {
+          latitude: shop.latitude,
+          longitude: shop.longitude
+        }
+      }));
+      
+      // Initialize image indices
+      for (const [idx] of products.value.entries()) {
+        currentImageIndex[idx] = 0;
+      }
+      
+      console.log(`Found ${result.shops.length} nearby shops`);
+    } else {
+      error.value = 'No nearby shops found. Try increasing the search radius.';
+    }
+    
+  } catch (err) {
+    console.error('Nearby search error:', err);
+    error.value = err.message || 'Failed to search nearby shops';
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Watch for search query changes
+watch(searchQuery, () => {
+  if (searchQuery.value) {
+    filters.search = searchQuery.value;
+    fetchProducts();
+  }
+});
+
+// Fetch products on mount
+onMounted(() => {
+  fetchProducts();
+});
 </script>
 
 <style scoped>
 .customer-products-page {
   padding: 2rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: 100vh;
 }
 
 /* Header */
 h5 {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1.75rem;
 }
 
@@ -252,14 +297,15 @@ h5 {
 }
 
 .input-group:focus-within {
-  border-color: #667eea;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 20px rgba(242, 190, 209, 0.2);
 }
 
 .input-group .form-control {
   border: none;
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
+  color: var(--color-text-dark);
 }
 
 .input-group .form-control:focus {
@@ -272,25 +318,28 @@ h5 {
   font-size: 1.2rem;
   padding: 0.5rem 1rem;
   transition: transform 0.2s ease;
+  color: var(--color-text-muted);
 }
 
 .input-group .btn:hover {
   transform: scale(1.1);
+  color: var(--color-primary);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border: none;
   border-radius: 50px;
   padding: 0.75rem 2rem;
   font-weight: 600;
+  color: #4A4A4A;
   transition: all 0.3s ease;
   white-space: nowrap;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.4);
 }
 
 /* Filters Section */
@@ -306,19 +355,19 @@ h5 {
 }
 
 .fw-semibold {
-  color: #2d3748 !important;
+  color: var(--color-text-dark) !important;
   font-size: 1rem;
   font-weight: 600 !important;
 }
 
 .filter-btn {
   padding: 0.6rem 1.25rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-bg-alt);
   background: white;
   border-radius: 50px;
   cursor: pointer;
   font-weight: 500;
-  color: #4a5568;
+  color: var(--color-text-muted);
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
@@ -326,10 +375,10 @@ h5 {
 }
 
 .filter-btn:hover {
-  border-color: #667eea;
-  color: #667eea;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.2);
 }
 
 /* Products Grid */
@@ -337,6 +386,7 @@ h5 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
   gap: 2rem;
+  margin-top: 2rem;
 }
 
 .product-carousel-item .card {
@@ -350,7 +400,7 @@ h5 {
 
 .product-carousel-item .card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 15px 50px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 15px 50px rgba(242, 190, 209, 0.2);
 }
 
 .product-carousel-item .card-body {
@@ -365,7 +415,7 @@ h5 {
 }
 
 .carousel-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border: none;
   border-radius: 50%;
   width: 45px;
@@ -374,17 +424,17 @@ h5 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: white;
+  color: #4A4A4A;
   flex-shrink: 0;
   font-size: 1.5rem;
   font-weight: bold;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.3);
 }
 
 .carousel-btn:hover:not(:disabled) {
   transform: scale(1.15);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.5);
 }
 
 .carousel-btn:disabled {
@@ -405,7 +455,7 @@ h5 {
   height: 280px;
   border-radius: 12px;
   overflow: hidden;
-  background: #f8f9fa;
+  background: var(--color-bg-light);
 }
 
 .product-image {
@@ -436,15 +486,15 @@ h5 {
 .product-main h6 {
   font-size: 1.35rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   margin-bottom: 0.75rem;
 }
 
 .price {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #667eea;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -452,7 +502,7 @@ h5 {
 }
 
 .product-main p {
-  color: #4a5568;
+  color: var(--color-text-muted);
   line-height: 1.6;
   font-size: 0.95rem;
 }
@@ -475,13 +525,13 @@ h5 {
 }
 
 .text-muted {
-  color: #718096 !important;
+  color: var(--color-text-muted) !important;
 }
 
 /* Load More Button */
 .btn-outline-primary {
-  border: 2px solid #667eea;
-  color: #667eea;
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
   background: white;
   padding: 0.75rem 2.5rem;
   border-radius: 50px;
@@ -490,11 +540,11 @@ h5 {
 }
 
 .btn-outline-primary:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: #4A4A4A;
   border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.4);
 }
 
 /* Responsive Design */

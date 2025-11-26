@@ -4,12 +4,12 @@ from flask import Blueprint, jsonify, request
 from models.model import db, Product, Shop, SalesData
 from sqlalchemy import or_, func
 from utils.image_utils import resolve_product_image, resolve_shop_image
-from services.ai_service import generate_ai_caption
+from utils.performance_utils import cached_ai_caption, batch_ai_captions, performance_monitor
 from config import Config
 import requests
 from decimal import Decimal
 
-discovery_portal_bp = Blueprint("discovery_portal", __name__, url_prefix="/api/v1/customer")
+discovery_portal_bp = Blueprint("discovery_portal", __name__)
 
 
 # Helper: Geocode Shop Location (MapMyIndia)
@@ -34,27 +34,56 @@ def geocode_address(address):
 
 # GET: Trending Fabrics (AI-enhanced captions)
 @discovery_portal_bp.route("/trending-fabrics", methods=["GET"])
+@performance_monitor
 def get_trending_fabrics():
-    """Return top trending fabrics with AI-generated marketing captions."""
+    """Return top trending fabrics with AI-generated marketing captions for Shop Managers only."""
     try:
-        trending_fabrics = (
-            db.session.query(
-                Product,
-                func.coalesce(func.sum(SalesData.revenue), 0).label("total_revenue"),
-                func.coalesce(func.sum(SalesData.quantity_sold), 0).label("units_sold")
+        # Check if AI captions are requested and user has permission
+        generate_captions = request.args.get("generate_captions", "false").lower() == "true"
+        
+        # Only allow AI caption generation for Shop Managers
+        if generate_captions:
+            from utils.auth_utils import extract_token_from_request, decode_jwt
+            from models.model import User
+            
+            token = extract_token_from_request()
+            if not token:
+                generate_captions = False
+            else:
+                decoded = decode_jwt(token)
+                if decoded:
+                    user = User.query.get(decoded.get("user_id"))
+                    if not user or user.role not in ["shop_owner", "admin", "manager"]:
+                        generate_captions = False  # Deny AI generation for regular customers
+                else:
+                    generate_captions = False
+        
+        # Use a single session with proper cleanup
+        with db.session.begin():
+            trending_fabrics = (
+                db.session.query(
+                    Product,
+                    func.coalesce(func.sum(SalesData.revenue), 0).label("total_revenue"),
+                    func.coalesce(func.sum(SalesData.quantity_sold), 0).label("units_sold")
+                )
+                .outerjoin(SalesData, SalesData.product_id == Product.id)
+                .group_by(Product.id)
+                .order_by(func.coalesce(func.sum(SalesData.revenue), 0).desc(), Product.rating.desc())
+                .limit(10)
+                .all()
             )
-            .outerjoin(SalesData, SalesData.product_id == Product.id)
-            .group_by(Product.id)
-            .order_by(func.coalesce(func.sum(SalesData.revenue), 0).desc(), Product.rating.desc())
-            .limit(10)
-            .all()
-        )
 
+        # Extract products for batch AI caption generation
+        products = [product for product, _, _ in trending_fabrics]
+        
+        # Generate AI captions efficiently using batch processing
+        ai_captions = batch_ai_captions(products, generate_captions)
+
+        # Build result efficiently
         result = []
-
-        for product, total_revenue, units_sold in trending_fabrics:
+        for i, (product, total_revenue, units_sold) in enumerate(trending_fabrics):
             price_value = _to_float(product.price)
-            caption = generate_ai_caption(product.name, product.category or "Textile", price_value)
+            
             result.append({
                 "id": product.id,
                 "name": product.name,
@@ -63,13 +92,15 @@ def get_trending_fabrics():
                 "rating": round(product.rating or 0, 1),
                 "badge": product.badge or "Trending",
                 "image": resolve_product_image(product),
-                "ai_caption": caption
+                "ai_caption": ai_captions[i]
             })
 
         return jsonify({
             "status": "success",
             "count": len(result),
-            "fabrics": result
+            "fabrics": result,
+            "captions_generated": generate_captions,
+            "user_role": "shop_manager" if generate_captions else "customer"
         }), 200
 
     except Exception as e:
@@ -92,53 +123,38 @@ def _to_float(value):
         return 0.0
 
 
-def _resolve_product_image(product):
-    image = getattr(product, "image_url", None)
-    if image:
-        return image
-
-    images_rel = getattr(product, "images", None)
-    if images_rel is not None:
-        try:
-            first_image = images_rel.first()
-        except AttributeError:
-            first_image = images_rel[0] if images_rel else None
-        if first_image and getattr(first_image, "url", None):
-            return first_image.url
-
-    if hasattr(product, "shop") and getattr(product.shop, "image_url", None):
-        return product.shop.image_url
-
-    return ""
-
-
 # GET: Popular Shops
 @discovery_portal_bp.route("/popular-shops", methods=["GET"])
+@performance_monitor
 def get_popular_shops():
     """Return popular shops with geolocation enrichment."""
     try:
-        popular_shops = (
-            db.session.query(
-                Shop,
-                func.coalesce(func.sum(SalesData.revenue), 0).label("total_revenue"),
-                func.coalesce(func.sum(SalesData.quantity_sold), 0).label("units_sold")
+        # Use a single session with proper cleanup
+        with db.session.begin():
+            popular_shops = (
+                db.session.query(
+                    Shop,
+                    func.coalesce(func.sum(SalesData.revenue), 0).label("total_revenue"),
+                    func.coalesce(func.sum(SalesData.quantity_sold), 0).label("units_sold")
+                )
+                .outerjoin(SalesData, SalesData.shop_id == Shop.id)
+                .group_by(Shop.id)
+                .order_by(func.coalesce(func.sum(SalesData.revenue), 0).desc(), Shop.rating.desc())
+                .limit(10)
+                .all()
             )
-            .outerjoin(SalesData, SalesData.shop_id == Shop.id)
-            .group_by(Shop.id)
-            .order_by(func.coalesce(func.sum(SalesData.revenue), 0).desc(), Shop.rating.desc())
-            .limit(10)
-            .all()
-        )
 
         results = []
-        lat_lon_updated = False
+        shops_to_update = []
 
+        # Process shops outside of database session
         for shop, total_revenue, units_sold in popular_shops:
+            # Check if geocoding is needed
             if (shop.lat is None or shop.lon is None) and shop.location:
                 lat, lon = geocode_address(shop.location)
                 if lat is not None and lon is not None:
+                    shops_to_update.append({"id": shop.id, "lat": lat, "lon": lon})
                     shop.lat, shop.lon = lat, lon
-                    lat_lon_updated = True
 
             results.append({
                 "id": shop.id,
@@ -151,8 +167,17 @@ def get_popular_shops():
                 "image": resolve_shop_image(shop)
             })
 
-        if lat_lon_updated:
-            db.session.commit()
+        # Batch update geocoded shops if any
+        if shops_to_update:
+            try:
+                with db.session.begin():
+                    for update in shops_to_update:
+                        db.session.query(Shop).filter(Shop.id == update["id"]).update({
+                            "lat": update["lat"],
+                            "lon": update["lon"]
+                        })
+            except Exception as e:
+                print(f"Failed to update shop geocodes: {e}")
 
         return jsonify({
             "status": "success",

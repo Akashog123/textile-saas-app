@@ -1,14 +1,19 @@
-import os
 from flask import Blueprint, jsonify
 from models.model import ExternalProduct, ExternalSalesDataItem
 from models.model import db
 import pandas as pd
-import google.generativeai as genai
+from services.ai_providers import get_provider
 
 top_selling_bp = Blueprint("top_selling", __name__)
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel("gemini-2.5-flash")
+# Global AI provider
+ai_provider = None
+try:
+    ai_provider = get_provider()
+    print(f"Top selling routes AI Provider initialized: {ai_provider.__class__.__name__}")
+except Exception as e:
+    print(f"Failed to initialize AI provider for top selling routes: {e}")
+    ai_provider = None
 
 @top_selling_bp.route('/', methods=['GET'])
 def top_selling_products():
@@ -80,15 +85,15 @@ def top_selling_products():
     )
 
     ai_output = ""
-    if not summary_df.empty and os.getenv("GEMINI_API_KEY"):
+    if not summary_df.empty and ai_provider:
         prompt = f"""
         Analyze yearly sales and provide insights.
         Data: {summary_df.to_json(orient="records")}
         """
         try:
-            ai_output = model.generate_content(prompt).text.strip()
+            ai_output = ai_provider.generate_text(prompt)
         except Exception as exc:
-            print("[Top Selling AI]", exc)
+            print(f"[Top Selling AI] {ai_provider.__class__.__name__} error:", exc)
             ai_output = "AI analysis unavailable."
     else:
         ai_output = "No summarized sales data to analyze."

@@ -5,12 +5,18 @@ from flask import Blueprint, jsonify
 from models.model import ExternalSalesDataItem, StoreRegion
 from models.model import db
 import pandas as pd
-import google.generativeai as genai
+from services.ai_providers import get_provider
 
 trending_shops_bp = Blueprint("trending", __name__)
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel("gemini-2.5-flash")
+# Global AI provider
+ai_provider = None
+try:
+    ai_provider = get_provider()
+    print(f"Trending routes AI Provider initialized: {ai_provider.__class__.__name__}")
+except Exception as e:
+    print(f"Failed to initialize AI provider for trending routes: {e}")
+    ai_provider = None
 
 @trending_shops_bp.route('/', methods=['GET'])
 def trending_shops():
@@ -74,15 +80,15 @@ def trending_shops():
                  .reset_index()
 
     ai_json = {}
-    if not trend_df.empty and os.getenv("GEMINI_API_KEY"):
+    if not trend_df.empty and ai_provider:
         try:
-            ai_text = model.generate_content(
+            ai_text = ai_provider.generate_text(
                 f"Analyze textile shop trends:\n{trend_df.head(50).to_string()}"
-            ).text
+            )
             match = re.search(r'\{.*\}', ai_text, re.DOTALL)
             ai_json = json.loads(match.group(0)) if match else {}
         except Exception as exc:
-            print("[Trending Shops AI]", exc)
+            print(f"[Trending Shops AI] {ai_provider.__class__.__name__} error:", exc)
             ai_json = {}
 
     return jsonify({

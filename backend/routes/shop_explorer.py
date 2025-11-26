@@ -8,7 +8,7 @@ from services.ai_service import generate_ai_caption
 import requests
 from math import cos, radians
 
-shop_explorer_bp = Blueprint("shop_explorer", __name__, url_prefix="/api/v1/customer")
+shop_explorer_bp = Blueprint("shop_explorer", __name__)
 
 
 # GET: All Shops

@@ -1,28 +1,11 @@
 <template>
   <div class="customer-shops-page">
-    <!-- Header with Search and Filters -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">All Shops</h5>
-      <div class="d-flex gap-2 align-items-center">
-        <div class="input-group" style="max-width: 400px">
-          <input
-            type="text"
-            class="form-control"
-            placeholder="Search for Shops and Fabrics..."
-            v-model="searchQuery"
-          />
-          <button class="btn btn-outline-secondary">
-            <i class="bi bi-mic-fill"></i>
-          </button>
-          <button class="btn btn-outline-secondary">
-            <i class="bi bi-camera-fill"></i>
-          </button>
-        </div>
-        <button class="btn btn-primary">
-          <i class="bi bi-geo-alt-fill"></i> Nearby Shops
-        </button>
-      </div>
-    </div>
+    <!-- Search Bar -->
+    <SearchBar 
+      v-model="searchQuery"
+      placeholder="Search for shops and locations..."
+      @nearby-search="handleNearbySearch"
+    />
 
     <!-- Filters -->
     <div class="filters-section mb-3 d-flex gap-2 align-items-center">
@@ -57,28 +40,15 @@
           <h6 class="mb-2">
             <i class="bi bi-geo-alt-fill"></i> Shop Locations
           </h6>
-          <div class="map-container border rounded position-relative">
-            <iframe
-              src="https://www.openstreetmap.org/export/embed.html?bbox=77.5%2C12.9%2C77.7%2C13.1&layer=mapnik&marker=13.0%2C77.6"
-              width="100%"
-              height="380"
-              class="map-iframe"
-              title="Interactive map showing textile shop locations"
-              loading="lazy"
-            ></iframe>
-            <!-- Map Markers Overlay -->
-            <div class="map-markers">
-              <div
-                v-for="(shop, idx) in shops"
-                :key="idx"
-                class="map-marker"
-                :style="{ top: shop.mapY, left: shop.mapX }"
-                @click="selectShop(shop)"
-              >
-                <div class="marker-label">{{ shop.shortName }}</div>
-              </div>
-            </div>
-          </div>
+          <MapmyIndiaMap
+            :shops="shopsWithCoordinates"
+            :center="mapCenter"
+            :zoom="13"
+            height="380px"
+            @marker-click="selectShop"
+            @location-found="handleUserLocationFound"
+            @map-ready="handleMapReady"
+          />
         </div>
       </div>
 
@@ -176,167 +146,233 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, computed } from 'vue';
+import { getAllShops, getShopDetails } from '@/api/apiCustomer';
+import SearchBar from '@/components/SearchBar.vue';
+import MapmyIndiaMap from '@/components/MapmyIndiaMap.vue';
 
-const searchQuery = ref("");
+const searchQuery = ref('');
 const filterRating = ref(false);
 const filterLocation = ref(false);
 const filterSort = ref(false);
 const selectedShop = ref(null);
 
-const shops = ref([
+// Loading and error states
+const loading = ref(false);
+const error = ref('');
+
+// Shops data from backend
+const shops = ref([]);
+
+// Map-related data
+const mapCenter = ref({ lat: 28.6139, lng: 77.2090 }); // Default to Delhi
+const userLocation = ref(null);
+
+// Computed property for shops with coordinates
+const shopsWithCoordinates = computed(() => {
+  return shops.value.map(shop => ({
+    ...shop,
+    lat: shop.lat || parseFloat(shop.latitude) || 28.6139 + (Math.random() - 0.5) * 0.1,
+    lng: shop.lng || parseFloat(shop.longitude) || 77.2090 + (Math.random() - 0.5) * 0.1
+  }));
+});
+
+/**
+ * Fetch all shops from backend
+ */
+const fetchShops = async () => {
+  loading.value = true;
+  error.value = '';
+  try {
+    const response = await getAllShops();
+    if (response.data && response.data.shops) {
+      shops.value = response.data.shops.map(shop => ({
+        id: shop.id,
+        name: shop.name,
+        shortName: shop.name.split(' ').slice(0, 2).join(' '), // First 2 words
+        description: shop.description || 'Quality textile shop',
+        address: shop.address || 'Location not available',
+        contact: shop.contact || 'Contact not available',
+        hours: shop.hours || 'Open during business hours',
+        mapX: `${Math.random() * 70 + 15}%`,
+        mapY: `${Math.random() * 60 + 20}%`,
+        rating: shop.rating || 4,
+        products: shop.products || []
+      }));
+    }
+  } catch (err) {
+    console.error('[Shops Error]', err);
+    error.value = err.response?.data?.message || 'Failed to load shops';
+    // Fallback to demo data
+    shops.value = getFallbackShops();
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
+ * Fetch detailed shop information
+ */
+const fetchShopDetails = async (shopId) => {
+  try {
+    const response = await getShopDetails(shopId);
+    if (response.data && response.data.shop) {
+      return {
+        id: response.data.shop.id,
+        name: response.data.shop.name,
+        description: response.data.shop.description,
+        address: response.data.shop.address,
+        contact: response.data.shop.contact,
+        hours: response.data.shop.hours || 'Open during business hours',
+        rating: response.data.shop.rating || 4,
+        products: (response.data.products || []).map(p => ({
+          id: p.id,
+          name: p.name,
+          rating: p.rating || 4,
+          description: p.ai_caption || p.description || '',
+          image: p.image_url || `https://placehold.co/400x300?text=${encodeURIComponent(p.name)}`
+        }))
+      };
+    }
+  } catch (err) {
+    console.error('[Shop Details Error]', err);
+    return null;
+  }
+};
+
+/**
+ * Fallback demo data
+ */
+const getFallbackShops = () => [
   {
-    name: "The Silk Emporium",
-    shortName: "Silk Emporium",
-    description:
-      "Premier destination for authentic silk fabrics featuring traditional handloom textiles and modern designer collections. Over 50 years of trusted quality.",
-    address: "Shop 42, MG Road, Bangalore - 560001",
-    contact: "+91 98765 43210",
-    hours: "Open Monday to Saturday, 10AM To 8PM",
-    mapX: "30%",
-    mapY: "25%",
+    name: 'The Silk Emporium',
+    shortName: 'Silk Emporium',
+    description: 'Premier destination for authentic silk fabrics featuring traditional handloom textiles.',
+    address: 'Shop 42, MG Road, Bangalore - 560001',
+    contact: '+91 98765 43210',
+    hours: 'Open Monday to Saturday, 10AM To 8PM',
+    mapX: '30%',
+    mapY: '25%',
     rating: 5,
-    products: [
-      {
-        id: 1,
-        name: "Silk Brocade",
-        rating: 5,
-        description: "Handwoven silk with golden threads",
-        image:
-          "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-      {
-        id: 2,
-        name: "Designer Georgette",
-        rating: 5,
-        description: "Luxury georgette with floral prints",
-        image:
-          "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-    ],
+    products: []
   },
   {
-    name: "Heritage Textile House",
-    shortName: "Heritage House",
-    description:
-      "Specializing in premium cotton and handwoven fabrics with rich cultural heritage. Wide range of traditional and contemporary designs for all occasions.",
-    address: "156, Commercial Street, Bangalore - 560042",
-    contact: "+91 98123 45678",
-    hours: "Open Daily, 9AM To 9PM",
-    mapX: "70%",
-    mapY: "30%",
+    name: 'Heritage Textile House',
+    shortName: 'Heritage House',
+    description: 'Specializing in premium cotton and handwoven fabrics with rich cultural heritage.',
+    address: '156, Commercial Street, Bangalore - 560042',
+    contact: '+91 98123 45678',
+    hours: 'Open Daily, 9AM To 9PM',
+    mapX: '70%',
+    mapY: '30%',
     rating: 4,
-    products: [
-      {
-        id: 1,
-        name: "Cotton Batik",
-        rating: 4,
-        description: "Traditional batik printed cotton",
-        image:
-          "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-      {
-        id: 2,
-        name: "Block Print Fabric",
-        rating: 4,
-        description: "Hand block printed designs",
-        image:
-          "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-    ],
-  },
-  {
-    name: "Artisan Fabric Gallery",
-    shortName: "Artisan Gallery",
-    description:
-      "Curated collection of artisan fabrics showcasing traditional craftsmanship. Supporting local weavers and offering unique, handcrafted textile pieces.",
-    address: "78, 100 Feet Road, Indiranagar - 560038",
-    contact: "+91 99876 54321",
-    hours: "Open Tuesday to Sunday, 10:30AM To 7:30PM",
-    mapX: "60%",
-    mapY: "60%",
-    rating: 5,
-    products: [
-      {
-        id: 1,
-        name: "Handloom Cotton",
-        rating: 5,
-        description: "Artisan woven cotton fabric",
-        image:
-          "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-      {
-        id: 2,
-        name: "Eco-Dyed Silk",
-        rating: 5,
-        description: "Naturally dyed silk textiles",
-        image:
-          "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-    ],
-  },
-  {
-    name: "Modern Textile Studio",
-    shortName: "Modern Studio",
-    description:
-      "Contemporary fabric store offering latest trends in textiles. Perfect blend of modern designs and quality materials for fashion-forward customers.",
-    address: "234, 80 Feet Road, Koramangala - 560095",
-    contact: "+91 97654 32109",
-    hours: "Open Monday to Saturday, 11AM To 8PM",
-    mapX: "25%",
-    mapY: "70%",
-    rating: 4,
-    products: [
-      {
-        id: 1,
-        name: "Designer Prints",
-        rating: 4,
-        description: "Contemporary printed fabrics",
-        image:
-          "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-      {
-        id: 2,
-        name: "Modern Weaves",
-        rating: 4,
-        description: "Trendy textile designs",
-        image:
-          "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=400",
-      },
-    ],
-  },
-]);
+    products: []
+  }
+];
 
 const toggleFilter = (filter) => {
-  if (filter === "rating") filterRating.value = !filterRating.value;
-  if (filter === "location") filterLocation.value = !filterLocation.value;
-  if (filter === "sort") filterSort.value = !filterSort.value;
+  if (filter === 'rating') filterRating.value = !filterRating.value;
+  if (filter === 'location') filterLocation.value = !filterLocation.value;
+  if (filter === 'sort') filterSort.value = !filterSort.value;
 };
 
-const selectShop = (shop) => {
-  selectedShop.value = shop;
+const selectShop = async (shop) => {
+  // Fetch detailed shop info if we have an ID
+  if (shop.id) {
+    const details = await fetchShopDetails(shop.id);
+    selectedShop.value = details || shop;
+  } else {
+    selectedShop.value = shop;
+  }
 };
 
-const viewShopProfile = (shop) => {
-  selectedShop.value = shop;
+const viewShopProfile = async (shop) => {
+  await selectShop(shop);
 };
 
 const closeShopProfile = () => {
   selectedShop.value = null;
 };
+
+// Handle nearby search from SearchBar
+const handleNearbySearch = async () => {
+  try {
+    filterLocation.value = true; // Show filter is active
+    
+    // Import the MapmyIndia service
+    const { getNearbyShopsAuto, formatDistance } = await import('@/services/mapmyindiaService');
+    
+    // Get nearby shops (automatically gets user location)
+    const result = await getNearbyShopsAuto(10000); // 10km radius for shops page
+    
+    if (result.shops && result.shops.length > 0) {
+      // Transform nearby shops to our shop format
+      shops.value = result.shops.map((shop) => ({
+        id: shop.id,
+        name: shop.name,
+        shortName: shop.name.split(' ').slice(0, 2).join(' '),
+        description: `Located ${formatDistance(shop.distance)} from you`,
+        address: shop.address,
+        contact: 'Contact not available',
+        hours: 'Open during business hours',
+        mapX: `${Math.random() * 70 + 15}%`, // Random positioning for visual
+        mapY: `${Math.random() * 60 + 20}%`,
+        rating: 4,
+        products: [],
+        distance: shop.distance,
+        latitude: shop.latitude,
+        longitude: shop.longitude
+      }));
+      
+      // Sort by distance (nearest first)
+      shops.value.sort((a, b) => a.distance - b.distance);
+      
+      console.log(`Found ${result.shops.length} nearby shops`);
+      
+      // Show user location on map (if needed)
+      console.log('User location:', result.user_location);
+      
+    } else {
+      console.log('No nearby shops found');
+      alert('No nearby shops found within 10km. Showing all shops.');
+      fetchShops(); // Fallback to all shops
+    }
+    
+  } catch (err) {
+    console.error('Nearby search error:', err);
+    alert(err.message || 'Failed to search nearby shops');
+    filterLocation.value = false;
+  }
+};
+
+// Map event handlers
+const handleMapReady = (mapInstance) => {
+  console.log('Map is ready:', mapInstance);
+};
+
+const handleUserLocationFound = (location) => {
+  userLocation.value = location;
+  mapCenter.value = { lat: location.latitude, lng: location.longitude };
+  console.log('User location found:', location);
+};
+
+// Fetch data on mount
+onMounted(() => {
+  fetchShops();
+});
 </script>
 
 <style scoped>
 .customer-shops-page {
   padding: 2rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: 100vh;
 }
 
 /* Header */
 h5 {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1.75rem;
 }
 
@@ -345,7 +381,7 @@ h5 {
   padding: 1rem 1.5rem;
   background: white;
   border-radius: 16px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -353,33 +389,33 @@ h5 {
 }
 
 .fw-semibold {
-  color: #4a5568;
+  color: var(--color-text-muted);
   font-size: 1rem;
 }
 
 .filter-btn {
   padding: 0.6rem 1.25rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-bg-alt);
   background: white;
   border-radius: 50px;
   cursor: pointer;
   font-weight: 500;
-  color: #4a5568;
+  color: var(--color-text-muted);
   transition: all 0.3s ease;
 }
 
 .filter-btn:hover {
-  border-color: #667eea;
-  color: #667eea;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.2);
 }
 
 .filter-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   border-color: transparent;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.4);
 }
 
 /* Map Section */
@@ -392,7 +428,7 @@ h5 {
 
 .map-section h6 {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1.1rem;
   display: flex;
   align-items: center;
@@ -404,7 +440,7 @@ h5 {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  background: #f8f9fa;
+  background: var(--color-bg-light);
 }
 
 .map-iframe {
@@ -430,20 +466,20 @@ h5 {
 }
 
 .marker-label {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 50px;
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.4);
   transition: all 0.3s ease;
 }
 
 .marker-label:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.6);
 }
 
 /* Shops List */
@@ -463,7 +499,7 @@ h5 {
 }
 
 .shops-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border-radius: 10px;
 }
 
@@ -472,18 +508,18 @@ h5 {
   transition: all 0.3s ease;
   border: none;
   border-radius: 16px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   background: white;
 }
 
 .shop-item:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 35px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 12px 35px rgba(242, 190, 209, 0.2);
 }
 
 .shop-item .card-title {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1.25rem;
   margin-bottom: 0.75rem;
 }
@@ -550,14 +586,14 @@ h5 {
   width: 80px;
   height: 80px;
   font-size: 2.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.3);
 }
 
 .shop-profile-modal h5 {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   margin-bottom: 0.5rem;
 }
 
@@ -574,34 +610,34 @@ h5 {
 }
 
 .shop-profile-modal p {
-  color: #4a5568;
+  color: var(--color-text-muted);
   line-height: 1.6;
 }
 
 .products-section {
   margin-top: 2rem;
   padding-top: 2rem;
-  border-top: 2px solid #e2e8f0;
+  border-top: 2px solid var(--color-bg-alt);
 }
 
 .products-section h6 {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1.25rem;
   margin-bottom: 1.5rem;
 }
 
 .product-card {
-  background: #f8f9fa;
-  border: 2px solid #e2e8f0;
+  background: var(--color-bg-light);
+  border: 2px solid var(--color-bg-alt);
   border-radius: 12px;
   padding: 1rem;
   transition: all 0.3s ease;
 }
 
 .product-card:hover {
-  border-color: #667eea;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.15);
   transform: translateY(-3px);
 }
 
@@ -609,7 +645,7 @@ h5 {
   width: 100%;
   height: 120px;
   overflow: hidden;
-  background: #e2e8f0;
+  background: var(--color-bg-alt);
 }
 
 .product-image-shop {
@@ -625,17 +661,17 @@ h5 {
 }
 
 .product-image {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #4A4A4A;
   font-size: 2rem;
 }
 
 .product-card h6 {
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1rem;
 }
 

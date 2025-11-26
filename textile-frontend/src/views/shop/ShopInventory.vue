@@ -3,16 +3,30 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Sales Inventory</h5>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary btn-sm">
+        <button class="btn btn-outline-primary btn-sm" @click="handleExport" :disabled="loading">
           <i class="bi bi-download me-1"></i> Export
         </button>
-        <button class="btn btn-primary btn-sm">
+        <button class="btn btn-primary btn-sm" @click="handleImport" :disabled="loading">
           <i class="bi bi-upload me-1"></i> Import
         </button>
       </div>
     </div>
 
-    <div class="card">
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-2">Loading inventory...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error" class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+    </div>
+
+    <!-- Inventory Table -->
+    <div v-else class="card">
       <div class="card-body">
         <div class="table-responsive">
           <table class="table table-hover">
@@ -29,7 +43,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, idx) in inventoryData" :key="idx">
+              <tr v-for="(item, idx) in inventoryData" :key="item.id || idx">
                 <td>{{ idx + 1 }}</td>
                 <td>
                   <div class="product-thumbnail">
@@ -39,9 +53,7 @@
                 <td>
                   <div class="product-name-cell">
                     <strong>{{ item.name }}</strong>
-                    <small class="d-block text-muted">{{
-                      item.category
-                    }}</small>
+                    <small class="d-block text-muted">{{ item.category }}</small>
                   </div>
                 </td>
                 <td>
@@ -51,16 +63,7 @@
                   <strong class="price-text">{{ item.price }}</strong>
                 </td>
                 <td>
-                  <span
-                    :class="[
-                      'stock-badge',
-                      item.stock < 20
-                        ? 'low'
-                        : item.stock < 50
-                          ? 'medium'
-                          : 'high',
-                    ]"
-                  >
+                  <span :class="['stock-badge', getStockClass(item.stock)]">
                     {{ item.stock }}m
                   </span>
                 </td>
@@ -72,16 +75,24 @@
                     <button
                       class="btn btn-sm btn-outline-secondary"
                       title="Edit"
+                      @click="openEditModal(item)"
                     >
-                      <i class="bi bi-pencil"></i>
+                      <i class="bi bi pencil"></i>
                     </button>
                     <button
                       class="btn btn-sm btn-outline-danger"
                       title="Delete"
+                      @click="openDeleteModal(item)"
                     >
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
+                </td>
+              </tr>
+              <tr v-if="inventoryData.length === 0">
+                <td colspan="8" class="text-center text-muted py-4">
+                  <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                  No inventory items found. Click Import to add products.
                 </td>
               </tr>
             </tbody>
@@ -99,129 +110,326 @@
               <strong>{{ totalQuantity }}</strong> Total Meters Sold
             </span>
           </div>
-          <button class="btn btn-primary">
-            <i class="bi bi-plus-circle me-1"></i> Add New Product
-          </button>
         </div>
       </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
+      <div class="modal-dialog" @click.stop>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Edit Product</h5>
+            <button class="btn-close" @click="closeEditModal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Product Name</label>
+              <input type="text" class="form-control" v-model="editForm.name" disabled />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Price (per meter)</label>
+              <input
+                type="number"
+                class="form-control"
+                v-model.number="editForm.price"
+                step="0.01"
+                min="0"
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Stock (meters)</label>
+              <input
+                type="number"
+                class="form-control"
+                v-model.number="editForm.stock"
+                min="0"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="closeEditModal">Cancel</button>
+            <button class="btn btn-primary" @click="saveEdit" :disabled="saving">
+              <span v-if="saving">Saving...</span>
+              <span v-else>Save Changes</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
+      <div class="modal-dialog" @click.stop>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Confirm Delete</h5>
+            <button class="btn-close" @click="closeDeleteModal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to delete <strong>{{ deleteItem?.name }}</strong>?</p>
+            <p class="text-muted small">This action cannot be undone.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="closeDeleteModal">Cancel</button>
+            <button class="btn btn-danger" @click="confirmDelete" :disabled="deleting">
+              <span v-if="deleting">Deleting...</span>
+              <span v-else>Delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div v-if="showToast" class="toast-notification">
+      <i :class="toastIcon" class="me-2"></i>
+      {{ toastMessage }}
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from 'vue';
+import { getInventory, importInventory, editInventoryItem, deleteInventoryItem, exportInventory } from '@/api/apiInventory';
 
-const inventoryData = ref([
-  {
-    name: "Handwoven Silk Brocade",
-    category: "Premium Silk",
-    image:
-      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 245,
-    price: "₹1,850",
-    stock: 82,
-    sku: "SILK-BR-001",
-  },
-  {
-    name: "Premium Cotton Batik",
-    category: "Cotton Fabric",
-    image:
-      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 312,
-    price: "₹650",
-    stock: 156,
-    sku: "COT-BAT-002",
-  },
-  {
-    name: "Luxury Georgette Floral",
-    category: "Georgette",
-    image:
-      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 189,
-    price: "₹1,450",
-    stock: 67,
-    sku: "GEO-FLR-003",
-  },
-  {
-    name: "Designer Silk Collection",
-    category: "Designer Silk",
-    image:
-      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 156,
-    price: "₹2,150",
-    stock: 45,
-    sku: "SILK-DSG-004",
-  },
-  {
-    name: "Traditional Block Print",
-    category: "Cotton Print",
-    image:
-      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 278,
-    price: "₹780",
-    stock: 123,
-    sku: "COT-BLK-005",
-  },
-  {
-    name: "Artisan Handloom Cotton",
-    category: "Handloom",
-    image:
-      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 198,
-    price: "₹890",
-    stock: 89,
-    sku: "COT-HND-006",
-  },
-  {
-    name: "Ethnic Paisley Print",
-    category: "Printed Fabric",
-    image:
-      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 167,
-    price: "₹720",
-    stock: 98,
-    sku: "PRT-PAI-007",
-  },
-  {
-    name: "Vintage Linen Blend",
-    category: "Linen",
-    image:
-      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 134,
-    price: "₹1,120",
-    stock: 56,
-    sku: "LIN-VIN-008",
-  },
-  {
-    name: "Modern Abstract Print",
-    category: "Contemporary",
-    image:
-      "https://images.unsplash.com/photo-1636545659284-0481a5aab979?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 223,
-    price: "₹950",
-    stock: 112,
-    sku: "MOD-ABS-009",
-  },
-  {
-    name: "Floral Embroidered Silk",
-    category: "Embroidered",
-    image:
-      "https://images.unsplash.com/photo-1639654768139-9fd59f1a8417?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=100",
-    qty: 145,
-    price: "₹2,350",
-    stock: 34,
-    sku: "SILK-EMB-010",
-  },
-]);
+// Loading and error states
+const loading = ref(false);
+const error = ref('');
+const saving = ref(false);
+const deleting = ref(false);
 
+// Data
+const inventoryData = ref([]);
+
+// Shop ID
+const shopId = computed(() => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  return user.shop_id || user.id;
+});
+
+// Modals
+const showEditModal = ref(false);
+const showDeleteModal = ref(false);
+const editForm = ref({ id: null, name: '', price: 0, stock: 0 });
+const deleteItem = ref(null);
+
+// Toast
+const showToast = ref(false);
+const toastMessage = ref('');
+const toastIcon = ref('bi bi-check-circle-fill');
+
+/**
+ * Fetch inventory from backend
+ */
+const fetchInventory = async () => {
+  if (!shopId.value) {
+    error.value = 'Shop ID not found. Please log in again.';
+    return;
+  }
+
+  loading.value = true;
+  error.value = '';
+  try {
+    const response = await getInventory(shopId.value);
+    if (response.data && response.data.products) {
+      inventoryData.value = response.data.products.map(p => ({
+        id: p.id,
+        name: p.name,
+        category: p.category || 'Uncategorized',
+        image: p.image_url || `https://placehold.co/100x100?text=${encodeURIComponent(p.name)}`,
+        qty: p.sales_qty || 0,
+        price: p.price ? `₹${parseFloat(p.price).toLocaleString()}` : '₹0',
+        priceRaw: parseFloat(p.price) || 0,
+        stock: p.stock || 0,
+        sku: p.sku || 'N/A'
+      }));
+    }
+  } catch (err) {
+    console.error('[Inventory Error]', err);
+    error.value = err.response?.data?.message || 'Failed to load inventory';
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
+ * Handle import
+ */
+const handleImport = () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.xlsx,.xls';
+
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 16 * 1024 * 1024) {
+      showToastMessage('File too large (max 16MB)', 'bi bi-exclamation-circle-fill');
+      return;
+    }
+
+    loading.value = true;
+    try {
+      await importInventory(shopId.value, file);
+      showToastMessage('Inventory imported successfully!', 'bi bi-check-circle-fill');
+      await fetchInventory();
+    } catch (err) {
+      console.error('[Import Error]', err);
+      showToastMessage(err.response?.data?.message || 'Import failed', 'bi bi-exclamation-circle-fill');
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  input.click();
+};
+
+/**
+ * Handle export
+ */
+const handleExport = async () => {
+  try {
+    loading.value = true;
+    const response = await exportInventory(shopId.value);
+    
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `inventory_${shopId.value}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    showToastMessage('Inventory exported successfully!', 'bi bi-check-circle-fill');
+  } catch (err) {
+    console.error('[Export Error]', err);
+    showToastMessage(err.response?.data?.message || 'Export failed', 'bi bi-exclamation-circle-fill');
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
+ * Open edit modal
+ */
+const openEditModal = (item) => {
+  editForm.value = {
+    id: item.id,
+    name: item.name,
+    price: item.priceRaw,
+    stock: item.stock
+  };
+  showEditModal.value = true;
+};
+
+/**
+ * Close edit modal
+ */
+const closeEditModal = () => {
+  showEditModal.value = false;
+  editForm.value = { id: null, name: '', price: 0, stock: 0 };
+};
+
+/**
+ * Save edit
+ */
+const saveEdit = async () => {
+  if (editForm.value.price < 0 || editForm.value.stock < 0) {
+    showToastMessage('Price and stock must be non-negative', 'bi bi-exclamation-circle-fill');
+    return;
+  }
+
+  saving.value = true;
+  try {
+    await editInventoryItem(editForm.value.id, {
+      price: editForm.value.price,
+      stock: editForm.value.stock
+    });
+    
+    showToastMessage('Product updated successfully!', 'bi bi-check-circle-fill');
+    closeEditModal();
+    await fetchInventory();
+  } catch (err) {
+    console.error('[Edit Error]', err);
+    showToastMessage(err.response?.data?.message || 'Update failed', 'bi bi-exclamation-circle-fill');
+  } finally {
+    saving.value = false;
+  }
+};
+
+/**
+ * Open delete modal
+ */
+const openDeleteModal = (item) => {
+  deleteItem.value = item;
+  showDeleteModal.value = true;
+};
+
+/**
+ * Close delete modal
+ */
+const closeDeleteModal = () => {
+  showDeleteModal.value = false;
+  deleteItem.value = null;
+};
+
+/**
+ * Confirm delete
+ */
+const confirmDelete = async () => {
+  if (!deleteItem.value) return;
+
+  deleting.value = true;
+  try {
+    await deleteInventoryItem(deleteItem.value.id);
+    showToastMessage('Product deleted successfully!', 'bi bi-check-circle-fill');
+    closeDeleteModal();
+    await fetchInventory();
+  } catch (err) {
+    console.error('[Delete Error]', err);
+    showToastMessage(err.response?.data?.message || 'Delete failed', 'bi bi-exclamation-circle-fill');
+  } finally {
+    deleting.value = false;
+  }
+};
+
+/**
+ * Show toast notification
+ */
+const showToastMessage = (message, icon) => {
+  toastMessage.value = message;
+  toastIcon.value = icon;
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
+
+/**
+ * Get stock class based on quantity
+ */
+const getStockClass = (stock) => {
+  if (stock < 20) return 'low';
+  if (stock < 50) return 'medium';
+  return 'high';
+};
+
+/**
+ * Compute total quantity
+ */
 const totalQuantity = computed(() => {
   return inventoryData.value.reduce((sum, item) => sum + item.qty, 0);
+});
+
+// Fetch inventory on mount
+onMounted(() => {
+  fetchInventory();
 });
 </script>
 
 <style scoped>
 .shop-inventory-tab {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: calc(100vh - 60px);
   padding: 2rem;
   animation: fadeIn 0.5s ease-in;
@@ -239,7 +447,7 @@ const totalQuantity = computed(() => {
 }
 
 h5 {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -269,7 +477,7 @@ h5 {
 }
 
 .table th {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   font-weight: 600;
   font-size: 0.9rem;
@@ -280,13 +488,13 @@ h5 {
 
 .table tbody tr {
   transition: all 0.3s ease;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-bg-alt);
 }
 
 .table tbody tr:hover {
   background: linear-gradient(
     135deg,
-    rgba(102, 126, 234, 0.05) 0%,
+    rgba(242, 190, 209, 0.05) 0%,
     rgba(118, 75, 162, 0.05) 100%
   );
   transform: scale(1.01);
@@ -296,24 +504,23 @@ h5 {
 .table td {
   padding: 0.75rem;
   vertical-align: middle;
-  color: #4a5568;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
-/* Product Thumbnail */
 .product-thumbnail {
   width: 50px;
   height: 50px;
   border-radius: 8px;
   overflow: hidden;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--color-bg-alt);
   transition: all 0.3s ease;
 }
 
 .product-thumbnail:hover {
-  border-color: #667eea;
+  border-color: var(--color-primary);
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
 }
 
 .product-thumbnail img {
@@ -322,22 +529,20 @@ h5 {
   object-fit: cover;
 }
 
-/* Product Name Cell */
 .product-name-cell strong {
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-weight: 600;
   font-size: 0.95rem;
 }
 
 .product-name-cell small {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--color-text-muted);
   margin-top: 0.15rem;
 }
 
-/* Badges */
 .qty-badge {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   padding: 0.35rem 0.75rem;
   border-radius: 20px;
@@ -375,7 +580,6 @@ h5 {
   color: white;
 }
 
-/* Action Buttons */
 .action-buttons {
   display: flex;
   gap: 0.5rem;
@@ -392,7 +596,6 @@ h5 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Inventory Stats */
 .inventory-stats {
   display: flex;
   gap: 2rem;
@@ -403,101 +606,117 @@ h5 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
 .stat-item i {
   font-size: 1.25rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .stat-item strong {
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-weight: 700;
   font-size: 1.1rem;
 }
 
-/* Buttons */
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+}
+
+.modal-dialog {
+  min-width: 400px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-bg-alt);
+}
+
+.modal-title {
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-bg-alt);
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Toast Notification */
+.toast-notification {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1100;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border: none;
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  padding: 0.6rem 1.25rem;
+  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
-.btn-outline-primary {
-  border: 2px solid #667eea;
-  color: #667eea;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  padding: 0.5rem 1rem;
-}
-
-.btn-outline-primary:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.btn-outline-secondary {
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.btn-outline-danger {
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.btn-outline-danger:hover {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  border-color: transparent;
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
   .shop-inventory-tab {
     padding: 1rem;
   }
 
-  .table th,
-  .table td {
-    padding: 0.5rem 0.4rem;
-    font-size: 0.8rem;
-  }
-
-  .product-thumbnail {
-    width: 40px;
-    height: 40px;
-  }
-
-  .inventory-stats {
-    flex-direction: column;
-    gap: 0.75rem;
-    align-items: flex-start;
-  }
-
-  .d-flex.justify-content-between {
-    flex-direction: column;
-    gap: 1rem;
+  .modal-dialog {
+    min-width: 90%;
   }
 }
 </style>
