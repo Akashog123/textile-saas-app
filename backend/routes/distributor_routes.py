@@ -1,12 +1,13 @@
-import os
-import io
-
 # routes/distributor.py
 from flask import Blueprint, jsonify, request, send_file
 import pandas as pd
 from datetime import datetime
 from prophet import Prophet
+import os
+import io
 from google.generativeai import configure, GenerativeModel
+from utils.auth_utils import token_required, roles_required
+from utils.validation import validate_file_upload
 from services.forecasting_service import (
     forecast_sales,
     compute_regional_summary,
@@ -17,7 +18,6 @@ from services.ai_service import (
     generate_recommendation,
 )
 from routes.pdf_service import generate_pdf_report
-# from routes.auth_routes import token_required
 from models.model import Product, SalesData
 
 configure(api_key=os.getenv("GEMINI_API_KEY", ""))
@@ -27,7 +27,8 @@ distributor_bp = Blueprint("distributor", __name__)
 
 # POST: Regional Demand & AI Forecast Insights
 @distributor_bp.route("/regional-demand", methods=["POST"])
-# @token_required
+@token_required
+@roles_required('distributor', 'manufacturer')
 def get_regional_demand(current_user):
     """
     Generate AI-powered regional demand insights and sales forecasting.
@@ -38,6 +39,11 @@ def get_regional_demand(current_user):
 
         if not file:
             return jsonify({"status": "error", "message": "No input file provided"}), 400
+        
+        # Validate file upload
+        is_valid, message = validate_file_upload(file, ['.csv', '.xlsx'], max_size_mb=16)
+        if not is_valid:
+            return jsonify({"status": "error", "message": message}), 400
 
         # Read CSV or XLSX dynamically
         if file.filename.endswith(".csv"):
@@ -72,7 +78,7 @@ def get_regional_demand(current_user):
             "top_products": trending_products,
             "forecast": forecasts,
             "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-            "analyst": current_user.username
+            "analyst": current_user.get("username")
         }
 
         return jsonify({
@@ -164,13 +170,19 @@ def _generate_production_ai_summary(df, forecast_df):
 
 # POST: Production Planning (embedded implementation)
 @distributor_bp.route("/production-plan", methods=["POST"])
-# @token_required
-def distributor_production_plan():
+@token_required
+@roles_required('distributor', 'manufacturer')
+def distributor_production_plan(current_user):
     """Upload sales CSV and get AI-powered production planning insights."""
     try:
         file = request.files.get("file")
         if not file:
             return jsonify({"status": "error", "message": "No file uploaded"}), 400
+        
+        # Validate file upload
+        is_valid, message = validate_file_upload(file, ['.csv', '.xlsx', '.xls'], max_size_mb=16)
+        if not is_valid:
+            return jsonify({"status": "error", "message": message}), 400
 
         filename = (file.filename or "").lower()
         if filename.endswith(".csv"):
@@ -268,8 +280,9 @@ def distributor_production_plan():
 
 # GET: Export Production Plan CSV (embedded implementation)
 @distributor_bp.route("/export-plan", methods=["GET"])
-# @token_required
-def distributor_export_plan():
+@token_required
+@roles_required('distributor', 'manufacturer')
+def distributor_export_plan(current_user):
     """Export a production plan CSV derived from live sales data."""
     try:
         window_start = datetime.utcnow().date().replace(day=1)
@@ -325,7 +338,8 @@ def distributor_export_plan():
 
 # GET: Regional Demand Report PDF (AI Summary)
 @distributor_bp.route("/regional-report", methods=["GET"])
-# @token_required
+@token_required
+@roles_required('distributor', 'manufacturer')  
 def generate_regional_report(current_user):
     """
     Generates a downloadable PDF summary of AI insights and forecast data.

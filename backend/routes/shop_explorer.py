@@ -3,6 +3,7 @@
 from flask import Blueprint, jsonify, request
 from models.model import db, Shop, Product
 from config import Config
+from utils.image_utils import resolve_product_image, resolve_shop_image
 from services.ai_service import generate_ai_caption
 import requests
 from math import cos, radians
@@ -29,7 +30,7 @@ def get_all_shops():
                 "lat": s.lat,
                 "lon": s.lon,
                 "shortName": s.name.split()[0] if s.name else "Shop",
-                "image": s.image_url or f"https://picsum.photos/seed/{s.id}/600/400",
+                "image": resolve_shop_image(s),
             })
 
         return jsonify({"status": "success", "count": len(result), "shops": result}), 200
@@ -64,7 +65,7 @@ def get_shop_details(shop_id):
                 "description": product.description or "Premium textile fabric.",
                 "category": product.category,
                 "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
-                "image": _resolve_product_image(product),
+                "image": resolve_product_image(product),
                 "ai_caption": caption
             })
 
@@ -74,7 +75,7 @@ def get_shop_details(shop_id):
             "description": shop.description or "",
             "rating": round(getattr(shop, "rating", 4.3) or 4.3, 1),
             "location": shop.location or "N/A",
-            "image": shop.image_url or f"https://picsum.photos/seed/{shop.id}/600/400",
+            "image": resolve_shop_image(shop),
             "products": product_data
         }
 
@@ -114,7 +115,7 @@ def search():
             "name": p.name,
             "category": p.category,
             "price": f"₹{p.price:,.0f}",
-            "image": p.image_url or f"https://picsum.photos/seed/{p.id}/600/400"
+            "image": resolve_product_image(p)
         } for p in products]
 
         return jsonify({

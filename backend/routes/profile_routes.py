@@ -1,20 +1,20 @@
-# routes/profile.py
+# routes/profile_routes.py
 
 from flask import Blueprint, request, jsonify
 from models.model import db, User
-from routes.auth_routes import token_required
+from utils.auth_utils import token_required
 
 profile_bp = Blueprint("profile", __name__)
 
 # Fetch Current User Profile
 @profile_bp.route("/", methods=["GET"])
-# @token_required
-def get_profile(decoded):
+@token_required
+def get_profile(current_user):
     """
     Fetch the logged-in user's profile details.
     """
     try:
-        user = User.query.get(decoded.get("user_id"))
+        user = User.query.get(current_user.get("id"))
         if not user:
             return jsonify({"status": "error", "message": "User not found"}), 404
 
@@ -50,15 +50,15 @@ def get_profile(decoded):
 
 # Update User Profile
 @profile_bp.route("/update", methods=["PUT"])
-# @token_required
-def update_profile(decoded):
+@token_required
+def update_profile(current_user):
     """
     Update current user's profile fields dynamically.
     Only allows editing of basic info (not role or approval).
     """
     try:
         data = request.get_json(force=True, silent=True) or {}
-        user = User.query.get(decoded.get("user_id"))
+        user = User.query.get(current_user.get("id"))
 
         if not user:
             return jsonify({"status": "error", "message": "User not found"}), 404
@@ -80,7 +80,7 @@ def update_profile(decoded):
         db.session.commit()
 
         return jsonify({
-            "status": "success",
+            "status": "error",
             "message": "Profile updated successfully!",
             "updated_fields": updated_fields
         }), 200

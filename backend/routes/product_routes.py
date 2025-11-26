@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from models.model import db, Product, Shop, SalesData
 from sqlalchemy import or_
 from werkzeug.exceptions import NotFound
+from utils.image_utils import resolve_product_image
 from services.ai_service import generate_ai_caption
 from services.forecasting_service import top_trending_products
 import pandas as pd
@@ -57,7 +58,7 @@ def get_all_products():
                 "rating": round(p.rating or 4.0, 1),
                 "seller": shop.name if shop else "Independent Seller",
                 "location": shop.location if shop else "Unknown",
-                # "image": p.image_url or f"https://picsum.photos/seed/{p.id}/800/600",
+                "image": resolve_product_image(p),
                 "ai_caption": caption,
             })
 
@@ -90,7 +91,7 @@ def get_product_detail(product_id):
             "rating": round(product.rating or 4.0, 1),
             "seller": shop.name if shop else "Independent Seller",
             "address": shop.location if shop else "N/A",
-            # "image": product.image_url or f"https://picsum.photos/seed/{product.id}/800/600",
+            "image": resolve_product_image(product),
             "ai_caption": caption,
         }
 
@@ -129,7 +130,7 @@ def get_suggested_products():
                     "id": p.id,
                     "name": p.name,
                     "price": f"₹{p.price:,.0f}",
-                    "image": p.image_url or f"https://picsum.photos/seed/{p.id}/600/400",
+                    "image": resolve_product_image(p),
                     "caption": caption
                 })
             return jsonify({"status": "success", "source": "fallback", "suggested": result}), 200
@@ -155,7 +156,7 @@ def get_suggested_products():
                 "price": f"₹{product.price:,.0f}",
                 "growth": f"{t['Growth']}%",
                 "sales": f"₹{t['Sales_curr']:,.0f}",
-                "image": product.image_url or f"https://picsum.photos/seed/{product.id}/600/400",
+                "image": resolve_product_image(product),
                 "caption": caption
             })
 
