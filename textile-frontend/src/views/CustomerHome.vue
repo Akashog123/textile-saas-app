@@ -1,17 +1,17 @@
 <template>
-  <div class="customer-container">
-    <!-- Child route components render here -->
-    <router-view />
+  <div class="customer-layout">
+    <router-view :key="$route.fullPath" />
   </div>
 </template>
 
 <script setup>
-// Container component for customer routes
+// Customer portal layout wrapper
+// All navigation handled by NavBar.vue
 </script>
 
 <style scoped>
-.customer-container {
-  min-height: calc(100vh - 60px);
-  background: #f8f9fa;
+.customer-layout {
+  min-height: calc(100vh - 120px);
+  background: transparent;
 }
 </style>

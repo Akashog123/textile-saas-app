@@ -1,13 +1,13 @@
 <template>
   <div class="navbar-wrapper">
-    <nav
-      class="navbar navbar-expand-lg navbar-light bg-gradient-primary shadow-elegant"
-    >
-      <div class="container-fluid px-4">
-        <div class="navbar-brand fw-bold brand-logo" to="/">
-          <i class="bi bi-scissors brand-icon"></i>
+    <nav class="navbar navbar-expand-lg fixed-top">
+      <div class="container">
+        <router-link to="/" class="navbar-brand">
+          <div class="brand-icon">
+            <i class="bi bi-flower1"></i>
+          </div>
           <span class="brand-text">SE Textile</span>
-        </div>
+        </router-link>
 
         <button
           class="navbar-toggler"
@@ -22,449 +22,289 @@
         </button>
 
         <div class="collapse navbar-collapse" id="mainNav">
-          <!-- Right: user & logout -->
-          <div
-            class="d-flex align-items-center gap-3 ms-auto"
-            v-if="isLoggedIn"
-          >
-            <div class="user-profile-badge">
-              <i class="bi bi-person-circle user-avatar"></i>
-              <span class="username-text">{{ username }}</span>
-            </div>
-            <button class="btn btn-logout btn-sm" @click="logout">
-              <i class="bi bi-box-arrow-right logout-icon"></i>
-              Logout
-            </button>
-          </div>
+          <ul class="navbar-nav ms-auto">
+            <!-- Navigation links for authenticated users -->
+            <template v-if="isAuthenticated && user">
+              <!-- Customer Navigation -->
+              <template v-if="user.role === 'customer'">
+                <li class="nav-item">
+                  <router-link to="/customer" class="nav-link">
+                    <i class="bi bi-house-door me-2"></i>Home
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/customer/products" class="nav-link">
+                    <i class="bi bi-grid me-2"></i>Products
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/customer/shops" class="nav-link">
+                    <i class="bi bi-shop me-2"></i>Shops
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/customer/profile" class="nav-link">
+                    <i class="bi bi-person me-2"></i>Profile
+                  </router-link>
+                </li>
+              </template>
+
+              <!-- Shop Owner Navigation -->
+              <template v-if="user.role === 'shop_owner' || user.role === 'manager'">
+                <li class="nav-item">
+                  <router-link to="/shop/dashboard" class="nav-link">
+                    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/shop/inventory" class="nav-link">
+                    <i class="bi bi-box-seam me-2"></i>Inventory
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/shop/marketing" class="nav-link">
+                    <i class="bi bi-megaphone me-2"></i>Marketing
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/shop/inquiry" class="nav-link">
+                    <i class="bi bi-chat-dots me-2"></i>Inquiries
+                  </router-link>
+                </li>
+              </template>
+
+              <!-- Distributor Navigation -->
+              <template v-if="user.role === 'distributor' || user.role === 'manufacturer'">
+                <li class="nav-item">
+                  <router-link to="/distributor" class="nav-link">
+                    <i class="bi bi-house-door me-2"></i>Home
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/distributor/planning" class="nav-link">
+                    <i class="bi bi-graph-up me-2"></i>Planning
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/distributor/regional-demand" class="nav-link">
+                    <i class="bi bi-geo-alt me-2"></i>Regional Demand
+                  </router-link>
+                </li>
+              </template>
+            </template>
+
+            <!-- User Menu -->
+            <li class="nav-item dropdown" v-if="isAuthenticated && user">
+              <a 
+                class="nav-link dropdown-toggle d-flex align-items-center" 
+                href="#" 
+                role="button" 
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <i class="bi bi-person-circle me-2"></i>
+                {{ user.username || user.email }}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">Welcome, {{ user.username || user.email }}</h6></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item" href="#" @click.prevent="$emit('logout')">
+                    <i class="bi bi-box-arrow-right me-2"></i>Logout
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <!-- Login/Register for non-authenticated users -->
+            <template v-if="!isAuthenticated">
+              <li class="nav-item">
+                <router-link to="/login" class="nav-link">
+                  <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                </router-link>
+              </li>
+              <li class="nav-item">
+                <router-link to="/login" class="btn btn-primary btn-sm ms-2">
+                  Get Started
+                </router-link>
+              </li>
+            </template>
+          </ul>
         </div>
       </div>
     </nav>
-
-    <!-- Shop Manager Sub-Navigation (visible only for shop_owner role) -->
-    <div
-      v-if="isLoggedIn && isShopRole"
-      class="sub-nav-container bg-gradient-light"
-    >
-      <div class="container-fluid px-4">
-        <ul class="nav nav-tabs-modern border-0 pt-2">
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{
-                active:
-                  $route.path.includes('/shop/dashboard') ||
-                  $route.path === '/shop',
-              }"
-              to="/shop/dashboard"
-            >
-              <i class="bi bi-speedometer2 nav-icon"></i>
-              <span class="nav-text">Dashboard</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/shop/inventory') }"
-              to="/shop/inventory"
-            >
-              <i class="bi bi-box-seam nav-icon"></i>
-              <span class="nav-text">Sales Inventory</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/shop/marketing') }"
-              to="/shop/marketing"
-            >
-              <i class="bi bi-megaphone nav-icon"></i>
-              <span class="nav-text">Marketing Content</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/shop/inquiry') }"
-              to="/shop/inquiry"
-            >
-              <i class="bi bi-search nav-icon"></i>
-              <span class="nav-text">Fabric Inquiry</span>
-            </router-link>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Customer Sub-Navigation (visible only for customer role) -->
-    <div
-      v-if="isLoggedIn && isCustomerRole"
-      class="sub-nav-container bg-gradient-light"
-    >
-      <div class="container-fluid px-4">
-        <ul class="nav nav-tabs-modern border-0 pt-2">
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{
-                active:
-                  $route.path.includes('/customer/home') ||
-                  $route.path === '/customer',
-              }"
-              to="/customer/home"
-            >
-              <i class="bi bi-house nav-icon"></i>
-              <span class="nav-text">Home</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/customer/shops') }"
-              to="/customer/shops"
-            >
-              <i class="bi bi-shop nav-icon"></i>
-              <span class="nav-text">Shops</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/customer/products') }"
-              to="/customer/products"
-            >
-              <i class="bi bi-bag nav-icon"></i>
-              <span class="nav-text">Products</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/customer/profile') }"
-              to="/customer/profile"
-            >
-              <i class="bi bi-person nav-icon"></i>
-              <span class="nav-text">Profile</span>
-            </router-link>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Distributor/Manufacturer Sub-Navigation (visible only for distributor/manufacturer role) -->
-    <div
-      v-if="isLoggedIn && isDistributorRole"
-      class="sub-nav-container bg-gradient-light"
-    >
-      <div class="container-fluid px-4">
-        <ul class="nav nav-tabs-modern border-0 pt-2">
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{
-                active:
-                  $route.path.includes('/distributor/demand') ||
-                  $route.path === '/distributor',
-              }"
-              to="/distributor/demand"
-            >
-              <i class="bi bi-graph-up-arrow nav-icon"></i>
-              <span class="nav-text">Regional Demand</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link
-              class="nav-link-modern"
-              :class="{ active: $route.path.includes('/distributor/planning') }"
-              to="/distributor/planning"
-            >
-              <i class="bi bi-calendar-check nav-icon"></i>
-              <span class="nav-text">Production Planning</span>
-            </router-link>
-          </li>
-        </ul>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { computed } from 'vue'
 
-// ---- state
-const router = useRouter();
-const route = useRoute();
-const isLoggedIn = ref(false);
-const username = ref("");
-const role = ref("");
-
-// role-based helpers
-const isShopRole = computed(() => role.value === "shop_owner" || role.value === "manager");
-const isCustomerRole = computed(() => role.value === "customer");
-const isDistributorRole = computed(() => role.value === "distributor" || role.value === "manufacturer");
-
-// Simplified hydrate (no remote verification)
-const hydrateFromStorage = () => {
-  const storedRole = localStorage.getItem("role");
-  const storedName = localStorage.getItem("username");
-
-  if (storedRole && storedName) {
-    isLoggedIn.value = true;
-    username.value = storedName;
-    role.value = storedRole;
-  } else {
-    isLoggedIn.value = false;
-    username.value = "";
-    role.value = "";
+// Props
+const props = defineProps({
+  user: {
+    type: Object,
+    default: null
+  },
+  isAuthenticated: {
+    type: Boolean,
+    default: false
   }
-};
+})
 
-const handleUserLogin = async () => {
-  await nextTick();
-  hydrateFromStorage();
-};
+// Emits
+const emit = defineEmits(['logout', 'refresh-auth'])
 
-onMounted(() => {
-  hydrateFromStorage();
-  window.addEventListener("user-logged-in", handleUserLogin);
-});
+// Computed properties
+const userRole = computed(() => props.user?.role || '')
+const userName = computed(() => props.user?.username || props.user?.email || 'User')
 
-onBeforeUnmount(() => {
-  window.removeEventListener("user-logged-in", handleUserLogin);
-});
+// Role-based helpers
+const isShopRole = computed(() => ['shop_owner', 'manager'].includes(userRole.value))
+const isCustomerRole = computed(() => userRole.value === 'customer')
+const isDistributorRole = computed(() => ['distributor', 'manufacturer'].includes(userRole.value))
 
-watch(() => route.path, () => {
-  hydrateFromStorage();
-});
-
-const logout = () => {
-  localStorage.clear();
-  isLoggedIn.value = false;
-  role.value = "";
-  username.value = "";
-  router.push("/login");
-};
+// Handle logout
+const handleLogout = () => {
+  emit('logout')
+}
 </script>
 
 <style scoped>
 
-.bg-gradient-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-.navbar-wrapper { position: sticky; top: 0; z-index: 1030; }
-.shadow-elegant { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); }
-/* (keep all your remaining CSS styles same as before) */
-/* Brand Styling */
-.brand-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: white !important;
-  font-size: 1.5rem;
-  transition: transform 0.3s ease;
+.navbar-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
 }
 
-.brand-logo:hover {
-  transform: scale(1.05);
+.navbar {
+  background: rgba(249, 245, 246, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(242, 190, 209, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 1rem 0;
+  transition: all 0.3s ease;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--color-text-dark);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.5px;
 }
 
 .brand-icon {
-  font-size: 1.8rem;
-}
-
-@keyframes rotate {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(10deg);
-  }
-}
-
-.brand-text {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-/* User Profile Badge */
-.user-profile-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 0.5rem 1rem;
-  border-radius: 50px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.user-avatar {
-  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  background: var(--color-primary);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #667eea;
-}
-
-.username-text {
   color: white;
+  font-size: 1.25rem;
+}
+
+.brand-text {
+  color: var(--color-text-dark);
+}
+
+.nav-link {
+  color: var(--color-text-muted);
   font-weight: 500;
-  font-size: 0.95rem;
-}
-
-/* Logout Button */
-.btn-logout {
-  background: rgba(255, 255, 255, 0.9);
-  color: #667eea;
-  font-weight: 600;
-  padding: 0.5rem 1.25rem;
-  border-radius: 50px;
-  border: none;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   transition: all 0.3s ease;
-}
-
-.btn-logout:hover {
-  background: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.logout-icon {
-  font-size: 1.1rem;
-}
-
-/* Sub Navigation */
-.sub-nav-container {
-  background: linear-gradient(to bottom, #f8f9fa, #ffffff);
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-}
-
-.bg-gradient-light {
-  background: linear-gradient(to right, #fdfbfb 0%, #ebedee 100%);
-}
-
-.nav-tabs-modern {
-  display: flex;
-  gap: 0.5rem;
-  padding-bottom: 0;
-}
-
-.nav-link-modern {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border: none;
-  color: #6c757d;
-  font-weight: 500;
-  border-radius: 12px 12px 0 0;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
   text-decoration: none;
 }
 
-.nav-link-modern::before {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  transform: translateX(-50%);
-  transition: width 0.3s ease;
+.nav-link:hover,
+.nav-link.router-link-active {
+  color: var(--color-text-dark);
+  background: rgba(242, 190, 209, 0.15);
 }
 
-.nav-link-modern:hover {
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.05);
+.nav-link i {
+  font-size: 1.1rem;
 }
 
-.nav-link-modern:hover::before {
-  width: 80%;
+.dropdown-menu {
+  border: none;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
 }
 
-.nav-link-modern.active {
-  color: #667eea;
-  background: white;
+.dropdown-header {
+  color: var(--color-text-dark);
   font-weight: 600;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+  font-size: 0.875rem;
 }
 
-.nav-link-modern.active::before {
-  width: 100%;
-}
-
-.nav-icon {
-  font-size: 1.2rem;
-  display: inline-block;
-}
-
-.nav-text {
-  font-size: 0.95rem;
-}
-
-/* Main Navbar Links */
-.navbar-nav .nav-link {
-  color: rgba(255, 255, 255, 0.9) !important;
-  font-weight: 500;
+.dropdown-item {
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
   transition: all 0.3s ease;
-  position: relative;
+  color: var(--color-text-muted);
 }
 
-.navbar-nav .nav-link::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 0;
-  height: 2px;
-  background: white;
-  transform: translateX(-50%);
-  transition: width 0.3s ease;
+.dropdown-item:hover {
+  background: rgba(242, 190, 209, 0.15);
+  color: var(--color-text-dark);
 }
 
-.navbar-nav .nav-link:hover {
-  color: white !important;
+.btn-primary {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  padding: 0.6rem 1.5rem;
+  border-radius: 50px;
+  transition: all 0.3s ease;
 }
 
-.navbar-nav .nav-link:hover::after {
-  width: 80%;
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.4);
 }
 
-/* Responsive Design */
-@media (max-width: 991px) {
-  .user-profile-badge {
-    margin-top: 1rem;
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.75rem 0;
   }
-
-  .btn-logout {
-    width: 100%;
-    justify-content: center;
-    margin-top: 0.5rem;
+  
+  .navbar-brand {
+    font-size: 1.1rem;
   }
-
-  .nav-tabs-modern {
-    flex-direction: column;
-    gap: 0.25rem;
+  
+  .brand-icon {
+    width: 35px;
+    height: 35px;
+    font-size: 1.1rem;
   }
-
-  .nav-link-modern {
-    border-radius: 8px;
+  
+  .nav-link {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
   }
 }
 
-/* Smooth Transitions */
-* {
-  transition:
-    color 0.2s ease,
-    background-color 0.2s ease;
+.navbar-toggler {
+  border-color: var(--color-primary);
 }
 
+.navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23F2BED1' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
 </style>

@@ -1,134 +1,337 @@
 <template>
   <div class="shop-inquiry-tab">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">Fabric Stock Inquiry</h5>
-      <button class="btn btn-outline-secondary btn-sm">
-        <svg width="16" height="16" fill="currentColor" class="me-1">
-          <path
-            d="M2 4h12M2 8h8M2 12h10"
-            stroke="currentColor"
-            stroke-width="2"
-            fill="none"
-          />
-        </svg>
-        Inquiry History
-      </button>
-    </div>
+    <h5 class="mb-3">
+      <i class="bi bi-chat-dots me-2"></i>Customer Inquiries & Fabric Analysis
+    </h5>
 
-    <div class="card">
+    <!-- Inquiry Form Card -->
+    <div class="card mb-4">
       <div class="card-body">
-        <div class="mb-4">
-          <label class="form-label" for="inquiry-message">Inquiry</label>
-          <div class="input-group">
-            <textarea
-              id="inquiry-message"
-              class="form-control"
-              placeholder="Add a Message (Optional)"
-              v-model="inquiryMessage"
-              rows="3"
-            ></textarea>
-          </div>
+        <h6 class="mb-3">Submit Inquiry</h6>
+        
+        <div class="mb-3">
+          <label class="form-label">Shop ID</label>
+          <input
+            type="number"
+            class="form-control"
+            v-model.number="inquiryForm.shopId"
+            placeholder="Enter shop ID"
+            required
+          />
+          <small class="text-muted">Enter the shop ID you want to inquire about</small>
         </div>
 
-        <div
-          class="upload-zone border border-2 border-dashed rounded p-4 text-center mb-4"
-          @dragover.prevent
-          @drop.prevent="handleInquiryFileDrop"
-          @click="$refs.inquiryFileInput.click()"
-        >
-          <div class="mb-2">
-            <svg width="40" height="40" fill="currentColor" class="text-muted">
-              <circle
-                cx="20"
-                cy="20"
-                r="18"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+        <div class="mb-3">
+          <label class="form-label">Your Message</label>
+          <textarea
+            class="form-control"
+            v-model="inquiryForm.message"
+            rows="4"
+            placeholder="Enter your inquiry message..."
+            required
+          ></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Upload Fabric Image (Optional)</label>
+          <p class="small text-muted mb-2">
+            Upload a fabric image to get AI-powered analysis including material identification and price estimation
+          </p>
+          <div class="upload-zone" @click="$refs.imageInput.click()">
+            <div v-if="!inquiryForm.image" class="text-center">
+              <i class="bi bi-image fs-1 text-muted mb-2"></i>
+              <p class="mb-0">Click to upload fabric image</p>
+              <small class="text-muted">JPG, PNG, WEBP (max 16MB)</small>
+            </div>
+            <div v-else class="text-center">
+              <img
+                :src="imagePreview"
+                alt="Fabric preview"
+                class="img-fluid rounded mb-2"
+                style="max-height: 200px"
               />
-              <path
-                d="M20 12v16M12 20h16"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-            </svg>
+              <p class="mb-0">{{ inquiryForm.image.name }}</p>
+              <button
+                class="btn btn-sm btn-outline-danger mt-2"
+                @click.stop="removeImage"
+              >
+                <i class="bi bi-trash"></i> Remove
+              </button>
+            </div>
           </div>
-          <p class="mb-2 small fw-semibold">Upload Image</p>
-          <p class="text-muted small mb-2">Drag and drop or click to upload</p>
           <input
             type="file"
-            @change="handleInquiryFileUpload"
-            class="d-none"
-            ref="inquiryFileInput"
+            ref="imageInput"
             accept="image/*"
+            @change="handleImageUpload"
+            class="d-none"
           />
-          <button
-            class="btn btn-outline-secondary btn-sm"
-            @click.stop="$refs.inquiryFileInput.click()"
-          >
-            Choose File / Browse
-          </button>
+        </div>
 
-          <div v-if="inquiryFile" class="mt-3 text-start">
-            <div class="alert alert-info small mb-0">
-              <i class="bi bi-paperclip"></i> Selected: {{ inquiryFile.name }}
+        <button
+          class="btn btn-primary w-100"
+          @click="submitInquiry"
+          :disabled="submitting || !inquiryForm.shopId || !inquiryForm.message"
+        >
+          <span v-if="submitting">
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Submitting...
+          </span>
+          <span v-else>
+            <i class="bi bi-send me-2"></i>Submit Inquiry
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- AI Fabric Analysis Result -->
+    <div v-if="fabricAnalysis" class="card mb-4 ai-analysis-card">
+      <div class="card-body">
+        <h6 class="mb-3">
+          <i class="bi bi-stars me-2"></i>AI Fabric Analysis
+        </h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <strong>Fabric Name:</strong>
+            <p>{{ fabricAnalysis.fabric_name }}</p>
+          </div>
+          <div class="col-md-6">
+            <strong>Material:</strong>
+            <p>{{ fabricAnalysis.material }}</p>
+          </div>
+          <div class="col-md-6">
+            <strong>Estimated Price:</strong>
+            <p class="fs-5 text-success">{{ fabricAnalysis.estimated_price }}</p>
+          </div>
+          <div class="col-12">
+            <strong>AI Suggestion:</strong>
+            <p class="text-muted">{{ fabricAnalysis.suggestion }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inquiry History -->
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">Your Inquiry History</h6>
+          <button
+            class="btn btn-sm btn-outline-primary"
+            @click="fetchInquiryHistory"
+            :disabled="loadingHistory"
+          >
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loadingHistory" class="text-center py-4">
+          <div class="spinner-border text-primary"></div>
+          <p class="mt-2 text-muted">Loading inquiries...</p>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="historyError" class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle me-2"></i>{{ historyError }}
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="inquiryHistory.length === 0" class="text-center py-4 text-muted">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          <p>No inquiries yet. Submit your first inquiry above!</p>
+        </div>
+
+        <!-- History List -->
+        <div v-else class="inquiry-list">
+          <div
+            v-for="(inquiry, idx) in inquiryHistory"
+            :key="idx"
+            class="inquiry-item p-3 mb-3 border rounded"
+          >
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <strong>Shop ID: {{ inquiry.shop_id }}</strong>
+                <small class="d-block text-muted">
+                  {{ formatDate(inquiry.timestamp) }}
+                </small>
+              </div>
+              <span class="badge bg-primary">{{ inquiry.status || 'Submitted' }}</span>
+            </div>
+            <p class="mb-0">{{ inquiry.message }}</p>
+            <div v-if="inquiry.fabric_analysis" class="mt-2 p-2 bg-light rounded">
+              <small class="fw-bold">AI Analysis:</small>
+              <small class="d-block">{{ inquiry.fabric_analysis.fabric_name }} - {{ inquiry.fabric_analysis.material }}</small>
             </div>
           </div>
         </div>
-
-        <div class="d-flex gap-2 justify-content-center">
-          <button
-            class="btn btn-primary"
-            @click="sendInquiry"
-            :disabled="!inquiryMessage && !inquiryFile"
-          >
-            Send Inquiry
-          </button>
-        </div>
-
-        <div v-if="inquirySubmitted" class="alert alert-success mt-4">
-          <i class="bi bi-check-circle-fill"></i> Inquiry submitted
-          successfully! You'll receive stock updates shortly.
-        </div>
       </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div v-if="showToast" class="toast-notification">
+      <i :class="toastIcon" class="me-2"></i>
+      {{ toastMessage }}
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from 'vue';
+import { submitInquiry as submitInquiryAPI, getInquiryHistory } from '@/api/apiInquiry';
 
-const inquiryMessage = ref("");
-const inquiryFile = ref(null);
-const inquirySubmitted = ref(false);
+// Form data
+const inquiryForm = ref({
+  shopId: null,
+  message: '',
+  image: null
+});
 
-const handleInquiryFileUpload = (event) => {
+const imagePreview = ref('');
+const submitting = ref(false);
+const fabricAnalysis = ref(null);
+
+// History
+const inquiryHistory = ref([]);
+const loadingHistory = ref(false);
+const historyError = ref('');
+
+// Toast
+const showToast = ref(false);
+const toastMessage = ref('');
+const toastIcon = ref('bi bi-check-circle-fill');
+
+/**
+ * Handle image upload
+ */
+const handleImageUpload = (event) => {
   const file = event.target.files[0];
-  if (file) {
-    inquiryFile.value = file;
+  if (!file) return;
+
+  // Validate file size
+  if (file.size > 16 * 1024 * 1024) {
+    showToastMessage('Image too large (max 16MB)', 'bi bi-exclamation-circle-fill');
+    return;
+  }
+
+  inquiryForm.value.image = file;
+  
+  // Create preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    imagePreview.value = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+/**
+ * Remove image
+ */
+const removeImage = () => {
+  inquiryForm.value.image = null;
+  imagePreview.value = '';
+};
+
+/**
+ * Submit inquiry
+ */
+const submitInquiry = async () => {
+  if (!inquiryForm.value.shopId || !inquiryForm.value.message) {
+    showToastMessage('Please fill in all required fields', 'bi bi-exclamation-circle-fill');
+    return;
+  }
+
+  submitting.value = true;
+  fabricAnalysis.value = null;
+
+  try {
+    const response = await submitInquiryAPI(
+      inquiryForm.value.shopId,
+      inquiryForm.value.message,
+      inquiryForm.value.image
+    );
+
+    if (response.data) {
+      showToastMessage('Inquiry submitted successfully!', 'bi bi-check-circle-fill');
+      
+      // Display fabric analysis if provided
+      if (response.data.fabric_analysis) {
+        fabricAnalysis.value = response.data.fabric_analysis;
+      }
+
+      // Reset form
+      inquiryForm.value = {
+        shopId: null,
+        message: '',
+        image: null
+      };
+      imagePreview.value = '';
+
+      // Refresh history
+      await fetchInquiryHistory();
+    }
+  } catch (err) {
+    console.error('[Inquiry Error]', err);
+    showToastMessage(
+      err.response?.data?.message || 'Failed to submit inquiry',
+      'bi bi-exclamation-circle-fill'
+    );
+  } finally {
+    submitting.value = false;
   }
 };
 
-const handleInquiryFileDrop = (event) => {
-  const file = event.dataTransfer.files[0];
-  if (file) {
-    inquiryFile.value = file;
+/**
+ * Fetch inquiry history
+ */
+const fetchInquiryHistory = async () => {
+  loadingHistory.value = true;
+  historyError.value = '';
+
+  try {
+    const response = await getInquiryHistory();
+    if (response.data && response.data.inquiries) {
+      inquiryHistory.value = response.data.inquiries;
+    }
+  } catch (err) {
+    console.error('[History Error]', err);
+    historyError.value = err.response?.data?.message || 'Failed to load inquiry history';
+  } finally {
+    loadingHistory.value = false;
   }
 };
 
-const sendInquiry = () => {
-  inquirySubmitted.value = true;
-  setTimeout(() => {
-    inquirySubmitted.value = false;
-    inquiryMessage.value = "";
-    inquiryFile.value = null;
-  }, 3000);
+/**
+ * Format date
+ */
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  try {
+    return new Date(timestamp).toLocaleString();
+  } catch {
+    return timestamp;
+  }
 };
+
+/**
+ * Show toast message
+ */
+const showToastMessage = (message, icon) => {
+  toastMessage.value = message;
+  toastIcon.value = icon;
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
+};
+
+// Fetch history on mount
+onMounted(() => {
+  fetchInquiryHistory();
+});
 </script>
 
 <style scoped>
 .shop-inquiry-tab {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: calc(100vh - 60px);
   padding: 2rem;
   animation: fadeIn 0.5s ease-in;
@@ -145,6 +348,14 @@ const sendInquiry = () => {
   }
 }
 
+h5, h6 {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
 .card {
   border-radius: 16px;
   border: none;
@@ -155,94 +366,70 @@ const sendInquiry = () => {
 }
 
 .upload-zone {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px dashed var(--color-primary);
   border-radius: 12px;
-  position: relative;
-  overflow: hidden;
-}
-
-.upload-zone::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(102, 126, 234, 0.05) 0%,
-    rgba(118, 75, 162, 0.05) 100%
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.upload-zone:hover::before {
-  opacity: 1;
+  padding: 2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, #e9ecef 100%);
 }
 
 .upload-zone:hover {
+  border-color: var(--color-accent);
   background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-  border-color: #667eea !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
 }
 
-.alert-info {
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-  border: 1.5px solid #7dd3fc;
+.ai-analysis-card {
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
+  border: 2px solid var(--color-primary);
+}
+
+.inquiry-item {
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, #e9ecef 100%);
+  transition: all 0.3s ease;
+}
+
+.inquiry-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  border: none;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
-.alert-success {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border: 1.5px solid #6ee7b7;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
-  animation: slideIn 0.3s ease-out;
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+}
+
+.toast-notification {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1100;
+  animation: slideIn 0.3s ease;
 }
 
 @keyframes slideIn {
   from {
+    transform: translateX(100%);
     opacity: 0;
-    transform: translateX(-20px);
   }
   to {
-    opacity: 1;
     transform: translateX(0);
+    opacity: 1;
   }
-}
-
-.btn-outline-primary {
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  border-width: 1.5px;
-}
-
-.btn-outline-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-}
-
-h5 {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 700;
-}
-
-.form-control,
-.form-select {
-  border-radius: 8px;
-  border: 1.5px solid #dee2e6;
-  transition: all 0.3s ease;
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.15);
 }
 </style>

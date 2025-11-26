@@ -1,12 +1,12 @@
 # backend/services/forecasting_service.py
 
 import pandas as pd
-from prophet import Prophet
+from services.prophet_service import prophet_manager
 
 # -------------------- FORECAST SALES --------------------
 def forecast_sales(df: pd.DataFrame):
     """
-    Run Prophet forecast and return next 4 weeks demand by product.
+    Run optimized Prophet forecast and return next 4 weeks demand by product.
     Expects columns: 'Date', 'Sales', 'Product'
     """
     results = []
@@ -17,29 +17,42 @@ def forecast_sales(df: pd.DataFrame):
 
     for product in df['Product'].dropna().unique():
         product_df = df[df['Product'] == product][['Date', 'Sales']].copy()
-        product_df.rename(columns={'Date': 'ds', 'Sales': 'y'}, inplace=True)
-
+        
         # Skip if insufficient data
         if len(product_df) < 5:
             print(f"[Warning] Not enough data for product '{product}' to forecast.")
             continue
 
         try:
-            model = Prophet()
-            model.fit(product_df)
-
-            # Predict next 4 weeks
-            future = model.make_future_dataframe(periods=4, freq='W')
-            forecast = model.predict(future)
-            forecast_data = forecast[['ds', 'yhat']].tail(4)
+            # Prepare data for optimized Prophet
+            prophet_df = product_df.copy()
+            prophet_df.columns = ["ds", "y"]  # Prophet expects ds, y columns
+            
+            # Use optimized Prophet service with 4 weeks forecast
+            forecast_data, metrics = prophet_manager.forecast_sales(
+                prophet_df, periods=4, freq='W'
+            )
+            
+            # Convert to expected format
+            forecast_list = []
+            for _, row in forecast_data.iterrows():
+                forecast_list.append({
+                    "week": row['ds'].strftime('%Y-%m-%d'),
+                    "predicted_sales": round(row['yhat'], 2)
+                })
 
             results.append({
                 "product": product,
-                "forecast": [
-                    {"week": row['ds'].strftime('%Y-%m-%d'), "predicted_sales": round(row['yhat'], 2)}
-                    for _, row in forecast_data.iterrows()
-                ]
+                "forecast": forecast_list,
+                "metrics": {
+                    "data_quality_score": metrics.get('data_quality_score', 0),
+                    "forecast_time_seconds": metrics.get('forecast_time_seconds', 0),
+                    "model_cached": metrics.get('model_cached', False)
+                }
             })
+            
+            print(f"[Success] Forecast for {product}: {metrics.get('forecast_time_seconds', 0):.2f}s")
+            
         except Exception as e:
             print(f"[Error] Forecast error for {product}: {e}")
 

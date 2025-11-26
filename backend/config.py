@@ -3,8 +3,9 @@ import os
 from dotenv import load_dotenv
 
 
-# Load Environment Variables
-load_dotenv()
+# Load Environment Variables from ROOT .env file
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+load_dotenv(os.path.join(ROOT_DIR, '.env'))
 
 
 class Config:
@@ -25,11 +26,33 @@ class Config:
         f"sqlite:///{os.path.join(DATA_DIR, 'se_textile.db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Connection Pool Settings (optimized for SQLite)
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_timeout": 30,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True,
+        "connect_args": {
+            "check_same_thread": False,
+            "timeout": 30
+        }
+    }
 
     # AI & API INTEGRATIONS
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     MAPMYINDIA_KEY = os.getenv("MAPMYINDIA_KEY", "")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+    
+    # AI Provider Selection (gemini or nvidia)
+    AI_PROVIDER = os.getenv("AI_PROVIDER", "nvidia").lower()  # Default: NVIDIA
+    
+    # AI Model Configuration - NVIDIA Defaults
+    AI_TEXT_MODEL = os.getenv("AI_TEXT_MODEL", "deepseek-ai/deepseek-r1")
+    AI_IMAGE_MODEL = os.getenv("AI_IMAGE_MODEL", "black-forest-labs/flux.1-kontext-dev")
+    AI_VISION_MODEL = os.getenv("AI_VISION_MODEL", "meta/llama-3.2-90b-vision-instruct")
 
     # FILE MANAGEMENT
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
@@ -66,12 +89,11 @@ class Config:
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
     
     # IMAGE SERVING CONFIGURATION
-    # Base URL for serving images (use production domain in production)
     API_BASE_URL = os.getenv("API_BASE_URL", f"http://127.0.0.1:{PORT}")
     
     # Image serving paths
-    STATIC_IMAGE_PATH = "/uploads"  # URL path prefix for uploaded images
-    DATASET_IMAGE_PATH = "/datasets"  # URL path prefix for dataset images
+    STATIC_IMAGE_PATH = "/uploads" 
+    DATASET_IMAGE_PATH = "/datasets" 
     
     # Fallback placeholder images
     PLACEHOLDER_IMAGE_SERVICE = os.getenv("PLACEHOLDER_IMAGE_SERVICE", "https://placehold.co")
