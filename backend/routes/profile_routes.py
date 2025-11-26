@@ -30,6 +30,7 @@ def get_profile(current_user):
             "pincode": user.pincode or "",
             "role": user.role,
             "approved": user.approved,
+            "shop_name": user.shops.first().name if user.shops.first() and user.role in ["shop_owner", "admin"] else None,
             "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S")
         }
 
@@ -80,7 +81,7 @@ def update_profile(current_user):
         db.session.commit()
 
         return jsonify({
-            "status": "error",
+            "status": "success",
             "message": "Profile updated successfully!",
             "updated_fields": updated_fields
         }), 200

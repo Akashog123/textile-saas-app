@@ -2,8 +2,7 @@
   <div class="shop-marketing-tab">
     <h5 class="mb-3">Marketing Content Generation</h5>
     <p class="text-muted">
-      Upload a product or export your product from sales data to generate your
-      marketing content
+      Upload sales data (CSV/XLSX) or product images to generate AI-powered marketing content
     </p>
 
     <div class="card">
@@ -33,36 +32,107 @@
               />
             </svg>
           </div>
-          <p class="mb-2">Click to Browse and Upload your product</p>
+          <p class="mb-2">Click to Browse and Upload</p>
           <input
             type="file"
             @change="handleFileUpload"
             class="d-none"
             ref="fileInput"
-            accept=".csv,.xlsx,image/*"
+            accept=".csv,.xlsx,.xls,.jpg,.jpeg,.png,.webp"
           />
           <button
             class="btn btn-outline-secondary btn-sm"
             @click.stop="$refs.fileInput.click()"
+            :disabled="loading"
           >
-            <i class="bi bi-folder2-open"></i> Import csv/xlsx
+            <i class="bi bi-folder2-open"></i> Import CSV/XLSX or Image
           </button>
         </div>
 
-        <div
-          v-if="uploadedFile"
-          class="alert alert-success d-flex align-items-center"
-        >
-          <span class="me-2"><i class="bi bi-check-circle-fill"></i></span>
-          Content Preprocessed
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Generating content...</span>
+          </div>
+          <p class="mt-2 text-muted">AI is generating your marketing content...</p>
         </div>
 
-        <div class="row g-3">
+        <!-- Error State -->
+        <div v-if="error" class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+        </div>
+
+        <!-- Generated Content Display -->
+        <div v-if="generatedContent && !loading" class="row g-3">
+          <!-- Image Display (if type is image) -->
+          <div v-if="generatedContent.type === 'image'" class="col-md-6">
+            <h6>Generated Marketing Poster</h6>
+            <div class="border rounded p-3 bg-light">
+              <img
+                v-if="generatedContent.poster"
+                :src="getImageUrl(generatedContent.poster)"
+                alt="Marketing Poster"
+                class="img-fluid rounded mb-3"
+              />
+              <button
+                class="btn btn-sm btn-primary w-100"
+                @click="downloadImage(generatedContent.poster)"
+              >
+                <i class="bi bi-download me-1"></i> Download Poster
+              </button>
+            </div>
+          </div>
+
+          <!-- Caption Display -->
+          <div :class="generatedContent.type === 'image' ? 'col-md-6' : 'col-12'">
+            <h6>AI-Generated Content</h6>
+            <div class="border rounded p-3 bg-light" style="max-height: 400px; overflow-y: auto">
+              <!-- Single Caption for Image -->
+              <div v-if="generatedContent.type === 'image'">
+                <p class="small mb-2"><strong>Marketing Caption:</strong></p>
+                <p class="mb-3">{{ generatedContent.caption }}</p>
+                <div class="d-flex gap-2">
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="copyToClipboard(generatedContent.caption)"
+                  >
+                    <i class="bi bi-files"></i> Copy
+                  </button>
+                </div>
+              </div>
+
+              <!-- Multiple Captions for CSV Data -->
+              <div v-else-if="generatedContent.type === 'data'">
+                <p class="small text-muted mb-3">
+                  Generated {{ generatedContent.ai_captions?.length || 0 }} captions
+                  from {{ generatedContent.rows_processed }} products
+                </p>
+                <div
+                  v-for="(item, idx) in generatedContent.ai_captions"
+                  :key="idx"
+                  class="mb-3 pb-3 border-bottom"
+                >
+                  <strong class="d-block mb-1">{{ item.product }}</strong>
+                  <small class="text-muted d-block mb-2">{{ item.category }}</small>
+                  <p class="small mb-2">{{ item.caption }}</p>
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="copyToClipboard(item.caption)"
+                  >
+                    <i class="bi bi-files"></i> Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="!generatedContent && !loading && !error" class="row g-3">
           <div class="col-md-6">
-            <h6>Review and Post Your Content</h6>
+            <h6>Marketing Image</h6>
             <div class="border rounded p-3 bg-light" style="min-height: 250px">
               <div
-                v-if="!uploadedFile"
                 class="text-center text-muted d-flex align-items-center justify-content-center"
                 style="height: 220px"
               >
@@ -71,36 +141,13 @@
                   Image will be generated here
                 </div>
               </div>
-              <div v-else class="text-center">
-                <div class="mb-2 fw-semibold">Generated Marketing Image</div>
-                <div
-                  class="bg-secondary rounded mb-3 d-flex align-items-center justify-content-center"
-                  style="height: 150px"
-                >
-                  <span class="text-white fs-1"
-                    ><i class="bi bi-palette-fill"></i
-                  ></span>
-                </div>
-                <button class="btn btn-sm btn-outline-primary">
-                  <svg width="16" height="16" fill="currentColor" class="me-1">
-                    <path
-                      d="M8 2v12M2 8h12"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      fill="none"
-                    />
-                  </svg>
-                  Download Image
-                </button>
-              </div>
             </div>
           </div>
 
           <div class="col-md-6">
-            <h6>&nbsp;</h6>
+            <h6>AI Caption</h6>
             <div class="border rounded p-3 bg-light" style="min-height: 250px">
               <div
-                v-if="!uploadedFile"
                 class="text-center text-muted d-flex align-items-center justify-content-center"
                 style="height: 220px"
               >
@@ -111,68 +158,150 @@
                   Caption will be generated here
                 </div>
               </div>
-              <div v-else>
-                <h6>Product Name</h6>
-                <p class="small mb-2"><strong>AI-generated Caption:</strong></p>
-                <p class="small">
-                  Handwoven elegance! Our latest premium silk collection brings
-                  together traditional craft and modern design. Perfect for
-                  festive occasions. Limited stock available!
-                </p>
-                <div class="d-flex gap-2 mt-3">
-                  <button class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-files"></i> Copy
-                  </button>
-                  <button class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-share"></i> Share
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
-
-        <div class="text-center mt-4">
-          <button class="btn btn-primary" :disabled="!uploadedFile">
-            Preview
-          </button>
         </div>
       </div>
     </div>
 
-    <div v-if="uploadedFile" class="mt-4 text-center text-muted small">
-      After uploading products set up Ads on
-      <button class="btn btn-link p-0">Preview Flash</button>
+    <!-- Toast Notification -->
+    <div v-if="showToast" class="toast-notification">
+      <i :class="toastIcon" class="me-2"></i>
+      {{ toastMessage }}
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref } from 'vue';
+import { generateMarketingContent } from '@/api/apiMarketing';
 
-const uploadedFile = ref(null);
+const loading = ref(false);
+const error = ref('');
+const generatedContent = ref(null);
 
-const handleFileUpload = (event) => {
+// Toast
+const showToast = ref(false);
+const toastMessage = ref('');
+const toastIcon = ref('bi bi-check-circle-fill');
+
+/**
+ * Handle file upload
+ */
+const handleFileUpload = async (event) => {
   const file = event.target.files[0];
-  if (file) {
-    uploadedFile.value = file;
-    setTimeout(() => {
-      console.log("File processed:", file.name);
-    }, 1000);
+  if (!file) return;
+
+  await processFile(file);
+};
+
+/**
+ * Handle file drop
+ */
+const handleFileDrop = async (event) => {
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+
+  await processFile(file);
+};
+
+/**
+ * Process uploaded file
+ */
+const processFile = async (file) => {
+  // Validate file size (16MB max)
+  if (file.size > 16 * 1024 * 1024) {
+    showToastMessage('File too large (max 16MB)', 'bi bi-exclamation-circle-fill');
+    return;
+  }
+
+  // Validate file type
+  const allowedExtensions = ['.csv', '.xlsx', '.xls', '.jpg', '.jpeg', '.png', '.webp'];
+  const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+  if (!allowedExtensions.includes(fileExt)) {
+    showToastMessage(
+      'Invalid file type. Allowed: CSV, XLSX, JPG, PNG, WEBP',
+      'bi bi-exclamation-circle-fill'
+    );
+    return;
+  }
+
+  loading.value = true;
+  error.value = '';
+  generatedContent.value = null;
+
+  try {
+    const response = await generateMarketingContent(file);
+    if (response.data) {
+      generatedContent.value = response.data;
+      showToastMessage('Marketing content generated successfully!', 'bi bi-check-circle-fill');
+    }
+  } catch (err) {
+    console.error('[Marketing Error]', err);
+    error.value = err.response?.data?.message || 'Failed to generate content';
+    showToastMessage(error.value, 'bi bi-exclamation-circle-fill');
+  } finally {
+    loading.value = false;
   }
 };
 
-const handleFileDrop = (event) => {
-  const file = event.dataTransfer.files[0];
-  if (file) {
-    uploadedFile.value = file;
+/**
+ * Get full image URL
+ */
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `http://127.0.0.1:5001${path}`;
+};
+
+/**
+ * Download generated image
+ */
+const downloadImage = async (imagePath) => {
+  try {
+    const imageUrl = getImageUrl(imagePath);
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `marketing_poster_${Date.now()}.png`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    showToastMessage('Poster downloaded!', 'bi bi-check-circle-fill');
+  } catch (err) {
+    console.error('[Download Error]', err);
+    showToastMessage('Download failed', 'bi bi-exclamation-circle-fill');
   }
+};
+
+/**
+ * Copy text to clipboard
+ */
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToastMessage('Copied to clipboard!', 'bi bi-check-circle-fill');
+  } catch (err) {
+    console.error('[Copy Error]', err);
+    showToastMessage('Failed to copy', 'bi bi-exclamation-circle-fill');
+  }
+};
+
+/**
+ * Show toast notification
+ */
+const showToastMessage = (message, icon) => {
+  toastMessage.value = message;
+  toastIcon.value = icon;
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), 3000);
 };
 </script>
 
 <style scoped>
 .shop-marketing-tab {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: calc(100vh - 60px);
   padding: 2rem;
   animation: fadeIn 0.5s ease-in;
@@ -199,7 +328,7 @@ const handleFileDrop = (event) => {
 }
 
 .upload-zone {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, #e9ecef 100%);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 12px;
@@ -208,12 +337,12 @@ const handleFileDrop = (event) => {
 }
 
 .upload-zone::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
     135deg,
-    rgba(102, 126, 234, 0.05) 0%,
+    rgba(242, 190, 209, 0.05) 0%,
     rgba(118, 75, 162, 0.05) 100%
   );
   opacity: 0;
@@ -226,41 +355,18 @@ const handleFileDrop = (event) => {
 
 .upload-zone:hover {
   background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-  border-color: #667eea !important;
+  border-color: var(--color-primary) !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
-}
-
-.alert-success {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border: 1.5px solid #6ee7b7;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.15);
 }
 
 .border.rounded {
   border-radius: 12px !important;
-  border-color: rgba(102, 126, 234, 0.2) !important;
+  border-color: rgba(242, 190, 209, 0.2) !important;
 }
 
 .bg-light {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
-}
-
-.bg-secondary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, #e9ecef 100%) !important;
 }
 
 .btn-outline-secondary,
@@ -269,30 +375,55 @@ const handleFileDrop = (event) => {
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.3s ease;
-  border-width: 1.5px;
 }
 
-.btn-outline-secondary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.2);
-}
-
+.btn-outline-secondary:hover,
 .btn-outline-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.2);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  border: none;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
 h5,
 h6 {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 700;
+}
+
+.toast-notification {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1100;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>

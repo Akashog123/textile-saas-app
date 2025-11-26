@@ -1,16 +1,17 @@
 <template>
-  <div class="shop-manager-container container-fluid py-4">
-    <!-- Child route components render here -->
-    <router-view />
+  <div class="shop-layout">
+    <router-view :key="$route.fullPath" />
   </div>
 </template>
 
 <script setup>
-// Container component for shop manager routes
+// Shop owner portal layout wrapper
+// All navigation handled by NavBar.vue
 </script>
 
 <style scoped>
-.shop-manager-container h2 {
-  font-weight: 700;
+.shop-layout {
+  min-height: calc(100vh - 120px);
+  background: transparent;
 }
 </style>

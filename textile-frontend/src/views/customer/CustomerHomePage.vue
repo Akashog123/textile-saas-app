@@ -1,36 +1,14 @@
 <template>
   <div class="customer-home-page">
-    <!-- Hero Search Section -->
-    <div class="hero-search-section mb-4">
-      <div class="search-wrapper">
-        <div class="d-flex gap-2 align-items-stretch">
-          <div class="input-group search-input-group flex-grow-1">
-            <span class="input-group-text search-icon"
-              ><i class="bi bi-search"></i
-            ></span>
-            <input
-              type="text"
-              class="form-control search-input"
-              placeholder="Search for Shops and Fabrics..."
-              v-model="searchQuery"
-            />
-            <button class="btn btn-voice" type="button" title="Voice Search">
-              <i class="bi bi-mic-fill"></i>
-            </button>
-            <button class="btn btn-camera" type="button" title="Image Search">
-              <i class="bi bi-camera-fill"></i>
-            </button>
-          </div>
-          <button class="btn btn-nearby" @click="searchNearbyShops">
-            <span class="nearby-icon"><i class="bi bi-geo-alt-fill"></i></span>
-            <span class="nearby-text">Nearby Shops</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- Search Bar -->
+    <SearchBar 
+      v-model="searchQuery"
+      placeholder="Search for Shops and Fabrics..."
+      @nearby-search="searchNearbyShops"
+    />
 
     <!-- Trending Fabric Patterns Section -->
-    <div class="section trending-section mb-4">
+    <div class="section trending-section mb-4" v-if="trendingFabrics.length > 0">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -131,7 +109,7 @@
     </div>
 
     <!-- Popular Local Shops Section -->
-    <div class="section shops-section mb-4">
+    <div class="section shops-section mb-4" v-if="popularShops.length > 0">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-house-fill"></i></span>
@@ -242,23 +220,15 @@
           Shop Locations Near You
         </h5>
       </div>
-      <div class="map-frame-container">
-        <iframe
-          src="https://www.openstreetmap.org/export/embed.html?bbox=77.5%2C12.9%2C77.7%2C13.1&layer=mapnik&marker=13.0%2C77.6"
-          width="100%"
-          height="400"
-          class="map-iframe"
-          title="Interactive map showing nearby textile shops"
-          loading="lazy"
-        ></iframe>
-        <div class="map-overlay-controls">
-          <button class="map-control-btn" title="Zoom In">+</button>
-          <button class="map-control-btn" title="Zoom Out">−</button>
-          <button class="map-control-btn" title="My Location">
-            <i class="bi bi-geo-alt-fill"></i>
-          </button>
-        </div>
-      </div>
+      <MapmyIndiaMap
+        :shops="popularShopsWithCoordinates"
+        :center="mapCenter"
+        :zoom="13"
+        height="400px"
+        @marker-click="selectShop"
+        @location-found="handleUserLocationFound"
+        @map-ready="handleMapReady"
+      />
     </div>
 
     <!-- Shop Profile Modal -->
@@ -288,95 +258,173 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, computed } from 'vue';
+import { getTrendingFabrics, getPopularShops } from '@/api/apiCustomer';
+import SearchBar from '@/components/SearchBar.vue';
+import MapmyIndiaMap from '@/components/MapmyIndiaMap.vue';
 
-const searchQuery = ref("");
+const searchQuery = ref('');
 const fabricIndex = ref(0);
 const shopIndex = ref(0);
 const selectedShop = ref(null);
 
-const trendingFabrics = ref([
-  {
-    name: "Handwoven Silk Brocade",
-    price: "₹1,850",
-    description:
-      "Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions. Premium quality with rich texture and vibrant colors.",
-    rating: 5,
-    badge: "Trending",
-    image:
-      "https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    name: "Premium Cotton Batik",
-    price: "₹650",
-    description:
-      "Soft and breathable premium cotton with traditional batik patterns. Ideal for summer wear with excellent comfort and durability. Eco-friendly and naturally dyed.",
-    rating: 4,
-    badge: "Best Seller",
-    image:
-      "https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    name: "Luxury Georgette Silk",
-    price: "₹1,450",
-    description:
-      "Elegant georgette silk with beautiful floral prints and luxurious drape. Lightweight and flowing fabric perfect for sarees, dresses, and scarves.",
-    rating: 5,
-    badge: "New Arrival",
-    image:
-      "https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    name: "Artisan Woven Cotton",
-    price: "₹890",
-    description:
-      "Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship with modern appeal. Durable and comfortable for everyday use.",
-    rating: 4,
-    badge: "Handcrafted",
-    image:
-      "https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-]);
+// Loading states
+const loadingFabrics = ref(false);
+const loadingShops = ref(false);
 
-const popularShops = ref([
-  {
-    name: "The Silk Emporium",
-    description:
-      "Premier destination for authentic silk fabrics featuring traditional handloom textiles and modern designer collections. Over 50 years of trusted quality and exceptional customer service.",
-    rating: 5,
-    location: "MG Road, Bangalore",
-    image:
-      "https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    name: "Heritage Textile House",
-    description:
-      "Specializing in premium cotton and handwoven fabrics with rich cultural heritage. Wide range of traditional and contemporary designs for all occasions.",
-    rating: 4,
-    location: "Commercial Street, Bangalore",
-    image:
-      "https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    name: "Artisan Fabric Gallery",
-    description:
-      "Curated collection of artisan fabrics showcasing traditional craftsmanship. Supporting local weavers and offering unique, handcrafted textile pieces.",
-    rating: 5,
-    location: "Indiranagar, Bangalore",
-    image:
-      "https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    name: "Modern Textile Studio",
-    description:
-      "Contemporary fabric store offering latest trends in textiles. Perfect blend of modern designs and quality materials for fashion-forward customers.",
-    rating: 4,
-    location: "Koramangala, Bangalore",
-    image:
-      "https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800",
-  },
-]);
+// Error states
+const errorFabrics = ref('');
+const errorShops = ref('');
 
+// Data from backend
+const trendingFabrics = ref([]);
+const popularShops = ref([]);
+
+// Map-related data
+const mapCenter = ref({ lat: 28.6139, lng: 77.2090 }); // Default to Delhi
+const userLocation = ref(null);
+
+// Computed property for shops with coordinates
+const popularShopsWithCoordinates = computed(() => {
+  return popularShops.value.map(shop => ({
+    ...shop,
+    lat: shop.lat || parseFloat(shop.latitude) || 28.6139 + (Math.random() - 0.5) * 0.1,
+    lng: shop.lng || parseFloat(shop.longitude) || 77.2090 + (Math.random() - 0.5) * 0.1
+  }));
+});
+
+/**
+ * Fetch trending fabrics from backend
+ */
+const fetchTrendingFabrics = async () => {
+  loadingFabrics.value = true;
+  errorFabrics.value = '';
+  try {
+    const response = await getTrendingFabrics();
+    if (response.data && response.data.fabrics) {
+      trendingFabrics.value = response.data.fabrics.map(fabric => ({
+        id: fabric.id,
+        name: fabric.name,
+        price: fabric.price ? `₹${parseFloat(fabric.price).toLocaleString()}` : '₹N/A',
+        description: fabric.ai_caption || fabric.description || 'No description available',
+        rating: fabric.rating || 4,
+        badge: fabric.badge || 'Trending',
+        image: fabric.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(fabric.name)}`
+      }));
+    }
+  } catch (err) {
+    console.error('[Trending Fabrics Error]', err);
+    errorFabrics.value = err.response?.data?.message || 'Failed to load trending fabrics';
+    // Fallback to demo data if API fails
+    trendingFabrics.value = getFallbackFabrics();
+  } finally {
+    loadingFabrics.value = false;
+  }
+};
+
+/**
+ * Fetch popular shops from backend
+ */
+const fetchPopularShops = async () => {
+  loadingShops.value = true;
+  errorShops.value = '';
+  try {
+    const response = await getPopularShops();
+    if (response.data && response.data.shops) {
+      popularShops.value = response.data.shops.map(shop => ({
+        id: shop.id,
+        name: shop.name,
+        description: shop.description || 'Trusted textile shop',
+        rating: shop.rating || 4,
+        location: shop.location || shop.address || 'Location not available',
+        lat: shop.lat,
+        lon: shop.lon,
+        image: shop.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`
+      }));
+    }
+  } catch (err) {
+    console.error('[Popular Shops Error]', err);
+    errorShops.value = err.response?.data?.message || 'Failed to load popular shops';
+    // Fallback to demo data if API fails
+    popularShops.value = getFallbackShops();
+  } finally {
+    loadingShops.value = false;
+  }
+};
+
+/**
+ * Fallback data for trending fabrics (demo)
+ */
+const getFallbackFabrics = () => [
+  {
+    name: 'Handwoven Silk Brocade',
+    price: '₹1,850',
+    description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions.',
+    rating: 5,
+    badge: 'Trending',
+    image: 'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    name: 'Premium Cotton Batik',
+    price: '₹650',
+    description: 'Soft and breathable premium cotton with traditional batik patterns. Ideal for summer wear with excellent comfort.',
+    rating: 4,
+    badge: 'Best Seller',
+    image: 'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    name: 'Luxury Georgette Silk',
+    price: '₹1,450',
+    description: 'Elegant georgette silk with beautiful floral prints and luxurious drape.',
+    rating: 5,
+    badge: 'New Arrival',
+    image: 'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    name: 'Artisan Woven Cotton',
+    price: '₹890',
+    description: 'Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship.',
+    rating: 4,
+    badge: 'Handcrafted',
+    image: 'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+];
+
+/**
+ * Fallback data for popular shops (demo)
+ */
+const getFallbackShops = () => [
+  {
+    name: 'The Silk Emporium',
+    description: 'Premier destination for authentic silk fabrics featuring traditional handloom textiles and modern designer collections.',
+    rating: 5,
+    location: 'MG Road, Bangalore',
+    image: 'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    name: 'Heritage Textile House',
+    description: 'Specializing in premium cotton and handwoven fabrics with rich cultural heritage.',
+    rating: 4,
+    location: 'Commercial Street, Bangalore',
+    image: 'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    name: 'Artisan Fabric Gallery',
+    description: 'Curated collection of artisan fabrics showcasing traditional craftsmanship.',
+    rating: 5,
+    location: 'Indiranagar, Bangalore',
+    image: 'https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    name: 'Modern Textile Studio',
+    description: 'Contemporary fabric store offering latest trends in textiles.',
+    rating: 4,
+    location: 'Koramangala, Bangalore',
+    image: 'https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
+  },
+];
+
+// Carousel navigation
 const prevFabric = () => {
   if (fabricIndex.value > 0) fabricIndex.value--;
 };
@@ -393,33 +441,97 @@ const nextShop = () => {
   if (shopIndex.value < popularShops.value.length - 1) shopIndex.value++;
 };
 
-const searchNearbyShops = () => {
-  console.log("Searching nearby shops...");
-  // Implement search functionality
+const searchNearbyShops = async () => {
+  try {
+    // Import the MapmyIndia service
+    const { getNearbyShopsAuto, formatDistance } = await import('@/services/mapmyindiaService');
+    
+    loadingShops.value = true;
+    errorShops.value = '';
+    
+    // Get nearby shops (automatically gets user location)
+    const result = await getNearbyShopsAuto(5000); // 5km radius
+    
+    if (result.shops && result.shops.length > 0) {
+      // Transform nearby shops to our format
+      popularShops.value = result.shops.map((shop) => ({
+        id: shop.id,
+        name: shop.name,
+        description: `Located ${formatDistance(shop.distance)} away • ${shop.address}`,
+        rating: 4,
+        location: shop.address,
+        lat: shop.latitude,
+        lon: shop.longitude,
+        image: `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`,
+        distance: shop.distance
+      }));
+      
+      // Sort by distance (nearest first)
+      popularShops.value.sort((a, b) => a.distance - b.distance);
+      
+      // Reset carousel to first shop
+      shopIndex.value = 0;
+      
+      console.log(`Found ${result.shops.length} nearby shops`);
+      
+    } else {
+      alert('No nearby shops found within 5km');
+    }
+    
+  } catch (err) {
+    console.error('Nearby search error:', err);
+    alert(err.message || 'Failed to search nearby shops');
+    errorShops.value = err.message;
+  } finally {
+    loadingShops.value = false;
+  }
 };
 
 const viewShopProfile = (shop) => {
   selectedShop.value = shop;
 };
 
+const selectShop = (shop) => {
+  selectedShop.value = shop;
+};
+
 const closeShopProfile = () => {
   selectedShop.value = null;
 };
+
+// Map event handlers
+const handleMapReady = (mapInstance) => {
+  console.log('Map is ready:', mapInstance);
+};
+
+const handleUserLocationFound = (location) => {
+  userLocation.value = location;
+  mapCenter.value = { lat: location.latitude, lng: location.longitude };
+  console.log('User location found:', location);
+};
+
+// Fetch data on component mount
+onMounted(() => {
+  fetchTrendingFabrics();
+  fetchPopularShops();
+});
 </script>
 
 <style scoped>
 .customer-home-page {
   padding: 2rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: 100vh;
 }
 
 /* Hero Search Section */
 .hero-search-section {
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
   padding: 2rem;
-  border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .search-wrapper {
@@ -428,16 +540,17 @@ const closeShopProfile = () => {
 }
 
 .search-input-group {
-  background: #f8f9fa;
+  background: white;
   border-radius: 50px;
   overflow: hidden;
   border: 2px solid transparent;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
 .search-input-group:focus-within {
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(242, 190, 209, 0.2);
 }
 
 .search-icon {
@@ -445,6 +558,7 @@ const closeShopProfile = () => {
   border: none;
   font-size: 1.2rem;
   padding-left: 1.5rem;
+  color: var(--color-text-muted);
 }
 
 .search-input {
@@ -452,6 +566,7 @@ const closeShopProfile = () => {
   background: transparent;
   font-size: 1rem;
   padding: 0.75rem 1rem;
+  color: var(--color-text-dark);
 }
 
 .search-input:focus {
@@ -466,15 +581,17 @@ const closeShopProfile = () => {
   font-size: 1.3rem;
   padding: 0.5rem 1rem;
   transition: transform 0.2s ease;
+  color: var(--color-text-muted);
 }
 
 .btn-voice:hover,
 .btn-camera:hover {
   transform: scale(1.1);
+  color: var(--color-primary);
 }
 
 .btn-nearby {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   border: none;
   border-radius: 50px;
@@ -489,7 +606,8 @@ const closeShopProfile = () => {
 
 .btn-nearby:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.4);
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
 .nearby-icon {
@@ -498,18 +616,20 @@ const closeShopProfile = () => {
 
 /* Section Styling */
 .section {
-  background: white;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
   padding: 2rem;
-  border-radius: 20px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .section:hover {
   transform: translateY(-5px);
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.08);
 }
 
 .section-header {
@@ -518,7 +638,7 @@ const closeShopProfile = () => {
 
 .section-title {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   font-size: 1.5rem;
   margin-bottom: 0.5rem;
   display: flex;
@@ -529,6 +649,7 @@ const closeShopProfile = () => {
 
 .title-icon {
   font-size: 1.8rem;
+  color: var(--color-primary);
   animation: bounce 2s infinite;
 }
 
@@ -543,17 +664,17 @@ const closeShopProfile = () => {
 }
 
 .section-subtitle {
-  color: #718096;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
   margin: 0;
 }
 
 /* Modern Card Styling */
 .modern-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, var(--color-bg-light) 100%);
+  border-radius: 20px;
   padding: 2rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-bg-alt);
   transition: all 0.3s ease;
   max-width: 900px;
   margin: 0 auto;
@@ -575,8 +696,8 @@ const closeShopProfile = () => {
 }
 
 .carousel-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
+  background: white;
+  border: 1px solid var(--color-primary);
   border-radius: 50%;
   width: 50px;
   height: 50px;
@@ -584,27 +705,33 @@ const closeShopProfile = () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: white;
+  color: var(--color-primary);
   flex-shrink: 0;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
 .carousel-btn:hover:not(:disabled) {
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  background: var(--color-primary);
+  color: white;
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
 }
 
 .carousel-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-  background: #cbd5e0;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
   box-shadow: none;
 }
 
 .btn-arrow {
   font-size: 2rem;
   font-weight: bold;
+  line-height: 1;
+  margin-top: -4px;
 }
 
 /* Fabric Card Specific */
@@ -612,6 +739,8 @@ const closeShopProfile = () => {
 .shop-image-container {
   position: relative;
   height: 100%;
+  overflow: hidden;
+  border-radius: 16px;
 }
 
 .fabric-image,
@@ -621,59 +750,13 @@ const closeShopProfile = () => {
   object-fit: cover;
   border-radius: 16px;
   display: block;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  transition: transform 0.3s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transition: transform 0.5s ease;
 }
 
 .fabric-image:hover,
 .shop-image:hover {
-  transform: scale(1.02);
-}
-
-.fabric-image-placeholder {
-  height: 300px;
-  border-radius: 16px;
-  overflow: hidden;
-  position: relative;
-}
-
-.gradient-bg-1 {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.gradient-bg-2 {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.image-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.3s ease;
-}
-
-.image-overlay:hover {
-  background: rgba(0, 0, 0, 0.5);
-}
-
-.overlay-content {
-  text-align: center;
-  color: white;
-}
-
-.overlay-icon {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 0.5rem;
-}
-
-.overlay-text {
-  font-size: 1rem;
-  font-weight: 500;
-  margin: 0;
+  transform: scale(1.05);
 }
 
 .fabric-badge {
@@ -687,8 +770,9 @@ const closeShopProfile = () => {
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  color: #667eea;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  color: var(--color-primary-dark);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
 }
 
 .badge-icon {
@@ -700,122 +784,117 @@ const closeShopProfile = () => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 1rem;
 }
 
 .fabric-name,
 .shop-name {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 1rem;
+  color: var(--color-text-dark);
+  margin-bottom: 0.5rem;
 }
 
 .price-tag {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 .price-amount {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  color: #667eea;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-primary);
 }
 
 .price-unit {
-  font-size: 1rem;
-  color: #718096;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 
 .fabric-description,
 .shop-description {
-  color: #4a5568;
+  color: var(--color-text-muted);
   line-height: 1.6;
+  margin-bottom: 1.5rem;
   flex-grow: 1;
-  margin-bottom: 1rem;
 }
 
-/* Rating Styles */
 .rating-container {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .stars {
   display: flex;
-  gap: 0.25rem;
+  gap: 2px;
 }
 
 .star {
-  font-size: 1.3rem;
-  transition: transform 0.2s ease;
+  font-size: 1.2rem;
+  color: #e2e8f0;
 }
 
 .star.filled {
   color: #fbbf24;
 }
 
-.star.empty {
-  color: #e2e8f0;
-}
-
 .rating-text {
-  font-size: 0.9rem;
-  color: #718096;
+  color: var(--color-text-muted);
   font-weight: 500;
+  font-size: 0.9rem;
 }
 
-/* Location */
-.shop-location {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #4a5568;
-}
-
-.location-icon {
-  font-size: 1.2rem;
-}
-
-/* Buttons */
 .btn-view-details,
 .btn-view-profile {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 0.75rem 2rem;
+  background: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  padding: 0.75rem 1.5rem;
   border-radius: 50px;
   font-weight: 600;
   transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: fit-content;
 }
 
 .btn-view-details:hover,
 .btn-view-profile:hover {
+  background: var(--color-primary);
+  color: white;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.3);
+}
+
+.shop-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.location-icon {
+  color: var(--color-primary);
 }
 
 .btn-outline-location {
-  border: 2px solid #667eea;
-  color: #667eea;
   background: transparent;
+  color: var(--color-text-dark);
+  border: 1px solid #e2e8f0;
   padding: 0.75rem 1.5rem;
   border-radius: 50px;
-  font-weight: 600;
+  font-weight: 500;
   transition: all 0.3s ease;
 }
 
 .btn-outline-location:hover {
-  background: #667eea;
-  color: white;
-  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-bg-alt);
 }
 
 /* Carousel Indicators */
@@ -829,67 +908,26 @@ const closeShopProfile = () => {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #cbd5e0;
+  background: #e2e8f0;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.indicator-dot:hover {
-  background: #a0aec0;
+.indicator-dot.active {
+  background: var(--color-primary);
   transform: scale(1.2);
 }
 
-.indicator-dot.active {
-  background: #667eea;
-  width: 30px;
-  border-radius: 5px;
-}
-
 /* Map Section */
-.map-frame-container {
-  position: relative;
-  border-radius: 16px;
+.map-section {
   overflow: hidden;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
 }
 
-.map-iframe {
-  border: none;
-  display: block;
-}
-
-.map-overlay-controls {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.map-control-btn {
-  width: 40px;
-  height: 40px;
-  background: white;
-  border: none;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.map-control-btn:hover {
-  background: #667eea;
-  color: white;
-  transform: scale(1.1);
-}
-
-/* Modal Styles */
+/* Modal Styling */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -900,72 +938,90 @@ const closeShopProfile = () => {
 
 .modal-content-modern {
   background: white;
-  padding: 2rem;
-  border-radius: 20px;
-  max-width: 600px;
+  border-radius: 24px;
   width: 100%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  padding: 2rem;
   position: relative;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .btn-close-modern {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #f7fafc;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: #f1f5f9;
   border: none;
-  font-size: 2rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #64748b;
+  transition: all 0.2s ease;
 }
 
 .btn-close-modern:hover {
-  background: #e53e3e;
-  color: white;
-  transform: rotate(90deg);
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .modal-header-modern {
+  text-align: center;
   margin-bottom: 1.5rem;
 }
 
 .modal-title {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-dark);
   margin-bottom: 0.25rem;
 }
 
 .modal-subtitle {
-  color: #718096;
+  color: var(--color-primary);
+  font-weight: 500;
   font-size: 0.9rem;
-  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .shop-modal-description {
-  color: #4a5568;
+  color: var(--color-text-muted);
   line-height: 1.6;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
 }
 
 .shop-modal-location {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  color: #667eea;
+  color: var(--color-text-dark);
   font-weight: 500;
+  background: var(--color-bg-alt);
+  padding: 1rem;
+  border-radius: 12px;
 }
 
-/* Modal Transition */
+/* Transitions */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.3s ease;
@@ -976,60 +1032,38 @@ const closeShopProfile = () => {
   opacity: 0;
 }
 
-.modal-fade-enter-active .modal-content-modern {
-  animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-  from {
-    transform: translateY(-50px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* Responsive Design */
+/* Responsive */
 @media (max-width: 768px) {
   .customer-home-page {
     padding: 1rem;
   }
-
-  .hero-search-section {
-    padding: 1.5rem;
-  }
-
-  .search-wrapper .d-flex {
+  
+  .carousel-container-centered {
     flex-direction: column;
   }
-
-  .btn-nearby {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .section {
-    padding: 1.5rem;
-  }
-
+  
   .carousel-btn {
-    width: 40px;
-    height: 40px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
   }
-
-  .fabric-name,
-  .shop-name {
-    font-size: 1.25rem;
+  
+  .carousel-btn.prev {
+    left: -10px;
   }
-
-  .price-amount {
-    font-size: 1.5rem;
+  
+  .carousel-btn.next {
+    right: -10px;
   }
-
-  .nearby-text {
-    display: none;
+  
+  .fabric-image,
+  .shop-image {
+    height: 200px;
+  }
+  
+  .modern-card {
+    padding: 1.5rem;
   }
 }
 </style>

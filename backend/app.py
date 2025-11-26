@@ -1,12 +1,10 @@
 import os
 import sys
-from flask import Flask, jsonify, send_from_directory, Response
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 from models.model import db
-from utils.seed_data import seed_minimal_data
 from config import Config
-import yaml
 
 # Environment Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -38,7 +36,9 @@ from routes.marketing_routes import marketing_bp
 from routes.distributor_routes import distributor_bp
 from routes.production_plan import production_bp
 from routes.pdf_service import pdf_bp
-from routes.catalog_routes import catalog_bp 
+from routes.catalog_routes import catalog_bp
+from routes.nearby_search import nearby_bp
+from routes.performance_routes import performance_bp 
 
 # Flask Application Setup
 app = Flask(
@@ -93,13 +93,15 @@ app.register_blueprint(image_bp, url_prefix="/api/v1/compare-images")
 app.register_blueprint(stores_bp, url_prefix="/api/v1/stores")
 app.register_blueprint(product_bp, url_prefix="/api/v1/products")
 app.register_blueprint(inquiry_bp, url_prefix="/api/v1/inquiry")
-app.register_blueprint(discovery_portal_bp, url_prefix="/api/v1/customer/discovery")
+app.register_blueprint(discovery_portal_bp, url_prefix="/api/v1/customer")
 app.register_blueprint(shop_explorer_bp, url_prefix="/api/v1/customer/shops")
 app.register_blueprint(marketing_bp, url_prefix="/api/v1/marketing")
 app.register_blueprint(distributor_bp, url_prefix="/api/v1/distributor")
 app.register_blueprint(production_bp, url_prefix="/api/v1/production")
 app.register_blueprint(pdf_bp, url_prefix="/api/v1/pdf")
 app.register_blueprint(catalog_bp, url_prefix="/api/v1/catalog")
+app.register_blueprint(nearby_bp)
+app.register_blueprint(performance_bp, url_prefix="/api/v1/performance")
 
 # Utility Routes
 @app.route("/uploads/<path:filename>")
@@ -130,13 +132,97 @@ def openapi_spec():
 @app.route("/health", methods=["GET"])
 def health_check():
     """Simple health check for monitoring."""
+    from utils.database_health import check_database_connection, get_database_pool_status
+    
+    db_healthy = check_database_connection()
+    pool_status = get_database_pool_status()
+    
     return jsonify({
-        "status": "ok",
+        "status": "ok" if db_healthy else "error",
         "service": "SE-Textile Backend",
         "version": "2.0.0",
-        "database": str(Config.SQLALCHEMY_DATABASE_URI),
+        "database": {
+            "connection": "healthy" if db_healthy else "unhealthy",
+            "uri": str(Config.SQLALCHEMY_DATABASE_URI),
+            "pool": pool_status
+        },
         "environment": Config.FLASK_ENV
-    }), 200
+    }), 200 if db_healthy else 503
+
+
+@app.route("/admin/recover-database", methods=["POST"])
+def recover_database():
+    """Admin endpoint to recover database connections."""
+    try:
+        from utils.connection_recovery import attempt_database_recovery, get_connection_recommendations
+        
+        success = attempt_database_recovery()
+        recommendations = get_connection_recommendations()
+        
+        return jsonify({
+            "status": "success" if success else "error",
+            "message": "Database recovery completed" if success else "Database recovery failed",
+            "recommendations": recommendations
+        }), 200 if success else 500
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Recovery failed: {str(e)}"
+        }), 500
+
+
+@app.route("/admin/db-status", methods=["GET"])
+def db_status():
+    """Admin endpoint to get database status."""
+    try:
+        from models.model import (
+            db, User, Shop, Product, SalesData, StoreRegion, 
+            ProductImage, Review, ExternalProduct, ExternalSalesDataItem,
+            SaleOrder, SalesLineItem
+        )
+        
+        stats = {
+            "users": User.query.count(),
+            "customers": User.query.filter_by(role='customer').count(),
+            "shop_owners": User.query.filter_by(role='shop_owner').count(),
+            "distributors": User.query.filter_by(role='distributor').count(),
+            "shops": Shop.query.count(),
+            "products": Product.query.count(),
+            "sales_records": SalesData.query.count(),
+            "store_regions": StoreRegion.query.count(),
+            "product_images": ProductImage.query.count(),
+            "reviews": Review.query.count(),
+            "external_products": ExternalProduct.query.count(),
+            "external_sales": ExternalSalesDataItem.query.count(),
+            "orders": SaleOrder.query.count(),
+            "order_items": SalesLineItem.query.count(),
+        }
+        
+        # Get detailed info
+        shops = Shop.query.all()
+        shop_details = []
+        for shop in shops:
+            owner = User.query.get(shop.owner_id)
+            product_count = Product.query.filter_by(shop_id=shop.id).count()
+            shop_details.append({
+                "name": shop.name,
+                "owner": owner.username if owner else "Unknown",
+                "products": product_count,
+                "city": shop.city
+            })
+        
+        return jsonify({
+            "status": "success",
+            "stats": stats,
+            "shop_details": shop_details
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to get status: {str(e)}"
+        }), 500
 
 
 @app.route("/", methods=["GET"])
@@ -162,13 +248,26 @@ def index():
     }), 200
 
 
+# Register database commands
+from utils.db_commands import register_commands
+register_commands(app)
+
+
 # Entry Point
 if __name__ == "__main__":
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     with app.app_context():
         db.create_all()
-        seed_summary = seed_minimal_data()
-        print("Seed summary:", seed_summary)
+        # Run comprehensive seeding on startup for development
+        if os.getenv("AUTO_SEED", "true").lower() == "true":
+            try:
+                from utils.comprehensive_seeding import seed_comprehensive_data
+                seed_summary = seed_comprehensive_data()
+                print("Comprehensive seeding completed!")
+                print("Seed summary:", seed_summary)
+            except Exception as e:
+                print(f"Seeding failed: {e}")
+                print("Continuing with application startup...")
 
     print("\nRegistered Flask Routes:")
     for rule in app.url_map.iter_rules():

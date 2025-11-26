@@ -13,7 +13,7 @@
           </p>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-gradient btn-sm" @click="uploadSalesData">
+          <button class="btn btn-gradient btn-sm" @click="handleUploadSalesData">
             <i class="bi bi-graph-up-arrow me-1"></i>
             Upload Sales Data
           </button>
@@ -124,12 +124,12 @@
                   >
                     <stop
                       offset="0%"
-                      stop-color="#667eea"
+                      stop-color="var(--color-primary)"
                       stop-opacity="0.15"
                     />
                     <stop
                       offset="100%"
-                      stop-color="#764ba2"
+                      stop-color="var(--color-accent)"
                       stop-opacity="0.02"
                     />
                   </linearGradient>
@@ -138,7 +138,7 @@
                 <path
                   d="M0,140 L50,130 L100,100 L150,110 L200,70 L250,60 L300,50 L350,35 L400,30"
                   fill="none"
-                  stroke="#667eea"
+                  stroke="var(--color-primary)"
                   stroke-width="3"
                   class="chart-path"
                 />
@@ -156,7 +156,7 @@
                   :cy="point.y"
                   r="6"
                   fill="#fff"
-                  stroke="#667eea"
+                  stroke="var(--color-primary)"
                   stroke-width="2.5"
                   class="chart-point"
                   @mouseenter="showTooltip(point)"
@@ -497,235 +497,144 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from 'vue';
+import { getShopDashboard, uploadSalesData as uploadSalesDataAPI, exportSalesData } from '@/api/apiShop';
 
-// Metrics Data
+// Loading and error states
+const loading = ref(false);
+const error = ref('');
+
+// Dashboard data from backend
+const dashboardData = ref(null);
+
+// Shop ID - get from logged-in user
+const shopId = computed(() => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  return user.shop_id || user.id; // Adjust based on your user object structure
+});
+
+// Metrics Data - dynamically populated from backend
 const metrics = ref([
   {
-    label: "Weekly Sales",
-    value: "₹26,700",
-    change: "+12%",
-    changeClass: "positive",
-    changeIcon: "bi bi-arrow-up",
-    icon: "bi bi-currency-rupee",
-    iconClass: "bg-success-soft",
+    label: 'Weekly Sales',
+    value: '₹0',
+    change: '+0%',
+    changeClass: 'positive',
+    changeIcon: 'bi bi-arrow-up',
+    icon: 'bi bi-currency-rupee',
+    iconClass: 'bg-success-soft',
   },
   {
-    label: "Pending Reorders",
-    value: "14",
-    change: "-3",
-    changeClass: "positive",
-    changeIcon: "bi bi-arrow-down",
-    icon: "bi bi-cart-check",
-    iconClass: "bg-warning-soft",
+    label: 'Pending Reorders',
+    value: '0',
+    change: '-0',
+    changeClass: 'positive',
+    changeIcon: 'bi bi-arrow-down',
+    icon: 'bi bi-cart-check',
+    iconClass: 'bg-warning-soft',
   },
   {
-    label: "Total Orders",
-    value: "147",
-    change: "+8%",
-    changeClass: "positive",
-    changeIcon: "bi bi-arrow-up",
-    icon: "bi bi-bag-check",
-    iconClass: "bg-primary-soft",
+    label: 'Total Orders',
+    value: '0',
+    change: '+0%',
+    changeClass: 'positive',
+    changeIcon: 'bi bi-arrow-up',
+    icon: 'bi bi-bag-check',
+    iconClass: 'bg-primary-soft',
   },
   {
-    label: "Customer Rating",
-    value: "4.8",
-    change: "+0.3",
-    changeClass: "positive",
-    changeIcon: "bi bi-arrow-up",
-    icon: "bi bi-star-fill",
-    iconClass: "bg-info-soft",
+    label: 'Customer Rating',
+    value: '0.0',
+    change: '+0',
+    changeClass: 'positive',
+    changeIcon: 'bi bi-arrow-up',
+    icon: 'bi bi-star-fill',
+    iconClass: 'bg-info-soft ',
   },
 ]);
 
-// Chart Points
+// Chart Points - from forecast data
 const chartPoints = ref([
-  { x: 0, y: 140, value: 3200 },
-  { x: 50, y: 130, value: 3500 },
-  { x: 100, y: 100, value: 4200 },
-  { x: 150, y: 110, value: 3900 },
-  { x: 200, y: 70, value: 5100 },
-  { x: 250, y: 60, value: 5400 },
-  { x: 300, y: 50, value: 5800 },
-  { x: 350, y: 35, value: 6200 },
+  { x: 0, y: 140, value: 0 },
+  { x: 50, y: 130, value: 0 },
+  { x: 100, y: 100, value: 0 },
+  { x: 150, y: 110, value: 0 },
+  { x: 200, y: 70, value: 0 },
+  { x: 250, y: 60, value: 0 },
+  { x: 300, y: 50, value: 0 },
+  { x: 350, y: 35, value: 0 },
 ]);
 
-// Forecasts
+// Forecasts - populated from backend
 const forecasts = ref([
   {
-    name: "Cotton",
-    icon: "bi bi-graph-up-arrow fs-3",
-    color: "#10b981",
-    iconBg: "bg-success-soft",
-    trend: "+20%",
-    trendIcon: "bi bi-arrow-up",
-    badgeClass: "trend-up",
+    name: 'Cotton',
+    icon: 'bi bi-graph-up-arrow fs-3',
+    color: '#10b981',
+    iconBg: 'bg-success-soft',
+    trend: '+0%',
+    trendIcon: 'bi bi-arrow-up',
+    badgeClass: 'trend-up',
   },
   {
-    name: "Silk",
-    icon: "bi bi-bar-chart-fill fs-3",
-    color: "#667eea",
-    iconBg: "bg-primary-soft",
-    trend: "Stable",
-    trendIcon: "bi bi-dash",
-    badgeClass: "trend-stable",
+    name: 'Silk',
+    icon: 'bi bi-bar-chart-fill fs-3',
+    color: 'var(--color-primary)',
+    iconBg: 'bg-primary-soft',
+    trend: 'Stable',
+    trendIcon: 'bi bi-dash',
+    badgeClass: 'trend-stable',
   },
   {
-    name: "Linen",
-    icon: "bi bi-graph-down-arrow fs-3",
-    color: "#ef4444",
-    iconBg: "bg-danger-soft",
-    trend: "-15%",
-    trendIcon: "bi bi-arrow-down",
-    badgeClass: "trend-down",
+    name: 'Linen',
+    icon: 'bi bi-graph-down-arrow fs-3',
+    color: '#ef4444',
+    iconBg: 'bg-danger-soft',
+    trend: '-0%',
+    trendIcon: 'bi bi-arrow-down',
+    badgeClass: 'trend-down',
   },
 ]);
 
-// AI Insights
-const aiInsights = ref([
-  {
-    icon: "bi bi-lightbulb-fill",
-    title: "Festive Season Alert",
-    description:
-      "Expect 20% increase in silk fabric demand during upcoming festive season. Consider increasing stock.",
-  },
-  {
-    icon: "bi bi-star-fill",
-    title: "Popular Product",
-    description:
-      "Handwoven Cotton is trending. Restock recommended to meet demand surge.",
-  },
-]);
+// AI Insights - from backend
+const aiInsights = ref([]);
 
 // Reorder Products with Images
 const reorderProducts = ref([
   {
-    name: "Premium Banarasi Silk",
-    image:
-      "https://images.unsplash.com/photo-1757382642968-0c8c9adbde0b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    supplier: "Varanasi Textiles",
+    name: 'Premium Banarasi Silk',
+    image: 'https://images.unsplash.com/photo-1757382642968-0c8c9adbde0b?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=500',
+    supplier: 'Varanasi Textiles',
     quantity: 23,
-    price: "₹1,999",
-    sku: "KMC7k1237938",
-  },
-  {
-    name: "Handwoven Cotton Fabric",
-    image:
-      "https://images.unsplash.com/photo-1630312584379-ee017b579993?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    supplier: "Gujarat Mills",
-    quantity: 45,
-    price: "₹899",
-    sku: "KMHCL25827",
-  },
-  {
-    name: "Designer Velvet Cloth",
-    image:
-      "https://images.unsplash.com/photo-1623658580841-217b1726a993?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    supplier: "Luxury Fabrics Co",
-    quantity: 18,
-    price: "₹2,499",
-    sku: "RTSJLKA357648",
-  },
-  {
-    name: "Pure Linen Fabric",
-    image:
-      "https://images.unsplash.com/photo-1616057732603-0439d9ace394?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
-    supplier: "Natural Textiles",
-    quantity: 32,
-    price: "₹1,299",
-    sku: "KPSJGVEA2533",
-  },
-  {
-    name: "Printed Cotton Blend",
-    image:
-      "https://images.unsplash.com/photo-1634225288911-b7622186f517?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
-    supplier: "Color Fabrics Ltd",
-    quantity: 56,
-    price: "₹799",
-    sku: "JKHYRSH44432",
+    price: '₹1,999',
+    sku: 'KMC7k1237938',
   },
 ]);
 
 // Available Products with Images
 const availableProducts = ref([
   {
-    name: "Handwoven Banarasi Silk",
-    image:
-      "https://images.unsplash.com/photo-1630961680768-998a170045fa?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    description: "Premium quality silk fabric with intricate golden patterns",
-    price: "₹2,499",
-    originalPrice: "₹2,999",
+    name: 'Handwoven Banarasi Silk',
+    image: 'https://images.unsplash.com/photo-1630961680768-998a170045fa?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=500',
+    description: 'Premium quality silk fabric with intricate golden patterns',
+    price: '₹2,499',
+    originalPrice: '₹2,999',
     discount: 500,
-    soldBy: "Heritage Textiles",
+    soldBy: 'Heritage Textiles',
     rating: 4.8,
     stock: 15,
-  },
-  {
-    name: "Organic Cotton Fabric",
-    image:
-      "https://images.unsplash.com/photo-1631089819675-ce4528460a32?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    description: "Soft and breathable pure cotton material",
-    price: "₹899",
-    originalPrice: "₹1,199",
-    discount: 300,
-    soldBy: "Green Fabrics Co",
-    rating: 4.6,
-    stock: 28,
-  },
-  {
-    name: "Luxury Velvet Cloth",
-    image:
-      "https://images.unsplash.com/photo-1613132962851-d054d7248a35?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    description: "Rich velvet texture perfect for premium garments",
-    price: "₹3,299",
-    soldBy: "Royal Fabrics",
-    rating: 4.9,
-    stock: 8,
-  },
-  {
-    name: "Pure Linen Material",
-    image:
-      "https://images.unsplash.com/photo-1666112514180-193096c14938?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    description: "Natural linen with excellent breathability",
-    price: "₹1,799",
-    originalPrice: "₹2,299",
-    discount: 500,
-    soldBy: "Eco Textiles",
-    rating: 4.5,
-    stock: 22,
-  },
-  {
-    name: "Vibrant Printed Cotton",
-    image:
-      "https://images.unsplash.com/photo-1639155330052-ef15046d5f09?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
-    description: "Colorful prints on soft cotton blend",
-    price: "₹1,099",
-    soldBy: "Modern Prints Ltd",
-    rating: 4.7,
-    stock: 35,
-  },
-  {
-    name: "Traditional Ikkat Silk",
-    image:
-      "https://images.unsplash.com/photo-1630961680574-158007a1fb73?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=500",
-    description: "Authentic ikkat pattern silk fabric",
-    price: "₹3,499",
-    soldBy: "Craft Textiles",
-    rating: 4.8,
-    stock: 12,
   },
 ]);
 
 // Product Filters
 const productFilters = ref([
-  { id: "all", label: "All", icon: "bi bi-grid" },
-  { id: "category", label: "Category", icon: "bi bi-palette-fill" },
-  { id: "price", label: "Price", icon: "bi bi-rulers" },
-  { id: "brand", label: "Brand", icon: "bi bi-tag-fill" },
+  { id: 'all', label: 'All', icon: 'bi bi-grid' },
+  { id: 'category', label: 'Category', icon: 'bi bi-palette-fill' },
+  { id: 'price', label: 'Price', icon: 'bi bi-rulers' },
+  { id: 'brand', label: 'Brand', icon: 'bi bi-tag-fill' },
 ]);
 
-const selectedFilter = ref("all");
+const selectedFilter = ref('all');
 
 // Carousel Controls
 const carouselTrack = ref(null);
@@ -738,55 +647,198 @@ const selectedProduct = ref(null);
 
 // Toast
 const showToast = ref(false);
-const toastMessage = ref("");
-const toastIcon = ref("bi bi-check-circle-fill");
+const toastMessage = ref('');
+const toastIcon = ref('bi bi-check-circle-fill');
 
-// Methods
-const uploadSalesData = () => {
-  toastMessage.value = "Upload dialog opened";
-  toastIcon.value = "bi bi-info-circle-fill";
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
+/**
+ * Fetch dashboard data from backend
+ */
+const fetchDashboard = async () => {
+  if (!shopId.value) {
+    error.value = 'Shop ID not found. Please log in again.';
+    return;
+  }
+
+  loading.value = true;
+  error.value = '';
+  try {
+    const response = await getShopDashboard(shopId.value);
+    if (response.data) {
+      dashboardData.value = response.data;
+      updateMetricsFromData(response.data);
+      updateForecastsFromData(response.data);
+      updateInsightsFromData(response.data);
+    }
+  } catch (err) {
+    console.error('[Dashboard Error]', err);
+    error.value = err.response?.data?.message || 'Failed to load dashboard';
+    // Keep default values if API fails
+  } finally {
+    loading.value = false;
+  }
 };
 
-const exportReport = () => {
-  toastMessage.value = "Exporting report...";
-  toastIcon.value = "bi bi-download";
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
+/**
+ * Update metrics from dashboard data
+ */
+const updateMetricsFromData = (data) => {
+  if (data.total_revenue !== undefined) {
+    metrics.value[0].value = `₹${parseFloat(data.total_revenue).toLocaleString()}`;
+  }
+  if (data.total_units !== undefined) {
+    metrics.value[2].value = data.total_units.toString();
+  }
+  // You can add more metric updates based on backend response
+};
+
+/**
+ * Update forecasts from dashboard data
+ */
+const updateForecastsFromData = (data) => {
+  if (data.forecast && data.forecast.length > 0) {
+    // Map forecast data to chart points for visualization
+    const forecastData = data.forecast.slice(0, 8); // First 8 points
+    chartPoints.value = forecastData.map((point, idx) => ({
+      x: idx * 50,
+      y: 140 - (point.yhat / 100), // Adjust based on your data scale
+      value: point.yhat
+    }));
+  }
+};
+
+/**
+ * Update AI insights from dashboard data
+ */
+const updateInsightsFromData = (data) => {
+  if (data.ai_insights) {
+    aiInsights.value = [
+      {
+        icon: 'bi bi-lightbulb-fill',
+        title: 'AI Recommendation',
+        description: data.ai_insights
+      }
+    ];
+  } else {
+    // Default insights
+    aiInsights.value = [
+      {
+        icon: 'bi bi-lightbulb-fill',
+        title: 'Upload Sales Data',
+        description: 'Upload your sales data to get AI-powered insights and forecasts.'
+      }
+    ];
+  }
+};
+
+/**
+ * Upload sales data file
+ */
+const handleUploadSalesData = async () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.xlsx,.xls';
+  
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file size (16MB max)
+    if (file.size > 16 * 1024 * 1024) {
+      toastMessage.value = 'File too large (max 16MB)';
+      toastIcon.value = 'bi bi-exclamation-circle-fill';
+      showToast.value = true;
+      setTimeout(() => (showToast.value = false), 3000);
+      return;
+    }
+
+    loading.value = true;
+    try {
+      toastMessage.value = 'Uploading sales data...';
+      toastIcon.value = 'bi bi-upload';
+      showToast.value = true;
+
+      await uploadSalesDataAPI(shopId.value, file);
+      
+      toastMessage.value = 'Sales data uploaded successfully!';
+      toastIcon.value = 'bi bi-check-circle-fill';
+      
+      // Refresh dashboard after upload
+      await fetchDashboard();
+    } catch (err) {
+      console.error('[Upload Error]', err);
+      toastMessage.value = err.response?.data?.message || 'Upload failed';
+      toastIcon.value = 'bi bi-exclamation-circle-fill';
+    } finally {
+      loading.value = false;
+      setTimeout(() => (showToast.value = false), 3000);
+    }
+  };
+  
+  input.click();
+};
+
+/**
+ * Export sales report
+ */
+const exportReport = async () => {
+  try {
+    toastMessage.value = 'Exporting report...';
+    toastIcon.value = 'bi bi-download';
+    showToast.value = true;
+
+    const response = await exportSalesData(shopId.value);
+    
+    // Create download link
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sales_report_${shopId.value}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    toastMessage.value = 'Report exported successfully!';
+    toastIcon.value = 'bi bi-check-circle-fill';
+  } catch (err) {
+    console.error('[Export Error]', err);
+    toastMessage.value = err.response?.data?.message || 'Export failed';
+    toastIcon.value = 'bi bi-exclamation-circle-fill';
+  } finally {
+    setTimeout(() => (showToast.value = false), 3000);
+  }
 };
 
 const viewSalesReport = () => {
-  toastMessage.value = "Opening detailed sales report...";
-  toastIcon.value = "bi bi-file-earmark-bar-graph";
+  toastMessage.value = 'Opening detailed sales report...';
+  toastIcon.value = 'bi bi-file-earmark-bar-graph';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
 
 const viewDetailedChart = () => {
-  toastMessage.value = "Opening chart analytics...";
-  toastIcon.value = "bi bi-graph-up";
+  toastMessage.value = 'Opening chart analytics...';
+  toastIcon.value = 'bi bi-graph-up';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
 
 const viewForecastDetails = (forecast) => {
   toastMessage.value = `Viewing ${forecast.name} forecast details`;
-  toastIcon.value = "bi bi-calendar-check";
+  toastIcon.value = 'bi bi-calendar-check';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
 
 const applyInsight = (insight) => {
   toastMessage.value = `Applied: ${insight.title}`;
-  toastIcon.value = "bi bi-check-circle-fill";
+  toastIcon.value = 'bi bi-check-circle-fill';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
 
 const viewAllSuggestions = () => {
-  toastMessage.value = "Loading all suggestions...";
-  toastIcon.value = "bi bi-grid-3x3-gap";
+  toastMessage.value = 'Loading all suggestions...';
+  toastIcon.value = 'bi bi-grid-3x3-gap';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
@@ -794,7 +846,7 @@ const viewAllSuggestions = () => {
 const scrollCarousel = (direction) => {
   const track = carouselTrack.value;
   const scrollAmount = 280;
-  if (direction === "left") {
+  if (direction === 'left') {
     track.scrollLeft -= scrollAmount;
   } else {
     track.scrollLeft += scrollAmount;
@@ -817,7 +869,7 @@ const viewProduct = (product) => {
 
 const addToCart = (product) => {
   toastMessage.value = `${product.name} added to cart!`;
-  toastIcon.value = "bi bi-cart-check-fill";
+  toastIcon.value = 'bi bi-cart-check-fill';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
@@ -825,7 +877,7 @@ const addToCart = (product) => {
 const selectFilter = (filterId) => {
   selectedFilter.value = filterId;
   toastMessage.value = `Filter applied: ${productFilters.value.find((f) => f.id === filterId).label}`;
-  toastIcon.value = "bi bi-funnel-fill";
+  toastIcon.value = 'bi bi-funnel-fill';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
@@ -846,14 +898,16 @@ const closeQuickView = () => {
 };
 
 const showTooltip = (point) => {
-  console.log("Sales:", point.value);
+  console.log('Sales:', point.value);
 };
 
 const hideTooltip = () => {
-  console.log("Hide tooltip");
+  console.log('Hide tooltip');
 };
 
+// Fetch dashboard on mount
 onMounted(() => {
+  fetchDashboard();
   updateArrows();
 });
 </script>
@@ -861,7 +915,7 @@ onMounted(() => {
 <style scoped>
 /* ===== Base Styles ===== */
 .shop-dashboard-tab {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
   min-height: calc(100vh - 60px);
   padding: 2rem;
   animation: fadeIn 0.5s ease-in;
@@ -909,7 +963,7 @@ onMounted(() => {
 }
 
 h6.card-title {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -920,16 +974,16 @@ h6.card-title {
 .dashboard-hero {
   background: linear-gradient(
     135deg,
-    rgba(102, 126, 234, 0.1) 0%,
+    rgba(242, 190, 209, 0.1) 0%,
     rgba(118, 75, 162, 0.1) 100%
   );
   border-radius: 16px;
   padding: 1.5rem;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(242, 190, 209, 0.2);
 }
 
 .hero-title {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -938,43 +992,43 @@ h6.card-title {
 }
 
 .hero-subtitle {
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
 }
 
 /* ===== Buttons ===== */
 .btn-gradient {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border: none;
   color: white;
   font-weight: 500;
   border-radius: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
 }
 
 .btn-gradient:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-  background: linear-gradient(135deg, #5568d3 0%, #65408b 100%);
+  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
   color: white;
 }
 
 .btn-outline-gradient {
-  border: 1.5px solid #667eea;
+  border: 1.5px solid var(--color-primary);
   background: transparent;
-  color: #667eea;
+  color: var(--color-primary);
   font-weight: 500;
   border-radius: 8px;
   transition: all 0.3s ease;
 }
 
 .btn-outline-gradient:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: #667eea;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  border-color: var(--color-primary);
   color: white;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.3);
 }
 
 /* ===== Metric Cards ===== */
@@ -997,7 +1051,7 @@ h6.card-title {
   left: 0;
   width: 100%;
   height: 3px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 100%);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.3s ease;
@@ -1015,7 +1069,7 @@ h6.card-title {
 }
 
 .metric-label {
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1035,7 +1089,7 @@ h6.card-title {
 .metric-value {
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1088,10 +1142,10 @@ h6.card-title {
 .summary-content {
   background: linear-gradient(
     135deg,
-    rgba(102, 126, 234, 0.05) 0%,
+    rgba(242, 190, 209, 0.05) 0%,
     rgba(118, 75, 162, 0.05) 100%
   );
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(242, 190, 209, 0.1);
   border-radius: 12px;
 }
 
@@ -1109,7 +1163,7 @@ h6.card-title {
 
 /* ===== Chart ===== */
 .chart-placeholder {
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  background: linear-gradient(135deg, rgba(242, 190, 209, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
   border-radius: 12px;
   padding: 1.5rem 1rem 0.5rem 1rem;
 }
@@ -1130,17 +1184,17 @@ h6.card-title {
 
 .chart-point:hover {
   r: 8;
-  filter: drop-shadow(0 2px 8px rgba(102, 126, 234, 0.5));
+  filter: drop-shadow(0 2px 8px rgba(242, 190, 209, 0.5));
 }
 
 /* ===== Forecast Section ===== */
 .forecast-container {
   background: linear-gradient(
     135deg,
-    rgba(102, 126, 234, 0.05) 0%,
+    rgba(242, 190, 209, 0.05) 0%,
     rgba(118, 75, 162, 0.05) 100%
   );
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(242, 190, 209, 0.1);
   border-radius: 12px;
 }
 
@@ -1181,8 +1235,8 @@ h6.card-title {
 }
 
 .trend-stable {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  background: rgba(242, 190, 209, 0.1);
+  color: var(--color-primary);
 }
 
 .trend-down {
@@ -1199,24 +1253,24 @@ h6.card-title {
   padding: 1rem;
   background: linear-gradient(
     135deg,
-    rgba(102, 126, 234, 0.03) 0%,
+    rgba(242, 190, 209, 0.03) 0%,
     rgba(118, 75, 162, 0.03) 100%
   );
   border-radius: 12px;
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(242, 190, 209, 0.1);
   transition: all 0.3s ease;
 }
 
 .insight-item:hover {
-  border-color: rgba(102, 126, 234, 0.3);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+  border-color: rgba(242, 190, 209, 0.3);
+  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.1);
   transform: translateX(4px);
 }
 
 .insight-icon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   border-radius: 10px;
   display: flex;
@@ -1237,7 +1291,7 @@ h6.card-title {
   scroll-behavior: smooth;
   padding: 1rem 0;
   scrollbar-width: thin;
-  scrollbar-color: #667eea #f1f1f1;
+  scrollbar-color: var(--color-primary) #f1f1f1;
 }
 
 .carousel-track::-webkit-scrollbar {
@@ -1250,12 +1304,12 @@ h6.card-title {
 }
 
 .carousel-track::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border-radius: 10px;
 }
 
 .carousel-track::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, #5568d3 0%, #65408b 100%);
+  background: linear-gradient(90deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
 .carousel-nav-btn {
@@ -1265,7 +1319,7 @@ h6.card-title {
   width: 40px;
   height: 40px;
   background: white;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(242, 190, 209, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1277,7 +1331,7 @@ h6.card-title {
 }
 
 .carousel-nav-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   transform: translateY(-50%) scale(1.1);
 }
@@ -1303,7 +1357,7 @@ h6.card-title {
 
 .reorder-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 12px 40px rgba(242, 190, 209, 0.2);
 }
 
 .product-image-wrapper {
@@ -1345,13 +1399,13 @@ h6.card-title {
 .product-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-dark);
   margin-bottom: 0.5rem;
 }
 
 .product-supplier {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   margin-bottom: 0.75rem;
 }
 
@@ -1362,7 +1416,7 @@ h6.card-title {
 }
 
 .product-price {
-  color: #667eea;
+  color: var(--color-primary);
 }
 
 .product-sku {
@@ -1377,7 +1431,7 @@ h6.card-title {
   border-radius: 20px;
   border: 1.5px solid #e9ecef;
   background: white;
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -1385,16 +1439,16 @@ h6.card-title {
 }
 
 .filter-chip:hover {
-  border-color: #667eea;
-  color: #667eea;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   transform: translateY(-2px);
 }
 
 .filter-chip.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: #667eea;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  border-color: var(--color-primary);
   color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
 }
 
 /* ===== Products Grid ===== */
@@ -1416,7 +1470,7 @@ h6.card-title {
 
 .product-grid-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 12px 40px rgba(242, 190, 209, 0.2);
 }
 
 .product-grid-image {
@@ -1473,7 +1527,7 @@ h6.card-title {
 .product-grid-name {
   font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-dark);
 }
 
 .rating {
@@ -1484,7 +1538,7 @@ h6.card-title {
 
 .product-description {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -1494,7 +1548,7 @@ h6.card-title {
 
 .supplier-info strong,
 .stock-info strong {
-  color: #1f2937;
+  color: var(--color-text-dark);
 }
 
 .product-grid-footer {
@@ -1508,7 +1562,7 @@ h6.card-title {
 .current-price {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #667eea;
+  color: var(--color-primary);
 }
 
 .original-price {
@@ -1573,7 +1627,7 @@ h6.card-title {
 }
 
 .modal-close-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   transform: rotate(90deg);
 }
@@ -1581,7 +1635,7 @@ h6.card-title {
 .price-large {
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1644,7 +1698,7 @@ h6.card-title {
 
 /* ===== Section Title ===== */
 .section-title {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

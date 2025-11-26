@@ -2,14 +2,14 @@
 from flask import Blueprint, jsonify, request, send_file
 import pandas as pd
 from datetime import datetime
-from prophet import Prophet
 import os
 import io
-from google.generativeai import configure, GenerativeModel
+from services.ai_providers import get_provider
 from utils.auth_utils import token_required, roles_required
-from utils.validation import validate_file_upload
+from utils.performance_utils import performance_monitor
+from utils.file_processing_utils import safe_file_processing, FileProcessingError
+from services.prophet_service import prophet_manager
 from services.forecasting_service import (
-    forecast_sales,
     compute_regional_summary,
     top_trending_products,
 )
@@ -20,15 +20,23 @@ from services.ai_service import (
 from routes.pdf_service import generate_pdf_report
 from models.model import Product, SalesData
 
-configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-
 distributor_bp = Blueprint("distributor", __name__)
+
+# Global AI provider
+ai_provider = None
+try:
+    ai_provider = get_provider()
+    print(f"Distributor routes AI Provider initialized: {ai_provider.__class__.__name__}")
+except Exception as e:
+    print(f"Failed to initialize AI provider for distributor routes: {e}")
+    ai_provider = None
 
 
 # POST: Regional Demand & AI Forecast Insights
 @distributor_bp.route("/regional-demand", methods=["POST"])
 @token_required
 @roles_required('distributor', 'manufacturer')
+@performance_monitor
 def get_regional_demand(current_user):
     """
     Generate AI-powered regional demand insights and sales forecasting.
@@ -40,26 +48,22 @@ def get_regional_demand(current_user):
         if not file:
             return jsonify({"status": "error", "message": "No input file provided"}), 400
         
-        # Validate file upload
-        is_valid, message = validate_file_upload(file, ['.csv', '.xlsx'], max_size_mb=16)
-        if not is_valid:
-            return jsonify({"status": "error", "message": message}), 400
-
-        # Read CSV or XLSX dynamically
-        if file.filename.endswith(".csv"):
-            df = pd.read_csv(file)
-        elif file.filename.endswith(".xlsx"):
-            df = pd.read_excel(file)
-        else:
-            return jsonify({"status": "error", "message": "Unsupported file format"}), 400
-
-        # Validate required columns
-        required_columns = {"Region", "Product", "Date", "Sales"}
-        if not required_columns.issubset(df.columns):
+        # Define required columns for sales data
+        required_columns = ['Date', 'Region', 'Product', 'Sales', 'Quantity']
+        
+        # Process file safely with optimizations
+        file_result = safe_file_processing(file, file.filename.split('.')[-1], required_columns)
+        
+        if file_result['status'] == 'error':
             return jsonify({
-                "status": "error",
-                "message": f"Missing required columns: {', '.join(required_columns - set(df.columns))}"
+                "status": "error", 
+                "message": file_result['message']
             }), 400
+        
+        df = file_result['data']
+        
+        # Log processing stats for monitoring
+        print(f"[PERF] Processed {file_result['rows']} rows, {file_result['memory_usage']} bytes")
 
         # Data processing through forecasting services
         regional_data = compute_regional_summary(df)
@@ -87,6 +91,11 @@ def get_regional_demand(current_user):
             "data": insights
         }), 200
 
+    except FileProcessingError as e:
+        return jsonify({
+            "status": "error",
+            "message": f"File processing error: {str(e)}"
+        }), 400
     except Exception as e:
         print("Error in /regional-demand:", e)
         return jsonify({
@@ -156,14 +165,16 @@ def _generate_production_ai_summary(df, forecast_df):
         3. A one-line summary for the overall production strategy.
         """
 
-        model = GenerativeModel("gemini-1.5-flash")
-        result = model.generate_content(summary_prompt)
+        if not ai_provider:
+            return "AI provider not configured for production insights."
 
-        return result.text.strip() if result and result.text else (
+        result = ai_provider.generate_text(summary_prompt)
+
+        return result if result else (
             "Increase silk and cotton; maintain linen; reduce wool production due to declining demand."
         )
 
-    except Exception as exc:  # pragma: no cover - fallback messaging
+    except Exception as exc:
         print("[AI Production Plan Error]", exc)
         return "Unable to generate AI insights currently."
 
@@ -211,10 +222,22 @@ def distributor_production_plan(current_user):
         if df.empty:
             return jsonify({"status": "error", "message": "No valid Date/Sales rows after parsing"}), 400
 
-        model = Prophet()
-        model.fit(df[["ds", "y"]])
-        future = model.make_future_dataframe(periods=30)
-        forecast = model.predict(future)
+        # Use optimized Prophet service
+        try:
+            forecast_data, metrics = prophet_manager.forecast_sales(df[["ds", "y"]], periods=30)
+            
+            # Convert back to expected format for AI summary
+            forecast = pd.DataFrame({
+                'ds': forecast_data['ds'],
+                'yhat': forecast_data['yhat'],
+                'yhat_lower': forecast_data['yhat_lower'],
+                'yhat_upper': forecast_data['yhat_upper']
+            })
+            
+            print(f"[Optimized Prophet] Forecast generated in {metrics.get('forecast_time_seconds', 0):.2f}s")
+            
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Forecasting failed: {str(e)}"}), 500
 
         ai_summary = _generate_production_ai_summary(df, forecast)
 
@@ -364,3 +387,59 @@ def generate_regional_report(current_user):
     except Exception as e:
         print("PDF generation failed:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# GET: Prophet Model Performance Metrics
+@distributor_bp.route("/prophet-metrics", methods=["GET"])
+@token_required
+@performance_monitor
+def get_prophet_metrics(current_user):
+    """Get Prophet model performance and cache statistics"""
+    try:
+        cache_stats = prophet_manager.get_cache_stats()
+        
+        return jsonify({
+            "status": "success",
+            "prophet_metrics": {
+                "cached_models": cache_stats["cached_models"],
+                "max_cache_size": cache_stats["max_cache_size"],
+                "cache_hit_ratio": cache_stats["cache_hit_ratio"],
+                "memory_usage_estimate_mb": cache_stats["memory_usage_estimate"],
+                "optimization_features": {
+                    "textile_seasonality": True,
+                    "outlier_detection": True,
+                    "data_validation": True,
+                    "model_caching": True,
+                    "performance_monitoring": True
+                },
+                "configuration": {
+                    "weekly_seasonality": True,
+                    "yearly_seasonality": True,
+                    "daily_seasonality": False,
+                    "changepoint_prior_scale": 0.05,
+                    "seasonality_prior_scale": 10.0,
+                    "interval_width": 0.8
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to get metrics: {str(e)}"}), 500
+
+
+# POST: Clear Prophet Model Cache
+@distributor_bp.route("/prophet-cache-clear", methods=["POST"])
+@token_required
+@roles_required('distributor', 'manufacturer')
+def clear_prophet_cache(current_user):
+    """Clear Prophet model cache (admin operation)"""
+    try:
+        prophet_manager.clear_cache()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Prophet model cache cleared successfully"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to clear cache: {str(e)}"}), 500

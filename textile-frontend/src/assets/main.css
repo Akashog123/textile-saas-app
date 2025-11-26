@@ -1,10 +1,15 @@
-/* Global app styles (small, focused additions for dashboard views) */
+/* Global app styles */
 :root {
+  --color-bg-light: #F9F5F6;   /* rgb(249, 245, 246) */
+  --color-bg-alt: #F8E8EE;     /* rgb(248, 232, 238) */
+  --color-accent: #FDCEDF;     /* rgb(253, 206, 223) */
+  --color-primary: #F2BED1;    /* rgb(242, 190, 209) */
+  
   --bg-card: #ffffff;
   --muted: #7a6f64;
-  --bg: #f7f2ec;
+  --bg: var(--color-bg-light);
   --card: #ffffff;
-  --accent: #d7b75a;
+  --accent: var(--color-primary);
 }
 
 body {
@@ -48,19 +53,16 @@ body {
   border-bottom: none;
 }
 
-/* small utility for badges shown in dashboard */
 .badge-light {
   background: #f3f4f6;
   color: #111827;
 }
 
-/* Ensure forms and other components keep consistent font smoothing */
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Responsive grid fallback for older browsers */
 @media (max-width: 768px) {
   .dashboard-grid {
     grid-template-columns: 1fr !important;
@@ -97,7 +99,6 @@ body,
   grid-column: 2 / span 1;
 }
 
-/* On small screens collapse to single column */
 @media (max-width: 900px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -172,19 +173,15 @@ body,
   font-weight: 700;
 }
 
-/* subtle responsive tweaks */
 @media (max-width: 575px) {
   .display-6 {
     font-size: 1.2rem;
   }
 }
 
-/* badges & tiny helpers */
 .badge {
   font-weight: 600;
 }
-
-/* ensure cards look elevated on light bg */
 .card {
   border: none;
   border-radius: 10px;
