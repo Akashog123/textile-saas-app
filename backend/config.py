@@ -42,6 +42,16 @@ class Config:
     for path in [UPLOAD_FOLDER, os.path.dirname(FAISS_INDEX_PATH), DATA_DIR]:
         os.makedirs(path, exist_ok=True)
 
+    # JWT Configuration
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
+    JWT_EXPIRATION_DAYS = int(os.getenv("JWT_EXPIRATION_DAYS", 7))
+    JWT_ALGORITHM = "HS256"
+
+    # Password Policy
+    PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", 8))
+    PASSWORD_REQUIRE_LETTER = os.getenv("PASSWORD_REQUIRE_LETTER", "True").lower() == "true"
+    PASSWORD_REQUIRE_NUMBER = os.getenv("PASSWORD_REQUIRE_NUMBER", "True").lower() == "true"
+
     # FILE LIMITS & FORMATS
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH_MB", 16)) * 1024 * 1024
     ALLOWED_EXTENSIONS = {"csv", "xlsx", "png", "jpg", "jpeg", "pdf"}
@@ -53,7 +63,19 @@ class Config:
 
     # SERVER SETTINGS
     PORT = int(os.getenv("PORT", 8000))
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")  # supports multiple origins via CORS(app, ...)
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+    
+    # IMAGE SERVING CONFIGURATION
+    # Base URL for serving images (use production domain in production)
+    API_BASE_URL = os.getenv("API_BASE_URL", f"http://127.0.0.1:{PORT}")
+    
+    # Image serving paths
+    STATIC_IMAGE_PATH = "/uploads"  # URL path prefix for uploaded images
+    DATASET_IMAGE_PATH = "/datasets"  # URL path prefix for dataset images
+    
+    # Fallback placeholder images
+    PLACEHOLDER_IMAGE_SERVICE = os.getenv("PLACEHOLDER_IMAGE_SERVICE", "https://placehold.co")
+    USE_PLACEHOLDER_IMAGES = os.getenv("USE_PLACEHOLDER_IMAGES", "True").lower() == "true"
 
 
 # Export ready-to-use config instance

@@ -3,6 +3,8 @@ from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from models.model import db, Shop, User, Notification
+from utils.auth_utils import token_required
+from utils.validation import validate_file_upload
 from services.ai_service import generate_ai_caption, analyze_fabric_inquiry
 
 inquiry_bp = Blueprint("inquiry", __name__, url_prefix="/api/v1/inquiry")
@@ -36,7 +38,8 @@ def save_inquiry_file(file):
 
 # POST: Submit + Analyze Fabric Inquiry (AI + Save)
 @inquiry_bp.route("/submit", methods=["POST"])
-def submit_inquiry():
+@token_required
+def submit_inquiry(current_user):
     """
     Allow customers or shop owners to submit a fabric inquiry with optional image/file attachment.
     Automatically runs Gemini-based AI analysis on the uploaded fabric image.
@@ -48,21 +51,26 @@ def submit_inquiry():
         data = request.form or request.get_json(silent=True) or {}
 
         shop_id = data.get("shop_id")
-        user_id = data.get("user_id")
-        username = data.get("username", "Anonymous")
         message = data.get("message", "").strip()
         file = request.files.get("file")
+        
+        user_id = current_user.get("id")
+        username = current_user.get("username", "User")
 
         # Validate required fields
         if not shop_id:
             return jsonify({"status": "error", "message": "shop_id is required"}), 400
-        if not user_id:
-            return jsonify({"status": "error", "message": "user_id is required"}), 400
 
         # Validate shop
         shop = Shop.query.get(shop_id)
         if not shop:
             return jsonify({"status": "error", "message": "Invalid shop ID"}), 404
+        
+        # Validate file if provided
+        if file:
+            is_valid, file_message = validate_file_upload(file, ['.png', '.jpg', '.jpeg', '.gif', '.pdf'], max_size_mb=10)
+            if not is_valid:
+                return jsonify({"status": "error", "message": file_message}), 400
 
         # Save uploaded file (if any)
         file_path = save_inquiry_file(file)
@@ -115,20 +123,20 @@ def submit_inquiry():
         }), 500
 
 
-# GET: Inquiry History for Shop/User (No JWT)
+# GET: Inquiry History for Shop/User
 @inquiry_bp.route("/history", methods=["GET"])
-def inquiry_history():
-    """Fetch all inquiries (notifications) made by a given user or shop."""
+@token_required
+def inquiry_history(current_user):
+    """Fetch all inquiries (notifications) made by the current authenticated user."""
     try:
-        print("[Info] Incoming query params:", request.args)
-
-        user_id = request.args.get("user_id")
-        role = request.args.get("role", "user")
+        print("[Info] Fetching history for user:", current_user)
+        
+        user_id = current_user.get("id")
+        role = current_user.get("role", "customer").lower()
 
         if not user_id:
             return jsonify({"status": "error", "message": "user_id is required"}), 400
 
-        # For shop owners → show inquiries related to their shop
         if role == "shop_owner":
             shop = Shop.query.filter_by(owner_id=user_id).first()
             if not shop:
@@ -138,7 +146,6 @@ def inquiry_history():
                 Notification.message.ilike(f"%{shop.name}%")
             ).order_by(Notification.created_at.desc()).all()
         else:
-            # For regular users
             messages = Notification.query.filter_by(
                 user_id=user_id
             ).order_by(Notification.created_at.desc()).all()

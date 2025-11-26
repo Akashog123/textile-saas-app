@@ -4,6 +4,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, send_file
 from models.model import db, SalesData
+from utils.auth_utils import token_required, roles_required, check_shop_ownership
+from utils.validation import validate_shop_id, validate_file_upload
 from services.ai_service import (
     forecast_trends,
     generate_demand_summary,
@@ -18,7 +20,8 @@ INSTANCE_FOLDER = Config.DATA_DIR
 
 # GET: AI-POWERED SHOP DASHBOARD + AUTO NEXT-MONTH FORECAST
 @shop_bp.route("/dashboard", methods=["GET"])
-def shop_dashboard():
+@token_required
+def shop_dashboard(current_user):
     """
     AI-powered shop dashboard
     - Reads uploaded monthly CSV
@@ -28,6 +31,10 @@ def shop_dashboard():
     shop_id = request.args.get("shop_id", type=int)
     if not shop_id:
         return jsonify({"status": "error", "message": "shop_id is required."}), 400
+    
+    # Validate ownership
+    if not check_shop_ownership(current_user.get("id"), shop_id):
+        return jsonify({"status": "error", "message": "You don't have permission to access this shop"}), 403
 
     sales_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
 
@@ -206,12 +213,23 @@ def shop_dashboard():
 
 # Upload Sales CSV
 @shop_bp.route("/upload_sales_data", methods=["POST"])
-def upload_sales_data():
+@token_required
+@roles_required('shop_owner', 'shop_manager')
+def upload_sales_data(current_user):
     try:
         shop_id = request.form.get("shop_id")
         file = request.files.get("file")
         if not shop_id or not file:
             return jsonify({"status": "error", "message": "Missing shop_id or file."}), 400
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to manage this shop"}), 403
+        
+        # Validate file upload
+        is_valid, message = validate_file_upload(file, ['.csv'], max_size_mb=16)
+        if not is_valid:
+            return jsonify({"status": "error", "message": message}), 400
 
         save_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
         file.save(save_path)
@@ -224,11 +242,16 @@ def upload_sales_data():
 
 # Export Sales Report
 @shop_bp.route("/sales/export", methods=["GET"])
-def export_sales():
+@token_required
+def export_sales(current_user):
     try:
         shop_id = request.args.get("shop_id", type=int)
         if not shop_id:
             return jsonify({"status": "error", "message": "shop_id is required."}), 400
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to export this shop's data"}), 403
 
         sales_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
         if not os.path.exists(sales_path):

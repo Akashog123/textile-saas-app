@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request, send_file
-from models.model import db, Product, Inventory, SalesData, ProductCatalog,Shop
+from models.model import db, Product, Inventory, SalesData, ProductCatalog, Shop
+from utils.auth_utils import token_required, roles_required, check_shop_ownership
+from utils.validation import validate_shop_id, validate_product_id, validate_price, validate_quantity, validate_file_upload
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
@@ -8,12 +10,17 @@ inventory_bp = Blueprint("inventory", __name__)
 
 # Fetch Inventory Items for a Shop
 @inventory_bp.route("/", methods=["GET"])
-def get_inventory():
+@token_required
+def get_inventory(current_user):
     """Fetch all inventory products for a given shop."""
     try:
         shop_id = request.args.get("shop_id")
         if not shop_id:
             return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        
+        # Validate shop ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to access this shop"}), 403
 
         products = Product.query.filter_by(shop_id=shop_id).order_by(Product.created_at.desc()).all()
         if products:
@@ -71,9 +78,9 @@ def get_inventory():
                 "sku": f"AUTO-{row['product_id']}",
                 "rating": 4.2,
                 "image": (
-                    f"http://127.0.0.1:5001{pinfo.get('image_url', '')}"
+                    f"{Config.API_BASE_URL}{pinfo.get('image_url', '')}"
                     if pinfo.get("image_url")
-                    else "https://placehold.co/400x300?text=No+Image"
+                    else f"{Config.PLACEHOLDER_IMAGE_SERVICE}/400x300?text=No+Image"
                 ),
                 "shop_id": shop_id
             })
@@ -91,7 +98,9 @@ def get_inventory():
 
 # Import Inventory via CSV or Excel
 @inventory_bp.route("/import", methods=["POST"])
-def import_inventory():
+@token_required
+@roles_required('shop_owner', 'shop_manager')
+def import_inventory(current_user):
     """Upload inventory via CSV/Excel for a shop."""
     try:
         file = request.files.get("file")
@@ -99,6 +108,15 @@ def import_inventory():
 
         if not file or not shop_id_raw:
             return jsonify({"status": "error", "message": "Missing file or shop_id"}), 400
+        
+        # Validate shop ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id_raw):
+            return jsonify({"status": "error", "message": "You don't have permission to manage this shop"}), 403
+        
+        # Validate file upload
+        is_valid, message = validate_file_upload(file, ['.csv', '.xlsx', '.xls'], max_size_mb=16)
+        if not is_valid:
+            return jsonify({"status": "error", "message": message}), 400
 
         filename = file.filename.lower()
         if filename.endswith(".csv"):
@@ -218,7 +236,8 @@ def import_inventory():
 
 # Edit Inventory (price, stock)
 @inventory_bp.route("/edit", methods=["POST"])
-def edit_inventory():
+@token_required
+def edit_inventory(current_user):
     """Edit price or stock of a product."""
     try:
         data = request.get_json()
@@ -232,15 +251,28 @@ def edit_inventory():
         product = Product.query.get(product_id)
         if not product:
             return jsonify({"status": "error", "message": "Product not found"}), 404
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), product.shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to edit this product"}), 403
 
         if price is not None:
-            product.price = float(price)
+            try:
+                validated_price = validate_price(price)
+                product.price = validated_price
+            except ValueError as e:
+                return jsonify({"status": "error", "message": str(e)}), 400
 
         inv = Inventory.query.filter_by(product_id=product_id).first()
-        if inv:
-            inv.qty_available = int(stock or inv.qty_available)
-        elif stock is not None:
-            db.session.add(Inventory(product_id=product.id, qty_available=int(stock)))
+        if stock is not None:
+            try:
+                validated_stock = validate_quantity(stock)
+                if inv:
+                    inv.qty_available = validated_stock
+                else:
+                    db.session.add(Inventory(product_id=product.id, qty_available=validated_stock))
+            except ValueError as e:
+                return jsonify({"status": "error", "message": str(e)}), 400
 
         db.session.commit()
         return jsonify({"status": "success", "message": "Inventory updated successfully"}), 200
@@ -252,7 +284,8 @@ def edit_inventory():
 
 # Delete Product
 @inventory_bp.route("/delete", methods=["DELETE"])
-def delete_inventory():
+@token_required
+def delete_inventory(current_user):
     """Delete a product and its inventory entry."""
     try:
         product_id = request.args.get("product_id")
@@ -262,6 +295,10 @@ def delete_inventory():
         product = Product.query.get(product_id)
         if not product:
             return jsonify({"status": "error", "message": "Product not found"}), 404
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), product.shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to delete this product"}), 403
 
         Inventory.query.filter_by(product_id=product_id).delete()
         db.session.delete(product)
@@ -275,12 +312,17 @@ def delete_inventory():
 
 # Export Inventory as Excel
 @inventory_bp.route("/export", methods=["GET"])
-def export_inventory():
+@token_required
+def export_inventory(current_user):
     """Download all inventory for a shop as Excel."""
     try:
         shop_id = request.args.get("shop_id")
         if not shop_id:
             return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to export this shop's inventory"}), 403
 
         products = Product.query.filter_by(shop_id=shop_id).all()
         if not products:
