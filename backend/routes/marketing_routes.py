@@ -2,6 +2,8 @@ import os
 import pandas as pd
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
+from utils.auth_utils import token_required, roles_required
+from utils.validation import validate_file_upload
 from services.ai_service import generate_ai_caption, forecast_trends, generate_marketing_poster
 
 # Blueprint Setup
@@ -20,7 +22,9 @@ def allowed_file(filename: str) -> bool:
 
 # POST: Upload CSV/Image → Generate AI Marketing Insights + Poster
 @marketing_bp.route("/generate", methods=["POST"])
-def generate_marketing_content():
+@token_required
+@roles_required('shop_owner', 'shop_manager', 'distributor', 'manufacturer')
+def generate_marketing_content(current_user):
     """
     Handles product uploads (CSV/XLSX/Image) and uses AI to generate:
     - Product captions (via Gemini)
@@ -30,11 +34,16 @@ def generate_marketing_content():
     try:
         # Retrieve uploaded file
         file = request.files.get("file")
-        if not file or not allowed_file(file.filename):
+        if not file:
             return jsonify({
                 "status": "error",
-                "message": "Invalid or missing file. Please upload a CSV, XLSX, or image file."
+                "message": "No file provided"
             }), 400
+        
+        # Validate file upload
+        is_valid, message = validate_file_upload(file, ['.csv', '.xlsx', '.png', '.jpg', '.jpeg'], max_size_mb=16)
+        if not is_valid:
+            return jsonify({"status": "error", "message": message}), 400
 
         # Save file securely
         filename = secure_filename(file.filename)
@@ -100,7 +109,7 @@ def generate_marketing_content():
                 "poster_prompt": poster_prompt or "AI prompt not available.",
                 "poster": f"/uploads/marketing/{os.path.basename(poster_path)}" if poster_path else None,
                 "preview": f"/uploads/marketing/{filename}",
-                "analyst": "Guest User"
+                "analyst": current_user.get("username", "User")
             })
 
         # SUCCESS RESPONSE

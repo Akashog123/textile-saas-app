@@ -2,54 +2,15 @@
 from flask import Blueprint, request, jsonify
 from models.model import db, User, Shop
 from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
-import jwt, os
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
 from sqlalchemy import or_
+from utils.auth_utils import generate_jwt, decode_jwt, token_required
+from utils.validation import validate_password
+from datetime import datetime
 
 
-# Environment Setup
-load_dotenv()
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/v1/auth")
 
-# JWT Utility Functions (kept for token verify)
-def generate_jwt(user):
-    secret_key = os.getenv("SECRET_KEY", "default-secret-key")
-    payload = {
-        "user_id": user.id,
-        "username": user.username,
-        "role": user.role,
-        "exp": datetime.utcnow() + timedelta(days=7)
-    }
-    return jwt.encode(payload, secret_key, algorithm="HS256")
-
-
-def decode_jwt(token):
-    try:
-        secret_key = os.getenv("SECRET_KEY", "default-secret-key")
-        return jwt.decode(token, secret_key, algorithms=["HS256"])
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-
-# Token Required Decorator
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"message": "Token missing or invalid."}), 401
-
-        token = auth_header.split(" ")[1]
-        decoded = decode_jwt(token)
-        if not decoded:
-            return jsonify({"message": "Invalid or expired token."}), 401
-
-        return f(decoded, *args, **kwargs)
-    return decorated
+# JWT utilities are now imported from utils.auth_utils
 
 
 # Register (Sign Up)
@@ -70,6 +31,11 @@ def register():
 
         if not data.get("email"):
             data["email"] = f"{data['username']}@noemail.com"
+
+        # Validate password strength
+        is_valid, password_message = validate_password(data["password"])
+        if not is_valid:
+            return jsonify({"status": "error", "message": password_message}), 400
 
         # Prevent duplicates
         duplicate = User.query.filter(
@@ -157,6 +123,10 @@ def login():
 
         if user.role.lower() == "professional" and not user.approved:
             return jsonify({"status": "error", "message": "Account awaiting admin approval."}), 403
+        
+        # Update last login timestamp (session tracking)
+        user.last_login_at = datetime.utcnow()
+        db.session.commit()
 
         # Include shop_id if user is a shop_owner
         shop_id = None
@@ -192,27 +162,20 @@ def login():
 
 # Session Validation (JWT based)
 @auth_bp.route("/session", methods=["GET"])
-# @token_required
-def session_check(decoded):
+@token_required
+def session_check(current_user):
     try:
-        user = User.query.get(decoded.get("user_id"))
-        if not user:
-            return jsonify({"status": "error", "message": "User not found."}), 404
+        # current_user is already injected by @token_required decorator
+        user_id = current_user.get("id")
 
         return jsonify({
             "status": "success",
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "full_name": user.full_name,
-                "role": user.role,
-                "approved": user.approved
-            }
+            "user": current_user
         }), 200
 
     except Exception as e:
         print(f"[Error - Session Check] {e}")
-        return jsonify({"status": "error", "message": "Session validation failed.", "error": str(e)}), 500
+        return jsonify({"status": "error", "message": "Session validation failed."}), 500
 
 
 # Token Verification

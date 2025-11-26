@@ -3,6 +3,7 @@
 from flask import Blueprint, jsonify, request
 from models.model import db, Product, Shop, SalesData
 from sqlalchemy import or_, func
+from utils.image_utils import resolve_product_image, resolve_shop_image
 from services.ai_service import generate_ai_caption
 from config import Config
 import requests
@@ -61,7 +62,7 @@ def get_trending_fabrics():
                 "description": product.description or "",
                 "rating": round(product.rating or 0, 1),
                 "badge": product.badge or "Trending",
-                "image": _resolve_product_image(product),
+                "image": resolve_product_image(product),
                 "ai_caption": caption
             })
 
@@ -147,7 +148,7 @@ def get_popular_shops():
                 "location": shop.location or "",
                 "lat": shop.lat,
                 "lon": shop.lon,
-                "image": shop.image_url or ""
+                "image": resolve_shop_image(shop)
             })
 
         if lat_lon_updated:
@@ -196,7 +197,7 @@ def get_nearby_shops():
             "location": s.location or "",
             "lat": s.lat,
             "lon": s.lon,
-            "image": s.image_url or ""
+            "image": resolve_shop_image(s)
         } for s in nearby_shops]
 
         return jsonify({
@@ -237,7 +238,7 @@ def search_items():
             "id": f.id,
             "name": f.name,
             "price": f"₹{_to_float(f.price):,.0f}",
-            "image": f.image_url or ""
+            "image": resolve_product_image(f)
         } for f in fabrics]
 
         shop_results = [{
@@ -245,7 +246,7 @@ def search_items():
             "name": s.name,
             "rating": round(s.rating or 0, 1),
             "location": s.location or "",
-            "image": s.image_url or ""
+            "image": resolve_shop_image(s)
         } for s in shops]
 
         return jsonify({

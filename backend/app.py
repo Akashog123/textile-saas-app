@@ -59,6 +59,27 @@ CORS(
 # Initialize Extensions
 db.init_app(app)
 
+# Security Headers Middleware
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    if not app.config['DEBUG']:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+# Global Error Handler
+@app.errorhandler(Exception)
+def handle_error(error):
+    """Handle all unhandled exceptions"""
+    app.logger.error(f"Unhandled exception: {error}", exc_info=True)
+    if app.config['DEBUG']:
+        return jsonify({"status": "error", "message": str(error)}), 500
+    else:
+        return jsonify({"status": "error", "message": "An internal error occurred"}), 500
+
 # Register Blueprints
 app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
 app.register_blueprint(profile_bp, url_prefix="/api/v1/profile")
