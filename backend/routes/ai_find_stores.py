@@ -74,6 +74,23 @@ def _transcribe_audio(file_storage):
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
             logger.debug(f"Cleaned up temporary file: {tmp_path}")
+def _parse_ai_matches(ai_text):
+    """
+    Extract JSON array from AI response safely.
+    AI sometimes returns text + JSON, so we isolate the JSON part.
+    """
+    try:
+        # Try direct JSON first
+        return json.loads(ai_text)
+    except json.JSONDecodeError:
+        # Fallback: extract JSON array using regex
+        match = re.search(r"\[.*\]", ai_text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group())
+            except Exception:
+                return []
+    return []
 
 
 @ai_bp.route("/", methods=["POST"])
