@@ -8,6 +8,7 @@ from services.ai_providers import get_provider
 from utils.auth_utils import token_required, roles_required
 from utils.performance_utils import performance_monitor
 from utils.file_processing_utils import safe_file_processing, FileProcessingError
+from utils.validation import  validate_file_upload
 from services.prophet_service import prophet_manager
 from services.forecasting_service import (
     compute_regional_summary,
@@ -68,7 +69,7 @@ def get_regional_demand(current_user):
         # Data processing through forecasting services
         regional_data = compute_regional_summary(df)
         trending_products = top_trending_products(df)
-        forecasts = forecast_sales(df)
+        forecasts = prophet_manager.forecast_sales(df)
 
         # AI Insights from Gemini
         top_product = trending_products[0]["Product"] if trending_products else "Fabric"
