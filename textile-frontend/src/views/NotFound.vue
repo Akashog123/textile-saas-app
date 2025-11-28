@@ -148,7 +148,7 @@ const goBack = () => {
 .btn-primary:hover {
   background: var(--color-primary-dark);
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 10px 20px rgba(74, 144, 226, 0.35);
 }
 
 .btn-outline {

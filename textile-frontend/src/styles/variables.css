@@ -1,0 +1,112 @@
+/**
+ * SE Textile App - CSS Variables
+ * Theme variables for consistent styling across the app
+ */
+
+:root {
+  /* Primary Blue Theme Palette - Refined */
+  --color-bg: #F4F7F9;
+  --color-bg-alt: #EBF3FA;
+  --color-bg-light: #FFFFFF;
+  --color-accent: #A6C8FF;
+  --color-primary: #3B82F6;
+  /* More vibrant blue */
+  --color-primary-dark: #2563EB;
+  --color-primary-light: #60A5FA;
+  --color-text-dark: #1E293B;
+  /* Slate 800 - softer than pure black */
+  --color-text-muted: #64748B;
+  /* Slate 500 */
+  --color-text-light: #94A3B8;
+  /* Slate 400 */
+
+  /* Semantic Colors - Modernized */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #06B6D4;
+
+  /* Border and Shadow */
+  --color-border: #E2E8F0;
+  --color-border-light: #F1F5F9;
+  --color-shadow: rgba(148, 163, 184, 0.1);
+  --color-shadow-light: rgba(148, 163, 184, 0.05);
+
+  /* Glass Effect - Premium */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-border-highlight: rgba(255, 255, 255, 0.8);
+  --glass-shadow: rgba(37, 99, 235, 0.05);
+
+  /* Gradients - Richer */
+  --gradient-primary: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  --gradient-accent: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+  --gradient-bg: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%);
+  /* Subtle blueish tint */
+  --gradient-hero: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
+  --gradient-mesh: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(239, 68, 68, 0.1) 0px, transparent 50%);
+
+  /* Legacy Compatibility */
+  --primary-color: var(--color-primary);
+  --primary-dark: var(--color-primary-dark);
+  --accent-color: var(--color-accent);
+  --text-muted: var(--color-text-muted);
+  --bg-light: var(--color-bg);
+  --bg-white: #ffffff;
+
+  /* Typography */
+  --font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Added Outfit for modern feel */
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+
+  /* Shadows - Layered & Smooth */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  --shadow-hover: 0 20px 40px -5px rgba(59, 130, 246, 0.2);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-index */
+  --z-hide: -1;
+  --z-auto: auto;
+  --z-base: 0;
+  --z-docked: 10;
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-banner: 1200;
+  --z-overlay: 1300;
+  --z-modal: 1400;
+  --z-popover: 1500;
+  --z-skip-link: 1600;
+  --z-toast: 1700;
+  --z-tooltip: 1800;
+}

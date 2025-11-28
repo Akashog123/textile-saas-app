@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-profile-tab">
+  <div class="customer-profile-tab fade-in-entry">
     <h5 class="mb-4">
       <i class="bi bi-person-circle me-2"></i>My Profile
     </h5>
@@ -284,13 +284,17 @@ onMounted(() => {
 
 <style scoped>
 .customer-profile-tab {
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
+  background: transparent;
   min-height: calc(100vh - 60px);
   padding: 2rem;
-  animation: fadeIn 0.5s ease-in;
+  padding-bottom: 4rem;
 }
 
-@keyframes fadeIn {
+.fade-in-entry {
+  animation: fadeInPage 0.6s ease-out forwards;
+}
+
+@keyframes fadeInPage {
   from {
     opacity: 0;
     transform: translateY(20px);
@@ -310,18 +314,19 @@ h5, h6 {
 }
 
 .card {
-  border-radius: 16px;
-  border: none;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .profile-field {
-  padding: 0.75rem;
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, #e9ecef 100%);
-  border-radius: 8px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
   transition: all 0.3s ease;
 }
 
@@ -349,7 +354,7 @@ h5, h6 {
 .form-control:focus,
 .form-select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 0.25rem rgba(242, 190, 209, 0.15);
+  box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.15);
 }
 
 .btn-primary {
@@ -362,7 +367,7 @@ h5, h6 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 

@@ -112,7 +112,7 @@ def db_status():
         users = User.query.all()
         for user in users:
             shops_count = Shop.query.filter_by(owner_id=user.id).count()
-            products_count = Product.query.filter_by(seller_id=user.id).count()
+            products_count = Product.query.join(Shop, Product.shop_id == Shop.id).filter(Shop.owner_id == user.id).count()
             print(f"  - {user.username} ({user.role}): {shops_count} shops, {products_count} products")
             
     except Exception as e:

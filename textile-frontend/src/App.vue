@@ -1,12 +1,19 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import NavBar from "@/components/NavBar.vue"
 import { getCurrentSession, logout } from '@/api/apiAuth'
+import { applyTheme } from '@/styles/theme-config'
+
+// Apply theme on app initialization
+onMounted(() => {
+  applyTheme()
+})
 
 // Authentication state
 const user = ref(null)
 const isAuthenticated = computed(() => !!user.value)
+const authKey = ref(0)
 const router = useRouter()
 
 // Check authentication on mount
@@ -17,18 +24,25 @@ const checkAuth = async () => {
       const response = await getCurrentSession()
       if (response.data.status === 'success') {
         user.value = response.data.user
+        authKey.value += 1
       } else {
         // Invalid session, clear token
         localStorage.removeItem('token')
         localStorage.removeItem('role')
         user.value = null
+        authKey.value += 1
       }
+    } else {
+      // No token, ensure user is null
+      user.value = null
+      authKey.value += 1
     }
   } catch (error) {
     console.error('Auth check failed:', error)
     localStorage.removeItem('token')
     localStorage.removeItem('role')
     user.value = null
+    authKey.value += 1
   }
 }
 
@@ -43,6 +57,7 @@ const handleLogout = async () => {
     localStorage.removeItem('role')
     localStorage.removeItem('user')
     user.value = null
+    authKey.value += 1
     router.push('/login')
   }
 }
@@ -59,12 +74,37 @@ const provideAuth = () => {
 
 onMounted(() => {
   checkAuth()
+  
+  // Listen for login events from child components
+  window.addEventListener('user-logged-in', handleLoginEvent)
+  
+  // Listen for storage events (cross-tab sync)
+  window.addEventListener('storage', handleStorageEvent)
 })
+
+// Clean up event listener
+onUnmounted(() => {
+  window.removeEventListener('user-logged-in', handleLoginEvent)
+  window.removeEventListener('storage', handleStorageEvent)
+})
+
+// Handle login event
+const handleLoginEvent = () => {
+  checkAuth()
+}
+
+// Handle storage events (for cross-tab sync)
+const handleStorageEvent = (event) => {
+  if (event.key === 'token' || event.key === 'user') {
+    checkAuth()
+  }
+}
 </script>
 
 <template>
   <div id="app" class="textile-app">
     <NavBar 
+      :key="authKey"
       :user="user" 
       :isAuthenticated="isAuthenticated"
       @logout="handleLogout"
@@ -77,6 +117,9 @@ onMounted(() => {
 </template>
 
 <style>
+/* Import consistent theme system */
+@import './styles/theme.css';
+
 /* Global styles matching LandingPage theme */
 .textile-app {
   min-height: 100vh;
@@ -89,14 +132,14 @@ onMounted(() => {
 
 /* Theme variables */
 :root {
-  /* Landing Page Theme Palette */
-  --color-bg: #F9F5F6;
-  --color-bg-alt: #F8E8EE;
-  --color-accent: #FDCEDF;
-  --color-primary: #F2BED1;
-  --color-primary-dark: #e0a3b8;
-  --color-text-dark: #4A4A4A;
-  --color-text-muted: #6c757d;
+  /* Blue Theme Palette */
+  --color-bg: #F0F4F8;
+  --color-bg-alt: #E6F2FF;
+  --color-accent: #B3D9FF;
+  --color-primary: #4A90E2;
+  --color-primary-dark: #357ABD;
+  --color-text-dark: #2C3E50;
+  --color-text-muted: #7F8C8D;
   
   /* Mapping to generic names for compatibility */
   --primary-color: var(--color-primary);

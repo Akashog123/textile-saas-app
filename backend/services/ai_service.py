@@ -7,7 +7,7 @@ Supports multiple AI providers (Gemini, NVIDIA) configured via environment
 import os
 import random
 import pandas as pd
-from PIL import Image
+import traceback
 from services.ai_providers import get_provider
 from services.prophet_service import prophet_manager
 
@@ -23,21 +23,35 @@ DEFAULT_PRIORITIES = [
 ]
 
 
-def generate_ai_caption(product_name: str, category: str = "", price: float = 0.0, image_path: str = None) -> str:
+def generate_ai_caption(product_name: str = None, category: str = None, price: float = None, image_path: str = None, description: str = None):
     """
-    Generate a short, catchy marketing caption using configured AI provider.
-    Supports both text and image-based caption generation.
+    Generate AI-powered marketing captions using configured AI provider.
+    Supports both image-based and text-based caption generation.
     """
     try:
         provider = get_provider()
+        DEFAULT_CAPTION = "Elegant textile product for modern fashion."
         
-        # Vision captioning (for uploaded image)
+        # Image-based caption (for single image uploads)
         if image_path and os.path.exists(image_path):
             prompt = (
                 "Generate a short, catchy marketing caption (under 25 words) "
                 "for this textile or fashion product image. "
                 "Focus on elegance, premium tone, and emotional appeal."
             )
+            
+            # Add product details to the prompt if provided
+            if product_name or category or description:
+                details = []
+                if product_name:
+                    details.append(f"Product: {product_name}")
+                if category:
+                    details.append(f"Category: {category}")
+                if description:
+                    details.append(f"Description: {description}")
+                
+                if details:
+                    prompt += f" Product details: {', '.join(details)}."
             
             try:
                 result = provider.analyze_image(image_path, prompt)
@@ -58,6 +72,7 @@ def generate_ai_caption(product_name: str, category: str = "", price: float = 0.
         Product: {product_name}
         Category: {category}
         Price: ₹{price_str}
+        {f'Description: {description}' if description else ''}
         Tone: Elegant, aesthetic, and festive to attract buyers.
         """
         
@@ -75,68 +90,275 @@ def generate_ai_caption(product_name: str, category: str = "", price: float = 0.
         return DEFAULT_CAPTION
 
 
-def generate_marketing_poster(image_path: str, product_name: str = None):
+def generate_marketing_poster(image_path: str, product_name: str = None, aspect_ratio: str = ""):
     """
-    Analyze image → create prompt → generate AI poster.
-    Uses configured AI provider for both analysis and generation.
+    Generate AI marketing poster from uploaded image with aspect ratio support.
+    Only uses AI services - no local fallbacks.
+    Proper logging for debugging AI issues.
     """
     if not os.path.exists(image_path):
-        print("Image path not found:", image_path)
+        print(f"[AI POSTER ERROR] Image path not found: {image_path}")
         return None, None
     
     try:
+        print(f"[AI POSTER] Starting generation for: {os.path.basename(image_path)}")
+        print(f"[AI POSTER] Full image path: {image_path}")
+        print(f"[AI POSTER] Image exists: {os.path.exists(image_path)}")
+        print(f"[AI POSTER] Image size: {os.path.getsize(image_path)} bytes")
+        print(f"[AI POSTER] Aspect ratio: {aspect_ratio or 'default (16:9)'}")
+        
         provider = get_provider()
+        print(f"[AI POSTER] Using provider: {type(provider).__name__}")
         
         # Step 1: Analyze image to create poster prompt
         vision_prompt = (
-            "You are an AI marketing designer. Analyze this textile or fashion image "
-            "and generate a descriptive text prompt for a marketing poster. "
-            "Include theme, tone, background, and visual style (festive, elegant, or luxury)."
+            "Analyze this product image for a high-end marketing poster. "
+            "Describe the visual elements in detail: lighting, colors, texture, and composition. "
+            "Then, write a stable-diffusion style prompt that would recreate this product in a professional studio setting. "
+            "Include keywords like 'cinematic lighting', '8k', 'photorealistic', 'commercial photography'."
         )
         
         try:
+            print(f"[AI POSTER] Analyzing image for prompt generation...")
             banner_prompt = provider.analyze_image(image_path, vision_prompt)
+            print(f"[AI POSTER] Generated prompt: {banner_prompt}")
+            
             if not banner_prompt or not banner_prompt.strip():
-                banner_prompt = "A luxurious festive textile banner with premium colors and elegant lighting."
+                banner_prompt = "Professional studio photography of a premium textile product, cinematic lighting, 8k resolution, commercial aesthetic."
+                print(f"[AI POSTER] Using fallback prompt: {banner_prompt}")
+            else:
+                # Clean up prompt if it contains "Prompt:" or similar
+                if "Prompt:" in banner_prompt:
+                    banner_prompt = banner_prompt.split("Prompt:")[-1].strip()
+                
+                # Limit prompt length to avoid API issues
+                if len(banner_prompt) > 900:
+                    banner_prompt = banner_prompt[:900] + "..."
+                    print(f"[AI POSTER] Truncated prompt to 900 characters")
         except Exception as e:
-            print("Prompt Generation Error:", e)
-            banner_prompt = "Elegant textile poster background with premium lighting."
+            print(f"[AI POSTER ERROR] Prompt generation failed: {str(e)}")
+            print(f"[AI POSTER ERROR] Traceback: {traceback.format_exc()}")
+            banner_prompt = "Professional studio photography of a premium textile product, cinematic lighting, 8k resolution, commercial aesthetic."
         
         if product_name:
-            banner_prompt = f"{banner_prompt} featuring '{product_name}'."
+            # Create a composite prompt
+            banner_prompt = f"Marketing poster for {product_name}. {banner_prompt}"
+            print(f"[AI POSTER] Enhanced prompt with product name: {banner_prompt}")
         
-        print("Poster prompt generated:", banner_prompt)
+        # Step 2: Generate poster image using AI only with aspect ratio
+        return _generate_ai_poster(image_path, banner_prompt, provider, aspect_ratio)
+    
+    except Exception as e:
+        print(f"[AI POSTER ERROR] Critical error in poster generation: {str(e)}")
+        print(f"[AI POSTER ERROR] Traceback: {traceback.format_exc()}")
+        return None, None
+
+
+def _generate_ai_poster(image_path: str, prompt: str, provider, aspect_ratio: str = ""):
+    """
+    Generate poster using AI services with dual API support and aspect ratio.
+    Uses original NVIDIA API for context-based, OpenAI API for text-based.
+    """
+    output_path = os.path.splitext(image_path)[0] + "_poster.png"
+    
+    try:
+        print(f"[AI POSTER] Attempting AI poster generation...")
+        print(f"[AI POSTER] Input image: {image_path}")
+        print(f"[AI POSTER] Output path: {output_path}")
+        print(f"[AI POSTER] Prompt length: {len(prompt)} characters")
+        print(f"[AI POSTER] Aspect ratio: {aspect_ratio or 'default (16:9)'}")
         
-        # Step 2: Generate poster image
+        # Determine aspect ratio for generation
+        generation_aspect_ratio = aspect_ratio if aspect_ratio else "16:9"
+        print(f"[AI POSTER] Using aspect ratio: {generation_aspect_ratio}")
+        
+        # Strategy 1: Context-based generation using NVIDIA API (image + text)
         try:
-            # For image context-based generation (NVIDIA Flux.1-Kontext)
+            print(f"[AI POSTER] Trying context-based generation...")
+            
+            # Read and encode the image
             with open(image_path, "rb") as f:
                 import base64
                 image_data = base64.b64encode(f.read()).decode()
+                image_b64 = f"data:image/jpeg;base64,{image_data}"
+                print(f"[AI POSTER] Encoded image data: {len(image_data)} bytes")
             
+            # Create a short, effective prompt for marketing poster
+            # Extract product name more reliably
+            if "for" in prompt:
+                # Split on "for" and take the part after it
+                parts = prompt.split("for", 1)
+                product_name = parts[1].strip() if len(parts) > 1 else prompt.split(".")[0].strip()
+            else:
+                # Take first sentence or first 50 characters
+                product_name = prompt.split(".")[0].strip() if "." in prompt else prompt[:50].strip()
+            
+            # Clean up the product name
+            product_name = product_name.replace("Create a marketing poster for", "").strip()
+            
+            simple_prompt = f"{product_name[:30]} marketing poster" if len(product_name) > 30 else f"{product_name} marketing poster"
+            
+            print(f"[AI POSTER] Context prompt: {simple_prompt}")
+            print(f"[AI POSTER] Prompt length: {len(simple_prompt)} characters")
+            
+            # Try context-based generation with image
             image_bytes = provider.generate_image(
-                banner_prompt,
-                context_image=f"data:image/png;base64,{image_data}",
-                aspect_ratio="match_input_image"
+                simple_prompt,
+                context_image=image_b64  # Pass the base64 image
             )
             
-            output_path = os.path.splitext(image_path)[0] + "_poster.png"
+            print(f"[AI POSTER] Generated {len(image_bytes)} bytes via context-based generation")
+            
             with open(output_path, "wb") as f:
                 f.write(image_bytes)
             
-            print(f"Poster image saved at {output_path}")
-            return banner_prompt, output_path
+            print(f"[AI POSTER SUCCESS] Context-based poster saved: {output_path}")
+            return simple_prompt, output_path
             
         except Exception as e:
-            if "quota" in str(e).lower():
-                print("AI quota limit reached. Poster not generated.")
-                return banner_prompt, None
-            print("Poster Image Generation Error:", e)
-            return banner_prompt, None
+            print(f"[AI POSTER ERROR] Context-based generation failed: {str(e)}")
+            print(f"[AI POSTER ERROR] Traceback: {traceback.format_exc()}")
+            
+            # Check for specific AI service issues
+            error_msg = str(e).lower()
+            if "quota" in error_msg or "limit" in error_msg:
+                print(f"[AI POSTER ERROR] AI quota limit reached")
+            elif "timeout" in error_msg:
+                print(f"[AI POSTER ERROR] AI service timeout")
+            elif "connection" in error_msg or "network" in error_msg:
+                print(f"[AI POSTER ERROR] Network connectivity issue")
+            elif "api" in error_msg or "key" in error_msg:
+                print(f"[AI POSTER ERROR] API configuration issue")
+            elif "422" in error_msg or "500" in error_msg:
+                print(f"[AI POSTER ERROR] Context generation not supported, falling back to text-only")
+            else:
+                print(f"[AI POSTER ERROR] Unknown AI service error")
+        
+        # Strategy 2: Text-based generation using NVIDIA API (text-only fallback)
+        try:
+            print(f"[AI POSTER] Trying text-based generation (fallback)...")
+            
+            # Create a short, effective prompt for marketing poster
+            # Extract product name more reliably
+            if "for" in prompt:
+                # Split on "for" and take the part after it
+                parts = prompt.split("for", 1)
+                product_name = parts[1].strip() if len(parts) > 1 else prompt.split(".")[0].strip()
+            else:
+                # Take first sentence or first 50 characters
+                product_name = prompt.split(".")[0].strip() if "." in prompt else prompt[:50].strip()
+            
+            # Clean up the product name
+            product_name = product_name.replace("Create a marketing poster for", "").strip()
+            
+            simple_prompt = f"{product_name[:30]} marketing poster" if len(product_name) > 30 else f"{product_name} marketing poster"
+            
+            print(f"[AI POSTER] Text-only prompt: {simple_prompt}")
+            print(f"[AI POSTER] Prompt length: {len(simple_prompt)} characters")
+            
+            image_bytes = provider.generate_image(
+                simple_prompt
+                # No context_image - text-only generation
+            )
+            
+            print(f"[AI POSTER] Generated {len(image_bytes)} bytes via text-based generation")
+            
+            with open(output_path, "wb") as f:
+                f.write(image_bytes)
+            
+            print(f"[AI POSTER SUCCESS] Text-based poster saved: {output_path}")
+            return f"Text-only: {simple_prompt}", output_path
+            
+        except Exception as e:
+            print(f"[AI POSTER ERROR] Text-based generation failed: {str(e)}")
+            print(f"[AI POSTER ERROR] Traceback: {traceback.format_exc()}")
+            
+            # Check for specific AI service issues
+            error_msg = str(e).lower()
+            if "quota" in error_msg or "limit" in error_msg:
+                print(f"[AI POSTER ERROR] AI quota limit reached")
+            elif "timeout" in error_msg:
+                print(f"[AI POSTER ERROR] AI service timeout")
+            elif "connection" in error_msg or "network" in error_msg:
+                print(f"[AI POSTER ERROR] Network connectivity issue")
+            elif "api" in error_msg or "key" in error_msg:
+                print(f"[AI POSTER ERROR] API configuration issue")
+            else:
+                print(f"[AI POSTER ERROR] Unknown AI service error")
     
     except Exception as e:
-        print("Marketing Poster Error:", e)
-        return None, None
+        print(f"[AI POSTER ERROR] Critical error in poster generation: {str(e)}")
+        print(f"[AI POSTER ERROR] Traceback: {traceback.format_exc()}")
+        return prompt, None
+    
+    # All AI strategies failed
+    print(f"[AI POSTER FAILED] Unable to generate poster with AI services")
+    return prompt, None
+
+
+def batch_generate_posters(image_paths: list, product_names: list = None, aspect_ratio: str = "", batch_size: int = 3):
+    """
+    Generate multiple posters using AI services with aspect ratio and batch processing.
+    Robust error handling and progress tracking.
+    """
+    if not product_names:
+        product_names = [f"Product {i+1}" for i in range(len(image_paths))]
+    
+    print(f"[BATCH AI] Starting batch poster generation for {len(image_paths)} images")
+    print(f"[BATCH AI] Settings: aspect_ratio={aspect_ratio}, batch_size={batch_size}")
+    
+    results = []
+    
+    # Process in batches to avoid API rate limits
+    for i in range(0, len(image_paths), batch_size):
+        batch_paths = image_paths[i:i + batch_size]
+        batch_names = product_names[i:i + batch_size]
+        
+        print(f"[BATCH AI] Processing batch {i//batch_size + 1}: {len(batch_paths)} images")
+        
+        for j, (image_path, product_name) in enumerate(zip(batch_paths, batch_names)):
+            try:
+                print(f"[BATCH AI] Processing image {i+j+1}/{len(image_paths)}: {product_name}")
+                
+                # Generate AI caption for the product
+                caption = generate_ai_caption(product_name, "Fashion", 1000, image_path)
+                print(f"[BATCH AI] Generated caption for {product_name}")
+                
+                # Generate poster with aspect ratio
+                prompt, poster_path = generate_marketing_poster(image_path, product_name, aspect_ratio)
+                
+                if poster_path:
+                    results.append({
+                        'success': True,
+                        'poster_path': poster_path,
+                        'prompt': prompt,
+                        'product_name': product_name,
+                        'caption': caption
+                    })
+                    print(f"[BATCH AI] SUCCESS: Poster generated for {product_name}")
+                else:
+                    results.append({
+                        'success': False,
+                        'error': 'Poster generation failed',
+                        'product_name': product_name,
+                        'caption': caption
+                    })
+                    print(f"[BATCH AI] FAILED: Poster generation for {product_name}")
+                    
+            except Exception as e:
+                print(f"[BATCH AI] ERROR processing {product_name}: {str(e)}")
+                print(f"[BATCH AI] Traceback: {traceback.format_exc()}")
+                
+                results.append({
+                    'success': False,
+                    'error': str(e),
+                    'product_name': product_name
+                })
+    
+    success_count = sum(1 for r in results if r['success'])
+    print(f"[BATCH AI] Completed: {success_count}/{len(image_paths)} posters generated successfully")
+    
+    return results
 
 
 def forecast_trends(df: pd.DataFrame):
