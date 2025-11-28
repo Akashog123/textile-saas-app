@@ -222,10 +222,9 @@ onMounted(() => {
 
 <style scoped>
 .distributor-home-page {
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
-  min-height: calc(100vh - 80px); /* Adjusted for navbar */
+  background: var(--gradient-bg);
+  min-height: calc(100vh - 80px);
   padding: 2rem;
-  animation: fadeIn 0.5s ease-in;
 }
 
 @keyframes fadeIn {

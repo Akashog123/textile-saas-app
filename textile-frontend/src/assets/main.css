@@ -1,9 +1,9 @@
 /* Global app styles */
 :root {
-  --color-bg-light: #F9F5F6;   /* rgb(249, 245, 246) */
-  --color-bg-alt: #F8E8EE;     /* rgb(248, 232, 238) */
-  --color-accent: #FDCEDF;     /* rgb(253, 206, 223) */
-  --color-primary: #F2BED1;    /* rgb(242, 190, 209) */
+  --color-bg-light: #F8FAFC;   /* Updated to blue theme */
+  --color-bg-alt: #E6F2FF;     /* Updated to blue theme */
+  --color-accent: #B3D9FF;     /* Updated to blue theme */
+  --color-primary: #4A90E2;    /* Updated to blue theme */
   
   --bg-card: #ffffff;
   --muted: #7a6f64;

@@ -301,11 +301,13 @@ const handleImageFile = async (event) => {
 }
 
 .search-input-group {
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
   border-radius: 50px;
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+  border: 1px solid var(--glass-border);
 }
 
 .search-input-group:focus-within {
@@ -316,7 +318,7 @@ const handleImageFile = async (event) => {
 .search-icon {
   background: transparent;
   border: none;
-  color: var(--primary-color);
+  color: var(--color-primary);
   font-size: 1.25rem;
   padding: 0 1rem;
 }
@@ -341,8 +343,8 @@ const handleImageFile = async (event) => {
 .btn-camera {
   background: transparent;
   border: none;
-  border-left: 1px solid var(--border-color);
-  color: var(--primary-color);
+  border-left: 1px solid var(--color-border);
+  color: var(--color-primary);
   padding: 0 1rem;
   font-size: 1.25rem;
   transition: all 0.3s ease;
@@ -350,8 +352,8 @@ const handleImageFile = async (event) => {
 
 .btn-voice:hover,
 .btn-camera:hover {
-  background: var(--bg-light);
-  color: var(--accent-color);
+  background: var(--color-bg-light);
+  color: var(--color-accent);
 }
 
 .btn-voice:disabled,
@@ -361,7 +363,7 @@ const handleImageFile = async (event) => {
 }
 
 .btn-nearby {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   border: none;
   border-radius: 50px;

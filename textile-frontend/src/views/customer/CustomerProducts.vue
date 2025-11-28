@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-products-page">
+  <div class="customer-products-page fade-in-entry">
     <!-- Search Bar -->
     <SearchBar 
       v-model="searchQuery"
@@ -108,6 +108,9 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { getProducts } from '@/api/apiProducts';
+import { formatPricePerMeter } from '@/utils/priceUtils';
+import { validateProductData } from '@/utils/dataValidation';
+import { handleApiError, executeWithRetry, createRetryConfig, showErrorNotification } from '@/utils/errorHandling';
 import SearchBar from '@/components/SearchBar.vue';
 
 const searchQuery = ref('');
@@ -140,19 +143,16 @@ const fetchProducts = async () => {
       search: searchQuery.value || filters.search
     };
     
-    const response = await getProducts(params);
+    const response = await executeWithRetry(
+      () => getProducts(params),
+      createRetryConfig(3, 1000)
+    );
+    
+    console.log('[Products Response]', response.data);
+    
     if (response.data && response.data.products) {
-      products.value = response.data.products.map(p => ({
-        id: p.id,
-        name: p.name,
-        price: p.price ? `₹${parseFloat(p.price).toLocaleString()}` : 'Price not available',
-        description: p.ai_caption || p.description || 'No description available',
-        rating: p.rating || 4,
-        seller: p.shop_name || 'Unknown Seller',
-        imageUrls: p.images && p.images.length > 0 
-          ? p.images.map(img => img.url || img)
-          : [p.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(p.name)}`]
-      }));
+      products.value = response.data.products.map(p => validateProductData(p));
+      console.log('[Processed Products]', products.value);
       
       // Initialize image indices
       for (const [idx] of products.value.entries()) {
@@ -160,8 +160,10 @@ const fetchProducts = async () => {
       }
     }
   } catch (err) {
-    console.error('[Products Error]', err);
-    error.value = err.response?.data?.message || 'Failed to load products';
+    const errorMessage = handleApiError(err, 'Products');
+    error.value = errorMessage;
+    showErrorNotification(errorMessage, 'error');
+    
     // Fallback to demo data
     products.value = getFallbackProducts();
     for (const [idx] of products.value.entries()) {
@@ -178,10 +180,10 @@ const fetchProducts = async () => {
 const getFallbackProducts = () => [
   {
     name: 'Handwoven Silk Brocade',
-    price: '₹1,850',
+    price: formatPricePerMeter(1850),
     description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear.',
     rating: 5,
-    seller: 'The Silk Emporium',
+    seller: 'Royal Silk Emporium',
     imageUrls: [
       'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
@@ -189,10 +191,10 @@ const getFallbackProducts = () => [
   },
   {
     name: 'Premium Cotton Batik Print',
-    price: '₹650',
+    price: formatPricePerMeter(650),
     description: 'Soft and breathable premium cotton with authentic batik patterns. Ideal for summer wear.',
     rating: 4,
-    seller: 'Heritage Textile House',
+    seller: 'Fashion Hub Textiles',
     imageUrls: [
       'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
     ],
@@ -274,9 +276,25 @@ onMounted(() => {
 
 <style scoped>
 .customer-products-page {
+  background: transparent;
+  min-height: calc(100vh - 80px);
   padding: 2rem;
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
-  min-height: 100vh;
+  padding-bottom: 4rem;
+}
+
+.fade-in-entry {
+  animation: fadeInPage 0.6s ease-out forwards;
+}
+
+@keyframes fadeInPage {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Header */
@@ -298,7 +316,7 @@ h5 {
 
 .input-group:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 4px 20px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 4px 20px rgba(74, 144, 226, 0.2);
 }
 
 .input-group .form-control {
@@ -339,19 +357,22 @@ h5 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
 }
 
 /* Filters Section */
 .filters-section {
   padding: 1rem 1.5rem;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
+  margin-bottom: 2rem;
 }
 
 .fw-semibold {
@@ -378,7 +399,7 @@ h5 {
   border-color: var(--color-primary);
   color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
 }
 
 /* Products Grid */
@@ -390,17 +411,18 @@ h5 {
 }
 
 .product-carousel-item .card {
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-  border: none;
-  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
   overflow: hidden;
-  background: white;
-  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .product-carousel-item .card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 15px 50px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 15px 50px rgba(74, 144, 226, 0.15);
 }
 
 .product-carousel-item .card-body {
@@ -429,12 +451,12 @@ h5 {
   font-size: 1.5rem;
   font-weight: bold;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.25);
 }
 
 .carousel-btn:hover:not(:disabled) {
   transform: scale(1.15);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.5);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
 }
 
 .carousel-btn:disabled {
@@ -544,7 +566,7 @@ h5 {
   color: #4A4A4A;
   border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
 }
 
 /* Responsive Design */

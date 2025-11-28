@@ -32,7 +32,6 @@ class User(db.Model, TimestampMixin):
 
     # Relationships
     shops = db.relationship("Shop", backref="owner", lazy="dynamic", cascade="all, delete-orphan")
-    products = db.relationship("Product", backref="seller", lazy="dynamic", cascade="all, delete-orphan")
     notifications = db.relationship("Notification", backref="user", lazy="dynamic", cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -110,7 +109,6 @@ class Product(db.Model, TimestampMixin):
     is_active = db.Column(db.Boolean, default=True, index=True)
 
     shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
-    seller_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
 
     images = db.relationship("ProductImage", backref="product", lazy="dynamic", cascade="all, delete-orphan")
     inventory = db.relationship("Inventory", uselist=False, backref="product", cascade="all, delete-orphan")
@@ -329,6 +327,28 @@ class ExternalSalesDataItem(db.Model):
 
     def __repr__(self):
         return f"<ExternalSalesDataItem Order={self.OrderId}, Product={self.ProductID}>"
+
+
+class MarketingHistory(db.Model):
+    """Track marketing content generation history"""
+    __tablename__ = "marketing_history"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    file_name = db.Column(db.String(255), nullable=False)
+    file_type = db.Column(db.String(50), nullable=False)  # 'csv', 'xlsx', 'image'
+    content_type = db.Column(db.String(50), nullable=False)  # 'data', 'image'
+    generated_content = db.Column(db.Text)  # JSON string of generated content
+    status = db.Column(db.String(20), default='completed')  # 'completed', 'failed'
+    error_message = db.Column(db.Text)
+    rows_processed = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationship
+    user = db.relationship("User", backref=db.backref("marketing_history", lazy="dynamic", cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f"<MarketingHistory {self.file_name} ({self.content_type})>"
 
 
 # DB Setup

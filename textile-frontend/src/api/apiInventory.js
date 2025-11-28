@@ -44,12 +44,22 @@ export const editInventoryItem = (productId, updates) => {
 
 /**
  * Delete a product from inventory
- * @param {number} productId - Product ID to delete
+ * @param {number} productId - Product ID
  * @returns {Promise} Response with deletion status
  */
 export const deleteInventoryItem = (productId) => {
-    return api.delete(`/inventory/delete`, {
-        params: { product_id: productId }
+    return api.delete(`/inventory/delete`, { data: { product_id: productId } });
+};
+
+/**
+ * Generate detailed PDF report for inventory
+ * @param {number} shopId - Shop ID
+ * @returns {Promise} Response with PDF file blob
+ */
+export const generateInventoryPDF = (shopId) => {
+    return api.get(`/inventory/report/pdf`, {
+        params: { shop_id: shopId },
+        responseType: 'blob'
     });
 };
 
@@ -70,5 +80,6 @@ export default {
     importInventory,
     editInventoryItem,
     deleteInventoryItem,
-    exportInventory
+    exportInventory,
+    generateInventoryPDF
 };

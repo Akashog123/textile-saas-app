@@ -1,10 +1,11 @@
 from flask import Blueprint, jsonify, request, send_file
 from models.model import db, Product, Inventory, SalesData, ProductCatalog, Shop
 from utils.auth_utils import token_required, roles_required, check_shop_ownership
-from utils.validation import validate_shop_id, validate_product_id, validate_price, validate_quantity, validate_file_upload
+from utils.validation import validate_price, validate_quantity, validate_file_upload
 import pandas as pd
-from io import BytesIO
+from io import BytesIO, StringIO
 from datetime import datetime
+from config import Config
 
 inventory_bp = Blueprint("inventory", __name__)
 
@@ -27,15 +28,26 @@ def get_inventory(current_user):
             data = []
             for p in products:
                 inv = Inventory.query.filter_by(product_id=p.id).first()
+                
+                # Get the primary image for this product
+                primary_image = p.images.filter_by(ordering=0).first()
+                image_url = primary_image.url if primary_image else None
+                
+                # Convert to proper URL format if needed
+                if image_url and not image_url.startswith('http'):
+                    image_url = f"/uploads/{image_url}" if not image_url.startswith('/') else image_url
+                
                 data.append({
                     "id": p.id,
                     "name": p.name,
                     "category": p.category,
                     "price": float(p.price),
-                    "stock": inv.qty_available,
+                    "stock": inv.qty_available if inv else 0,
+                    "minimum_stock": inv.safety_stock if inv else 0,
                     "sku": p.sku or f"AUTO-{p.id}",
                     "rating": round(p.rating, 1),
-                    "shop_id": p.shop_id
+                    "shop_id": p.shop_id,
+                    "image": image_url  # Only include real image, no placeholders
                 })
             return jsonify({
                 "status": "success",
@@ -129,7 +141,7 @@ def import_inventory(current_user):
         # Normalize columns to lowercase
         df.columns = [c.lower() for c in df.columns]
 
-        required_cols = {"name", "category", "price", "stock", "sku"}
+        required_cols = {"name", "category", "price", "stock", "sku", "minimum_stock"}
         if not required_cols.issubset(set(df.columns)):
             return jsonify({"status": "error", "message": f"File must contain columns: {', '.join(required_cols)}"}), 400
 
@@ -139,9 +151,10 @@ def import_inventory(current_user):
         except (ValueError, TypeError):
             return jsonify({"status":"error","message":"invalid shop_id"}), 400
 
-        # try to determine default seller_id from the shop owner (if exists)
+        # try to determine default shop owner (if exists)
         shop_obj = Shop.query.get(shop_id)
-        default_seller_id = shop_obj.owner_id if shop_obj and shop_obj.owner_id else 1
+        if not shop_obj:
+            return jsonify({"status":"error","message":"Shop not found"}), 404
 
         added, updated = 0, 0
         for _, row in df.iterrows():
@@ -162,27 +175,10 @@ def import_inventory(current_user):
                 stock = int(row.get("stock", 0) or 0)
             except (ValueError, TypeError):
                 stock = 0
-
-            # resolve seller_id: CSV column -> form param -> shop owner -> fallback 1
-            seller_id = None
-            if "seller_id" in df.columns:
-                raw = row.get("seller_id")
-                if pd.notna(raw) and raw != "":
-                    try:
-                        seller_id = int(raw)
-                    except (ValueError, TypeError):
-                        seller_id = None
-
-            if not seller_id:
-                form_seller = request.form.get("seller_id")
-                if form_seller:
-                    try:
-                        seller_id = int(form_seller)
-                    except (ValueError, TypeError):
-                        seller_id = None
-
-            if not seller_id:
-                seller_id = default_seller_id
+            try:
+                minimum_stock = int(row.get("minimum_stock", 0) or 0)
+            except (ValueError, TypeError):
+                minimum_stock = 0
 
             # try to find existing product for this shop + sku
             product = Product.query.filter_by(sku=sku, shop_id=shop_id).first()
@@ -191,23 +187,21 @@ def import_inventory(current_user):
                 product.name = name
                 product.category = category
                 product.price = price
-                # ensure seller_id is set (update it if missing/different)
-                product.seller_id = seller_id
                 inv = Inventory.query.filter_by(product_id=product.id).first()
                 if inv:
                     inv.qty_available = stock
+                    inv.safety_stock = minimum_stock
                 else:
-                    db.session.add(Inventory(product_id=product.id, qty_available=stock))
+                    db.session.add(Inventory(product_id=product.id, qty_available=stock, safety_stock=minimum_stock))
                 updated += 1
             else:
-                # create product with required seller_id and shop_id
+                # create product with required shop_id
                 new_product = Product(
                     name=name,
                     category=category,
                     price=price,
                     sku=sku,
-                    shop_id=shop_id,
-                    seller_id=seller_id
+                    shop_id=shop_id
                 )
                 db.session.add(new_product)
                 try:
@@ -218,7 +212,7 @@ def import_inventory(current_user):
                     print(f"[Import - product create failed] sku={sku} error={e}")
                     continue
 
-                db.session.add(Inventory(product_id=new_product.id, qty_available=stock))
+                db.session.add(Inventory(product_id=new_product.id, qty_available=stock, safety_stock=minimum_stock))
                 added += 1
 
         db.session.commit()
@@ -244,6 +238,7 @@ def edit_inventory(current_user):
         product_id = data.get("product_id")
         price = data.get("price")
         stock = data.get("stock")
+        minimum_stock = data.get("minimum_stock")
 
         if not product_id:
             return jsonify({"status": "error", "message": "product_id required"}), 400
@@ -271,6 +266,16 @@ def edit_inventory(current_user):
                     inv.qty_available = validated_stock
                 else:
                     db.session.add(Inventory(product_id=product.id, qty_available=validated_stock))
+            except ValueError as e:
+                return jsonify({"status": "error", "message": str(e)}), 400
+        
+        if minimum_stock is not None:
+            try:
+                validated_min_stock = validate_quantity(minimum_stock)
+                if inv:
+                    inv.safety_stock = validated_min_stock
+                else:
+                    db.session.add(Inventory(product_id=product.id, qty_available=0, safety_stock=validated_min_stock))
             except ValueError as e:
                 return jsonify({"status": "error", "message": str(e)}), 400
 
@@ -336,6 +341,7 @@ def export_inventory(current_user):
                 "Category": p.category or "General",
                 "Price": float(p.price or 0),
                 "Stock": inv.qty_available if inv else 0,
+                "Minimum Stock": inv.safety_stock if inv else 0,
                 "SKU": p.sku,
             })
 

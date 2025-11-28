@@ -9,7 +9,10 @@ import api from './axios';
  * @returns {Promise} Response with dashboard data including sales, revenue, AI insights, and forecast
  */
 export const getShopDashboard = (shopId) => {
-    return api.get(`/shop/dashboard`, { params: { shop_id: shopId } });
+    return api.get(`/shop/dashboard`, { 
+        params: { shop_id: shopId },
+        timeout: 30000
+    });
 };
 
 /**
@@ -41,8 +44,32 @@ export const exportSalesData = (shopId) => {
     });
 };
 
+/**
+ * Get distributors for search
+ * @param {string} search - Search term (optional)
+ * @returns {Promise} Response with list of distributors
+ */
+export const getDistributors = (search = '') => {
+    return api.get(`/shop/distributors`, {
+        params: { search }
+    });
+};
+
+/**
+ * Get next quarter demand forecast
+ * @param {number} shopId - Shop ID
+ * @returns {Promise} Response with demand forecast data
+ */
+export const getDemandForecast = (shopId) => {
+    return api.get(`/shop/demand-forecast`, {
+        params: { shop_id: shopId }
+    });
+};
+
 export default {
     getShopDashboard,
     uploadSalesData,
-    exportSalesData
+    exportSalesData,
+    getDistributors,
+    getDemandForecast
 };

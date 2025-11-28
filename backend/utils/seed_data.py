@@ -251,7 +251,6 @@ def _seed_products(owner: User, shop: Shop) -> Dict[int, Tuple[Product, Dict[str
             is_trending=False,
             is_active=True,
             shop_id=shop.id,
-            seller_id=owner.id,
         )
         db.session.add(product)
         db.session.flush()

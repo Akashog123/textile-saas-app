@@ -41,8 +41,8 @@ def save_inquiry_file(file):
 @token_required
 def submit_inquiry(current_user):
     """
-    Allow customers or shop owners to submit a fabric inquiry with optional image/file attachment.
-    Automatically runs Gemini-based AI analysis on the uploaded fabric image.
+    Allow shop owners to submit a fabric inquiry to multiple distributors with optional image.
+    Images are sent directly to distributors without AI analysis.
     """
     try:
         print("[Info] Received form data:", request.form)
@@ -50,21 +50,35 @@ def submit_inquiry(current_user):
 
         data = request.form or request.get_json(silent=True) or {}
 
-        shop_id = data.get("shop_id")
+        distributor_ids = data.get("distributor_ids")
         message = data.get("message", "").strip()
-        file = request.files.get("file")
+        file = request.files.get("image")  # Changed from 'file' to 'image'
         
         user_id = current_user.get("id")
         username = current_user.get("username", "User")
 
         # Validate required fields
-        if not shop_id:
-            return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        if not distributor_ids:
+            return jsonify({"status": "error", "message": "distributor_ids is required"}), 400
 
-        # Validate shop
-        shop = Shop.query.get(shop_id)
-        if not shop:
-            return jsonify({"status": "error", "message": "Invalid shop ID"}), 404
+        # Parse distributor IDs
+        try:
+            import json
+            distributor_ids = json.loads(distributor_ids)
+            if not isinstance(distributor_ids, list) or len(distributor_ids) == 0:
+                raise ValueError("Invalid distributor_ids format")
+        except (json.JSONDecodeError, ValueError) as e:
+            return jsonify({"status": "error", "message": "Invalid distributor_ids format"}), 400
+
+        # Validate distributors
+        distributors = User.query.filter(
+            User.id.in_(distributor_ids),
+            User.role == "distributor",
+            User.approved == True
+        ).all()
+
+        if len(distributors) != len(distributor_ids):
+            return jsonify({"status": "error", "message": "Some distributors are invalid or not approved"}), 404
         
         # Validate file if provided
         if file:
@@ -75,43 +89,31 @@ def submit_inquiry(current_user):
         # Save uploaded file (if any)
         file_path = save_inquiry_file(file)
 
-        # Run AI-based fabric analysis (only if file uploaded)
-        ai_result = None
-        if file_path:
-            ai_result = analyze_fabric_inquiry(file_path, message)
-            print("AI Inquiry Result:", ai_result)
-        else:
-            ai_result = {"analysis": "No image uploaded, only text message received."}
+        # Create notifications for each distributor
+        notifications_created = []
+        for distributor in distributors:
+            notification = Notification(
+                user_id=distributor.id,
+                message=f"Inquiry from {username}: {message or 'No message provided'}",
+                link=file_path.replace("\\", "/") if file_path else None,
+                is_read=False
+            )
+            db.session.add(notification)
+            notifications_created.append({
+                "distributor_id": distributor.id,
+                "distributor_name": distributor.full_name
+            })
 
-        # Fallback acknowledgment if Gemini unavailable
-        ai_ack = (
-            ai_result.get("analysis") 
-            if isinstance(ai_result, dict) and "analysis" in ai_result 
-            else generate_ai_caption(shop.name, "Fabric Inquiry", 0)
-        )
-
-        # Save inquiry as a notification record
-        notification = Notification(
-            user_id=user_id,
-            message=f"Inquiry to {shop.name}: {message or 'No message provided'}",
-            link=file_path.replace("\\", "/") if file_path else None,
-            is_read=False
-        )
-        db.session.add(notification)
         db.session.commit()
 
         # Return structured response
         return jsonify({
             "status": "success",
-            "message": "Fabric inquiry analyzed and submitted successfully!",
-            "details": {
-                "shop": shop.name,
-                "file_path": file_path.replace("\\", "/") if file_path else None,
-                "ai_analysis": ai_result,
-                "ai_acknowledgment": ai_ack,
-                "submitted_by": username
-            }
-        }), 201
+            "message": f"Inquiry sent to {len(distributors)} distributor(s)",
+            "notifications_created": notifications_created,
+            "file_uploaded": bool(file_path),
+            "file_path": file_path.replace("\\", "/") if file_path else None
+        })
 
     except Exception as e:
         print("Inquiry submission error:", e)
@@ -127,7 +129,7 @@ def submit_inquiry(current_user):
 @inquiry_bp.route("/history", methods=["GET"])
 @token_required
 def inquiry_history(current_user):
-    """Fetch all inquiries (notifications) made by the current authenticated user."""
+    """Fetch all inquiries made by or received by the current authenticated user."""
     try:
         print("[Info] Fetching history for user:", current_user)
         
@@ -138,14 +140,17 @@ def inquiry_history(current_user):
             return jsonify({"status": "error", "message": "user_id is required"}), 400
 
         if role == "shop_owner":
-            shop = Shop.query.filter_by(owner_id=user_id).first()
-            if not shop:
-                return jsonify({"status": "error", "message": "Shop not found"}), 404
-
+            # For shop owners: get notifications they sent (inquiries they made)
             messages = Notification.query.filter(
-                Notification.message.ilike(f"%{shop.name}%")
+                Notification.message.ilike(f"%Inquiry from%")
+            ).order_by(Notification.created_at.desc()).all()
+        elif role == "distributor":
+            # For distributors: get notifications they received
+            messages = Notification.query.filter_by(
+                user_id=user_id
             ).order_by(Notification.created_at.desc()).all()
         else:
+            # For customers/other roles: get their own notifications
             messages = Notification.query.filter_by(
                 user_id=user_id
             ).order_by(Notification.created_at.desc()).all()

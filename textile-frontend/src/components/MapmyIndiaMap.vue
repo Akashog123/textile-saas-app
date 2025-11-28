@@ -365,7 +365,7 @@ const addMarkers = () => {
         position: { lat: shop.lat, lng: shop.lng },
         html: `
           <div class="custom-map-marker" style="
-            background: var(--color-primary, #F2BED1);
+            background: var(--color-primary, #4A90E2);
             border: 3px solid white;
             border-radius: 50%;
             width: 32px;
@@ -456,7 +456,7 @@ const showShopInfo = (shop) => {
       <h6 style="margin: 0 0 8px 0; color: #333;">${shop.name}</h6>
       <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${shop.description || 'Shop description'}</p>
       <p style="margin: 0; color: #999; font-size: 12px;">${shop.address || 'Address'}</p>
-      ${shop.distance ? `<p style="margin: 4px 0 0 0; color: var(--color-primary, #F2BED1); font-weight: bold; font-size: 12px;">${shop.distance}</p>` : ''}
+      ${shop.distance ? `<p style="margin: 4px 0 0 0; color: var(--color-primary, #4A90E2); font-weight: bold; font-size: 12px;">${shop.distance}</p>` : ''}
     </div>
   `
   

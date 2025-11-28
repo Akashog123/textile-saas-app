@@ -558,8 +558,7 @@ def create_products_for_shops(shops: List[Shop]) -> Dict[int, List[Product]]:
                 rating=round(random.uniform(4.0, 4.8), 1),
                 is_trending=random.choice([True, False]),
                 is_active=True,
-                shop_id=shop.id,
-                seller_id=shop.owner_id
+                shop_id=shop.id
             )
             db.session.add(product)
             db.session.flush()

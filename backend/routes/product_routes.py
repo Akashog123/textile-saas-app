@@ -125,7 +125,7 @@ def get_product_detail(product_id):
             "badge": product.badge,
             "is_trending": product.is_trending,
             "is_active": product.is_active,
-            "seller": product.shop.name if product.shop else "Independent Seller",
+            "seller": product.seller.full_name if product.seller else "Independent Seller",
             "shop_id": product.shop_id,
             "shop_location": product.shop.location if product.shop else "Unknown",
             "shop_city": product.shop.city if product.shop else "Unknown",
