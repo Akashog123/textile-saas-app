@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-home-page">
+  <div class="customer-home-page fade-in-entry">
     <!-- Search Bar -->
     <SearchBar 
       v-model="searchQuery"
@@ -260,6 +260,8 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { getTrendingFabrics, getPopularShops } from '@/api/apiCustomer';
+import { formatPricePerMeter } from '@/utils/priceUtils';
+import { validateFabricData, validateShopData } from '@/utils/dataValidation';
 import SearchBar from '@/components/SearchBar.vue';
 import MapmyIndiaMap from '@/components/MapmyIndiaMap.vue';
 
@@ -301,16 +303,11 @@ const fetchTrendingFabrics = async () => {
   errorFabrics.value = '';
   try {
     const response = await getTrendingFabrics();
+    console.log('[Trending Fabrics Response]', response.data);
+    
     if (response.data && response.data.fabrics) {
-      trendingFabrics.value = response.data.fabrics.map(fabric => ({
-        id: fabric.id,
-        name: fabric.name,
-        price: fabric.price ? `₹${parseFloat(fabric.price).toLocaleString()}` : '₹N/A',
-        description: fabric.ai_caption || fabric.description || 'No description available',
-        rating: fabric.rating || 4,
-        badge: fabric.badge || 'Trending',
-        image: fabric.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(fabric.name)}`
-      }));
+      trendingFabrics.value = response.data.fabrics.map(fabric => validateFabricData(fabric));
+      console.log('[Processed Trending Fabrics]', trendingFabrics.value);
     }
   } catch (err) {
     console.error('[Trending Fabrics Error]', err);
@@ -331,16 +328,7 @@ const fetchPopularShops = async () => {
   try {
     const response = await getPopularShops();
     if (response.data && response.data.shops) {
-      popularShops.value = response.data.shops.map(shop => ({
-        id: shop.id,
-        name: shop.name,
-        description: shop.description || 'Trusted textile shop',
-        rating: shop.rating || 4,
-        location: shop.location || shop.address || 'Location not available',
-        lat: shop.lat,
-        lon: shop.lon,
-        image: shop.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`
-      }));
+      popularShops.value = response.data.shops.map(shop => validateShopData(shop));
     }
   } catch (err) {
     console.error('[Popular Shops Error]', err);
@@ -358,7 +346,7 @@ const fetchPopularShops = async () => {
 const getFallbackFabrics = () => [
   {
     name: 'Handwoven Silk Brocade',
-    price: '₹1,850',
+    price: formatPricePerMeter(1850),
     description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions.',
     rating: 5,
     badge: 'Trending',
@@ -366,7 +354,7 @@ const getFallbackFabrics = () => [
   },
   {
     name: 'Premium Cotton Batik',
-    price: '₹650',
+    price: formatPricePerMeter(650),
     description: 'Soft and breathable premium cotton with traditional batik patterns. Ideal for summer wear with excellent comfort.',
     rating: 4,
     badge: 'Best Seller',
@@ -374,7 +362,7 @@ const getFallbackFabrics = () => [
   },
   {
     name: 'Luxury Georgette Silk',
-    price: '₹1,450',
+    price: formatPricePerMeter(1450),
     description: 'Elegant georgette silk with beautiful floral prints and luxurious drape.',
     rating: 5,
     badge: 'New Arrival',
@@ -382,7 +370,7 @@ const getFallbackFabrics = () => [
   },
   {
     name: 'Artisan Woven Cotton',
-    price: '₹890',
+    price: formatPricePerMeter(890),
     description: 'Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship.',
     rating: 4,
     badge: 'Handcrafted',
@@ -519,19 +507,35 @@ onMounted(() => {
 
 <style scoped>
 .customer-home-page {
+  background: transparent;
+  min-height: calc(100vh - 80px);
   padding: 2rem;
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
-  min-height: 100vh;
+  padding-bottom: 4rem;
 }
 
-/* Hero Search Section */
+.fade-in-entry {
+  animation: fadeInPage 0.6s ease-out forwards;
+}
+
+@keyframes fadeInPage {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .hero-search-section {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  padding: 2rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  padding: 2.5rem;
   border-radius: 24px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glass-border);
+  margin-bottom: 2rem;
 }
 
 .search-wrapper {
@@ -550,7 +554,7 @@ onMounted(() => {
 
 .search-input-group:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.2);
 }
 
 .search-icon {
@@ -606,7 +610,7 @@ onMounted(() => {
 
 .btn-nearby:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
@@ -616,15 +620,13 @@ onMounted(() => {
 
 /* Section Styling */
 .section {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  padding: 2rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  padding: 2.5rem;
   border-radius: 24px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid var(--glass-border);
 }
 
 .section:hover {
@@ -671,13 +673,20 @@ onMounted(() => {
 
 /* Modern Card Styling */
 .modern-card {
-  background: linear-gradient(135deg, #ffffff 0%, var(--color-bg-light) 100%);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
   padding: 2rem;
-  border: 1px solid var(--color-bg-alt);
+  border: 1px solid var(--glass-border);
   transition: all 0.3s ease;
-  max-width: 900px;
+  max-width: 950px;
   margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+}
+
+.modern-card:hover {
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
 }
 
 /* Carousel Wrapper & Container */
@@ -715,7 +724,7 @@ onMounted(() => {
   transform: scale(1.1);
   background: var(--color-primary);
   color: white;
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
 }
 
 .carousel-btn:disabled {
@@ -866,7 +875,7 @@ onMounted(() => {
   background: var(--color-primary);
   color: white;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.25);
 }
 
 .shop-location {

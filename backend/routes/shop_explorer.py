@@ -65,6 +65,7 @@ def get_shop_details(shop_id):
                 "description": product.description or "Premium textile fabric.",
                 "category": product.category,
                 "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
+                "seller": product.seller.full_name if product.seller else "Independent Seller",
                 "image": resolve_product_image(product),
                 "ai_caption": caption
             })

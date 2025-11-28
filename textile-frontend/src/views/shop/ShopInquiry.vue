@@ -1,24 +1,74 @@
 <template>
   <div class="shop-inquiry-tab">
     <h5 class="mb-3">
-      <i class="bi bi-chat-dots me-2"></i>Customer Inquiries & Fabric Analysis
+      <i class="bi bi-chat-dots me-2"></i>Distributor Inquiries & Fabric Analysis
     </h5>
 
     <!-- Inquiry Form Card -->
     <div class="card mb-4">
       <div class="card-body">
-        <h6 class="mb-3">Submit Inquiry</h6>
+        <h6 class="mb-3">Submit Inquiry to Distributors</h6>
         
         <div class="mb-3">
-          <label class="form-label">Shop ID</label>
-          <input
-            type="number"
-            class="form-control"
-            v-model.number="inquiryForm.shopId"
-            placeholder="Enter shop ID"
-            required
-          />
-          <small class="text-muted">Enter the shop ID you want to inquire about</small>
+          <label class="form-label">Search and Select Distributors</label>
+          <div class="distributor-search">
+            <div class="input-group">
+              <input
+                type="text"
+                class="form-control"
+                v-model="distributorSearch"
+                @input="searchDistributors"
+                placeholder="Type to search distributors by name, city, or state..."
+              />
+              <button class="btn btn-outline-secondary" type="button">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+            
+            <!-- Search Results Dropdown -->
+            <div v-if="searchResults.length > 0 && showDropdown" class="search-dropdown">
+              <div class="search-results">
+                <div
+                  v-for="distributor in searchResults"
+                  :key="distributor.id"
+                  class="search-result-item"
+                  @click="addDistributor(distributor)"
+                >
+                  <div class="distributor-info">
+                    <strong>{{ distributor.full_name }}</strong>
+                    <small class="text-muted d-block">{{ distributor.city }}, {{ distributor.state }}</small>
+                    <small class="text-muted">{{ distributor.email }}</small>
+                  </div>
+                  <button class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected Distributors -->
+        <div v-if="selectedDistributors.length > 0" class="mb-3">
+          <label class="form-label">Selected Distributors</label>
+          <div class="selected-distributors">
+            <div
+              v-for="(dist, index) in selectedDistributors"
+              :key="dist.id"
+              class="distributor-chip"
+              :class="{ 'favorite': dist.isFavorite }"
+              @click="toggleFavorite(dist)"
+            >
+              <i class="bi bi-star-fill" v-if="dist.isFavorite"></i>
+              <i class="bi bi-person" v-else></i>
+              {{ dist.full_name }}
+              <button
+                class="btn-close btn-close-sm ms-2"
+                @click.stop="removeDistributor(index)"
+              ></button>
+            </div>
+          </div>
+          <small class="text-muted">Click the star icon to mark as favorite</small>
         </div>
 
         <div class="mb-3">
@@ -35,7 +85,7 @@
         <div class="mb-3">
           <label class="form-label">Upload Fabric Image (Optional)</label>
           <p class="small text-muted mb-2">
-            Upload a fabric image to get AI-powered analysis including material identification and price estimation
+            Upload a fabric image to send directly to distributors for review
           </p>
           <div class="upload-zone" @click="$refs.imageInput.click()">
             <div v-if="!inquiryForm.image" class="text-center">
@@ -71,43 +121,16 @@
         <button
           class="btn btn-primary w-100"
           @click="submitInquiry"
-          :disabled="submitting || !inquiryForm.shopId || !inquiryForm.message"
+          :disabled="submitting || selectedDistributors.length === 0 || !inquiryForm.message"
         >
           <span v-if="submitting">
             <span class="spinner-border spinner-border-sm me-2"></span>
             Submitting...
           </span>
           <span v-else>
-            <i class="bi bi-send me-2"></i>Submit Inquiry
+            <i class="bi bi-send me-2"></i>Send Inquiry to {{ selectedDistributors.length }} Distributor(s)
           </span>
         </button>
-      </div>
-    </div>
-
-    <!-- AI Fabric Analysis Result -->
-    <div v-if="fabricAnalysis" class="card mb-4 ai-analysis-card">
-      <div class="card-body">
-        <h6 class="mb-3">
-          <i class="bi bi-stars me-2"></i>AI Fabric Analysis
-        </h6>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <strong>Fabric Name:</strong>
-            <p>{{ fabricAnalysis.fabric_name }}</p>
-          </div>
-          <div class="col-md-6">
-            <strong>Material:</strong>
-            <p>{{ fabricAnalysis.material }}</p>
-          </div>
-          <div class="col-md-6">
-            <strong>Estimated Price:</strong>
-            <p class="fs-5 text-success">{{ fabricAnalysis.estimated_price }}</p>
-          </div>
-          <div class="col-12">
-            <strong>AI Suggestion:</strong>
-            <p class="text-muted">{{ fabricAnalysis.suggestion }}</p>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -177,21 +200,28 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { getDistributors } from '@/api/apiShop';
 import { submitInquiry as submitInquiryAPI, getInquiryHistory } from '@/api/apiInquiry';
 
 // Form data
 const inquiryForm = ref({
-  shopId: null,
   message: '',
   image: null
 });
 
-const imagePreview = ref('');
-const submitting = ref(false);
-const fabricAnalysis = ref(null);
+// Distributor search
+const distributorSearch = ref('');
+const searchResults = ref([]);
+const selectedDistributors = ref([]);
+const showDropdown = ref(false);
+const favoriteDistributors = ref([]);
 
-// History
+// Loading states
+const submitting = ref(false);
+const imagePreview = ref('');
+
+// Inquiry history
 const inquiryHistory = ref([]);
 const loadingHistory = ref(false);
 const historyError = ref('');
@@ -200,6 +230,92 @@ const historyError = ref('');
 const showToast = ref(false);
 const toastMessage = ref('');
 const toastIcon = ref('bi bi-check-circle-fill');
+
+/**
+ * Search distributors with debouncing
+ */
+let searchTimeout;
+const searchDistributors = () => {
+  clearTimeout(searchTimeout);
+  const query = distributorSearch.value.trim();
+  
+  if (query.length < 2) {
+    searchResults.value = [];
+    showDropdown.value = false;
+    return;
+  }
+  
+  searchTimeout = setTimeout(async () => {
+    try {
+      const response = await getDistributors(query);
+      if (response.data && response.data.status === 'success') {
+        // Filter out already selected distributors
+        searchResults.value = response.data.data.filter(
+          dist => !selectedDistributors.value.find(selected => selected.id === dist.id)
+        );
+        showDropdown.value = searchResults.value.length > 0;
+      }
+    } catch (err) {
+      console.error('[Search Error]', err);
+      searchResults.value = [];
+    }
+  }, 300);
+};
+
+/**
+ * Add distributor to selected list
+ */
+const addDistributor = (distributor) => {
+  // Check if already selected
+  if (selectedDistributors.value.find(d => d.id === distributor.id)) {
+    return;
+  }
+  
+  // Add with favorite status
+  const isFavorite = favoriteDistributors.value.includes(distributor.id);
+  selectedDistributors.value.push({
+    ...distributor,
+    isFavorite
+  });
+  
+  // Clear search
+  distributorSearch.value = '';
+  searchResults.value = [];
+  showDropdown.value = false;
+};
+
+/**
+ * Remove distributor from selected list
+ */
+const removeDistributor = (index) => {
+  selectedDistributors.value.splice(index, 1);
+};
+
+/**
+ * Toggle distributor favorite status
+ */
+const toggleFavorite = (distributor) => {
+  distributor.isFavorite = !distributor.isFavorite;
+  
+  if (distributor.isFavorite) {
+    // Move to top of list
+    const index = selectedDistributors.value.findIndex(d => d.id === distributor.id);
+    if (index > 0) {
+      selectedDistributors.value.splice(index, 1);
+      selectedDistributors.value.unshift(distributor);
+    }
+    favoriteDistributors.value.push(distributor.id);
+  } else {
+    // Remove from favorites
+    const favIndex = favoriteDistributors.value.indexOf(distributor.id);
+    if (favIndex > -1) {
+      favoriteDistributors.value.splice(favIndex, 1);
+    }
+  }
+  
+  // Save to localStorage
+  localStorage.setItem('favoriteDistributors', JSON.stringify(favoriteDistributors.value));
+};
 
 /**
  * Handle image upload
@@ -236,36 +352,32 @@ const removeImage = () => {
  * Submit inquiry
  */
 const submitInquiry = async () => {
-  if (!inquiryForm.value.shopId || !inquiryForm.value.message) {
-    showToastMessage('Please fill in all required fields', 'bi bi-exclamation-circle-fill');
+  if (selectedDistributors.value.length === 0 || !inquiryForm.value.message) {
+    showToastMessage('Please select at least one distributor and enter a message', 'bi bi-exclamation-circle-fill');
     return;
   }
 
   submitting.value = true;
-  fabricAnalysis.value = null;
 
   try {
+    // Submit to each selected distributor
+    const distributorIds = selectedDistributors.value.map(d => d.id);
     const response = await submitInquiryAPI(
-      inquiryForm.value.shopId,
+      distributorIds,
       inquiryForm.value.message,
       inquiryForm.value.image
     );
 
     if (response.data) {
-      showToastMessage('Inquiry submitted successfully!', 'bi bi-check-circle-fill');
-      
-      // Display fabric analysis if provided
-      if (response.data.fabric_analysis) {
-        fabricAnalysis.value = response.data.fabric_analysis;
-      }
+      showToastMessage(`Inquiry sent to ${distributorIds.length} distributor(s)!`, 'bi bi-check-circle-fill');
 
       // Reset form
       inquiryForm.value = {
-        shopId: null,
         message: '',
         image: null
       };
       imagePreview.value = '';
+      selectedDistributors.value = [];
 
       // Refresh history
       await fetchInquiryHistory();
@@ -326,6 +438,23 @@ const showToastMessage = (message, icon) => {
 // Fetch history on mount
 onMounted(() => {
   fetchInquiryHistory();
+  // Load favorites from localStorage
+  const savedFavorites = localStorage.getItem('favoriteDistributors');
+  if (savedFavorites) {
+    favoriteDistributors.value = JSON.parse(savedFavorites);
+  }
+});
+
+// Close dropdown when clicking outside
+onUnmounted(() => {
+  clearTimeout(searchTimeout);
+});
+
+// Handle click outside to close dropdown
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.distributor-search')) {
+    showDropdown.value = false;
+  }
 });
 </script>
 
@@ -405,7 +534,7 @@ h5, h6 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
@@ -431,5 +560,97 @@ h5, h6 {
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+/* Distributor Search Styles */
+.distributor-search {
+  position: relative;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.search-results {
+  padding: 8px 0;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.search-result-item:hover {
+  background-color: #f8f9fa;
+}
+
+.distributor-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.distributor-info strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #333;
+}
+
+.distributor-info small {
+  display: block;
+  line-height: 1.3;
+}
+
+.selected-distributors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.distributor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #e9ecef;
+  border: 1px solid #dee2e6;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.distributor-chip:hover {
+  background: #dee2e6;
+  transform: translateY(-1px);
+}
+
+.distributor-chip.favorite {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  border-color: #ffd700;
+  color: #333;
+}
+
+.distributor-chip i {
+  font-size: 0.875rem;
+}
+
+.distributor-chip.favorite i {
+  color: #ff6b35;
 }
 </style>

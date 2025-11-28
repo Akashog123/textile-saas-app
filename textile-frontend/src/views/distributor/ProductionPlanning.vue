@@ -282,7 +282,7 @@ h5, h6 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 

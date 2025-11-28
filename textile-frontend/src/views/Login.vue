@@ -444,6 +444,9 @@ const handleLogin = async () => {
       // Force event dispatch after navigation completes
       await nextTick();
       window.dispatchEvent(new Event("user-logged-in"));
+      
+      // Also trigger a storage event for cross-tab communication
+      window.dispatchEvent(new Event("storage"));
     } else {
       loginError.value = data.message || "Login failed. Please try again.";
     }
@@ -798,7 +801,7 @@ const handleRegister = async () => {
 .form-control:focus, .form-select:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(242, 190, 209, 0.15);
+  box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.15);
 }
 
 .form-control::placeholder {

@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-shops-page">
+  <div class="customer-shops-page fade-in-entry">
     <!-- Search Bar -->
     <SearchBar 
       v-model="searchQuery"
@@ -147,7 +147,8 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { getAllShops, getShopDetails } from '@/api/apiCustomer';
+import { getShopDetails, getAllShops } from '@/api/apiCustomer';
+import { validateShopData, validateProductData } from '@/utils/dataValidation';
 import SearchBar from '@/components/SearchBar.vue';
 import MapmyIndiaMap from '@/components/MapmyIndiaMap.vue';
 
@@ -186,19 +187,7 @@ const fetchShops = async () => {
   try {
     const response = await getAllShops();
     if (response.data && response.data.shops) {
-      shops.value = response.data.shops.map(shop => ({
-        id: shop.id,
-        name: shop.name,
-        shortName: shop.name.split(' ').slice(0, 2).join(' '), // First 2 words
-        description: shop.description || 'Quality textile shop',
-        address: shop.address || 'Location not available',
-        contact: shop.contact || 'Contact not available',
-        hours: shop.hours || 'Open during business hours',
-        mapX: `${Math.random() * 70 + 15}%`,
-        mapY: `${Math.random() * 60 + 20}%`,
-        rating: shop.rating || 4,
-        products: shop.products || []
-      }));
+      shops.value = response.data.shops.map(shop => validateShopData(shop));
     }
   } catch (err) {
     console.error('[Shops Error]', err);
@@ -218,20 +207,8 @@ const fetchShopDetails = async (shopId) => {
     const response = await getShopDetails(shopId);
     if (response.data && response.data.shop) {
       return {
-        id: response.data.shop.id,
-        name: response.data.shop.name,
-        description: response.data.shop.description,
-        address: response.data.shop.address,
-        contact: response.data.shop.contact,
-        hours: response.data.shop.hours || 'Open during business hours',
-        rating: response.data.shop.rating || 4,
-        products: (response.data.products || []).map(p => ({
-          id: p.id,
-          name: p.name,
-          rating: p.rating || 4,
-          description: p.ai_caption || p.description || '',
-          image: p.image_url || `https://placehold.co/400x300?text=${encodeURIComponent(p.name)}`
-        }))
+        ...validateShopData(response.data.shop),
+        products: (response.data.products || []).map(p => validateProductData(p))
       };
     }
   } catch (err) {
@@ -364,9 +341,25 @@ onMounted(() => {
 
 <style scoped>
 .customer-shops-page {
+  background: transparent;
+  min-height: calc(100vh - 80px);
   padding: 2rem;
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
-  min-height: 100vh;
+  padding-bottom: 4rem;
+}
+
+.fade-in-entry {
+  animation: fadeInPage 0.6s ease-out forwards;
+}
+
+@keyframes fadeInPage {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Header */
@@ -379,13 +372,16 @@ h5 {
 /* Filters Section */
 .filters-section {
   padding: 1rem 1.5rem;
-  background: white;
-  border-radius: 16px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
+  margin-bottom: 2rem;
 }
 
 .fw-semibold {
@@ -408,22 +404,24 @@ h5 {
   border-color: var(--color-primary);
   color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
 }
 
 .filter-btn.active {
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   border-color: transparent;
-  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.35);
 }
 
 /* Map Section */
 .map-section {
-  background: white;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
   padding: 1.5rem;
-  border-radius: 20px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
 }
 
 .map-section h6 {
@@ -466,20 +464,19 @@ h5 {
 }
 
 .marker-label {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: white;
-  padding: 0.5rem 1rem;
+  background: white;
+  border: 2px solid var(--color-primary);
   border-radius: 50px;
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
   transition: all 0.3s ease;
 }
 
 .marker-label:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.6);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.5);
 }
 
 /* Shops List */
@@ -505,16 +502,17 @@ h5 {
 
 .shop-item {
   cursor: pointer;
-  transition: all 0.3s ease;
-  border: none;
-  border-radius: 16px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  background: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
 }
 
 .shop-item:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 35px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 12px 35px rgba(74, 144, 226, 0.15);
 }
 
 .shop-item .card-title {
@@ -587,7 +585,7 @@ h5 {
   height: 80px;
   font-size: 2.5rem;
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  box-shadow: 0 8px 20px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.25);
 }
 
 .shop-profile-modal h5 {
@@ -637,7 +635,7 @@ h5 {
 
 .product-card:hover {
   border-color: var(--color-primary);
-  box-shadow: 0 4px 15px rgba(242, 190, 209, 0.15);
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.15);
   transform: translateY(-3px);
 }
 

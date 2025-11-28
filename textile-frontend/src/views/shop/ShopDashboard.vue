@@ -15,7 +15,7 @@
         <div class="d-flex gap-2">
           <button class="btn btn-gradient btn-sm" @click="handleUploadSalesData">
             <i class="bi bi-graph-up-arrow me-1"></i>
-            Upload Sales Data
+            Upload Periodic Sales Data
           </button>
           <button class="btn btn-gradient btn-sm" @click="exportReport">
             <i class="bi bi-download me-1"></i>
@@ -34,7 +34,7 @@
       >
         <div
           class="metric-card p-3"
-          :style="{ animationDelay: `${index * 0.1}s` }"
+          :style="{ animationDelay: (index * 0.1) + 's' }"
         >
           <div class="d-flex align-items-center justify-content-between mb-2">
             <small class="metric-label">{{ metric.label }}</small>
@@ -498,7 +498,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { getShopDashboard, uploadSalesData as uploadSalesDataAPI, exportSalesData } from '@/api/apiShop';
+import { getShopDashboard, uploadSalesData as uploadSalesDataAPI, exportSalesData, getDemandForecast } from '@/api/apiShop';
 
 // Loading and error states
 const loading = ref(false);
@@ -506,6 +506,11 @@ const error = ref('');
 
 // Dashboard data from backend
 const dashboardData = ref(null);
+
+// Demand forecast data
+const demandForecast = ref([]);
+const forecastLoading = ref(false);
+const forecastError = ref('');
 
 // Shop ID - get from logged-in user
 const shopId = computed(() => {
@@ -523,6 +528,15 @@ const metrics = ref([
     changeIcon: 'bi bi-arrow-up',
     icon: 'bi bi-currency-rupee',
     iconClass: 'bg-success-soft',
+  },
+  {
+    label: 'Avg Order Value',
+    value: '₹0',
+    change: '+0%',
+    changeClass: 'positive',
+    changeIcon: 'bi bi-arrow-up',
+    icon: 'bi bi-receipt',
+    iconClass: 'bg-info-soft',
   },
   {
     label: 'Pending Reorders',
@@ -544,12 +558,21 @@ const metrics = ref([
   },
   {
     label: 'Customer Rating',
-    value: '0.0',
+    value: '0.0★',
     change: '+0',
     changeClass: 'positive',
     changeIcon: 'bi bi-arrow-up',
     icon: 'bi bi-star-fill',
     iconClass: 'bg-info-soft ',
+  },
+  {
+    label: 'Growth',
+    value: '0%',
+    change: '+0%',
+    changeClass: 'positive',
+    changeIcon: 'bi bi-graph-up',
+    icon: 'bi bi-graph-up-arrow',
+    iconClass: 'bg-success-soft',
   },
 ]);
 
@@ -666,6 +689,7 @@ const fetchDashboard = async () => {
     if (response.data) {
       dashboardData.value = response.data;
       updateMetricsFromData(response.data);
+      updateReorderSuggestions(response.data);
       updateForecastsFromData(response.data);
       updateInsightsFromData(response.data);
     }
@@ -682,13 +706,40 @@ const fetchDashboard = async () => {
  * Update metrics from dashboard data
  */
 const updateMetricsFromData = (data) => {
-  if (data.total_revenue !== undefined) {
-    metrics.value[0].value = `₹${parseFloat(data.total_revenue).toLocaleString()}`;
+  if (data.weekly_sales !== undefined) {
+    metrics.value[0].value = data.weekly_sales || '₹0';
   }
-  if (data.total_units !== undefined) {
-    metrics.value[2].value = data.total_units.toString();
+  if (data.avg_order_value !== undefined) {
+    metrics.value[1].value = data.avg_order_value || '₹0';
   }
-  // You can add more metric updates based on backend response
+  if (data.pending_reorders !== undefined) {
+    metrics.value[2].value = data.pending_reorders || 0;
+  }
+  if (data.total_orders !== undefined) {
+    metrics.value[3].value = data.total_orders || 0;
+  }
+  if (data.customer_rating !== undefined) {
+    metrics.value[4].value = `${data.customer_rating}★` || '4.0★';
+  }
+  if (data.growth !== undefined) {
+    metrics.value[5].value = data.growth || '0%';
+  }
+};
+
+const updateReorderSuggestions = (data) => {
+  if (data.reorder_suggestions && data.reorder_suggestions.length > 0) {
+    reorderProducts.value = data.reorder_suggestions.map(item => ({
+      name: item.product_name,
+      image: `https://placehold.co/100x100?text=${encodeURIComponent(item.product_name)}`,
+      supplier: `SKU: ${item.sku}`,
+      quantity: item.reorder_quantity,
+      price: `₹${parseFloat(item.price).toLocaleString()}`,
+      sku: item.sku,
+      currentStock: item.current_stock,
+      minimumStock: item.minimum_stock,
+      category: item.category
+    }));
+  }
 };
 
 /**
@@ -753,13 +804,13 @@ const handleUploadSalesData = async () => {
 
     loading.value = true;
     try {
-      toastMessage.value = 'Uploading sales data...';
+      toastMessage.value = 'Uploading periodic sales data...';
       toastIcon.value = 'bi bi-upload';
       showToast.value = true;
 
       await uploadSalesDataAPI(shopId.value, file);
       
-      toastMessage.value = 'Sales data uploaded successfully!';
+      toastMessage.value = 'Periodic sales data uploaded successfully!';
       toastIcon.value = 'bi bi-check-circle-fill';
       
       // Refresh dashboard after upload
@@ -905,20 +956,54 @@ const hideTooltip = () => {
   console.log('Hide tooltip');
 };
 
-// Fetch dashboard on mount
+/**
+ * Fetch demand forecast data
+ */
+const fetchDemandForecast = async () => {
+  if (!shopId.value) return;
+  
+  forecastLoading.value = true;
+  forecastError.value = '';
+  
+  try {
+    const response = await getDemandForecast(shopId.value);
+    if (response.data && response.data.status === 'success') {
+      demandForecast.value = response.data.forecast || [];
+    }
+  } catch (err) {
+    console.error('[Demand Forecast Error]', err);
+    forecastError.value = err.response?.data?.message || 'Failed to load demand forecast';
+  } finally {
+    forecastLoading.value = false;
+  }
+};
+
+/**
+ * Get confidence badge class
+ */
+const getConfidenceClass = (confidence) => {
+  switch (confidence) {
+    case 'High': return 'bg-success';
+    case 'Medium': return 'bg-warning';
+    case 'Low': return 'bg-danger';
+    default: return 'bg-secondary';
+  }
+};
+
+// Fetch dashboard data on mount
 onMounted(() => {
   fetchDashboard();
   updateArrows();
+  fetchDemandForecast();
 });
 </script>
 
 <style scoped>
 /* ===== Base Styles ===== */
-.shop-dashboard-tab {
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
-  min-height: calc(100vh - 60px);
+.shop-dashboard {
+  background: var(--gradient-bg);
+  min-height: calc(100vh - 80px);
   padding: 2rem;
-  animation: fadeIn 0.5s ease-in;
 }
 
 @keyframes fadeIn {
@@ -974,12 +1059,12 @@ h6.card-title {
 .dashboard-hero {
   background: linear-gradient(
     135deg,
-    rgba(242, 190, 209, 0.1) 0%,
-    rgba(118, 75, 162, 0.1) 100%
+    rgba(74, 144, 226, 0.1) 0%,
+    rgba(179, 217, 255, 0.05) 100%
   );
   border-radius: 16px;
   padding: 1.5rem;
-  border: 1px solid rgba(242, 190, 209, 0.2);
+  border: 1px solid rgba(74, 144, 226, 0.2);
 }
 
 .hero-title {
@@ -1004,12 +1089,12 @@ h6.card-title {
   font-weight: 500;
   border-radius: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
 }
 
 .btn-gradient:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
   color: white;
 }
@@ -1028,7 +1113,7 @@ h6.card-title {
   border-color: var(--color-primary);
   color: white;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.25);
 }
 
 /* ===== Metric Cards ===== */
@@ -1142,10 +1227,10 @@ h6.card-title {
 .summary-content {
   background: linear-gradient(
     135deg,
-    rgba(242, 190, 209, 0.05) 0%,
-    rgba(118, 75, 162, 0.05) 100%
+    rgba(74, 144, 226, 0.05) 0%,
+    rgba(179, 217, 255, 0.03) 100%
   );
-  border: 1px solid rgba(242, 190, 209, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.1);
   border-radius: 12px;
 }
 
@@ -1163,7 +1248,7 @@ h6.card-title {
 
 /* ===== Chart ===== */
 .chart-placeholder {
-  background: linear-gradient(135deg, rgba(242, 190, 209, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.15) 0%, rgba(107, 163, 229, 0.15) 100%);
   border-radius: 12px;
   padding: 1.5rem 1rem 0.5rem 1rem;
 }
@@ -1184,17 +1269,17 @@ h6.card-title {
 
 .chart-point:hover {
   r: 8;
-  filter: drop-shadow(0 2px 8px rgba(242, 190, 209, 0.5));
+  filter: drop-shadow(0 2px 8px rgba(74, 144, 226, 0.4));
 }
 
 /* ===== Forecast Section ===== */
 .forecast-container {
   background: linear-gradient(
     135deg,
-    rgba(242, 190, 209, 0.05) 0%,
-    rgba(118, 75, 162, 0.05) 100%
+    rgba(74, 144, 226, 0.05) 0%,
+    rgba(179, 217, 255, 0.03) 100%
   );
-  border: 1px solid rgba(242, 190, 209, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.1);
   border-radius: 12px;
 }
 
@@ -1235,7 +1320,7 @@ h6.card-title {
 }
 
 .trend-stable {
-  background: rgba(242, 190, 209, 0.1);
+  background: rgba(74, 144, 226, 0.08);
   color: var(--color-primary);
 }
 
@@ -1253,17 +1338,17 @@ h6.card-title {
   padding: 1rem;
   background: linear-gradient(
     135deg,
-    rgba(242, 190, 209, 0.03) 0%,
-    rgba(118, 75, 162, 0.03) 100%
+    rgba(74, 144, 226, 0.03) 0%,
+    rgba(179, 217, 255, 0.02) 100%
   );
   border-radius: 12px;
-  border: 1px solid rgba(242, 190, 209, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.08);
   transition: all 0.3s ease;
 }
 
 .insight-item:hover {
-  border-color: rgba(242, 190, 209, 0.3);
-  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.1);
+  border-color: rgba(74, 144, 226, 0.25);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.08);
   transform: translateX(4px);
 }
 
@@ -1319,7 +1404,7 @@ h6.card-title {
   width: 40px;
   height: 40px;
   background: white;
-  border: 1px solid rgba(242, 190, 209, 0.2);
+  border: 1px solid rgba(74, 144, 226, 0.15);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1357,7 +1442,7 @@ h6.card-title {
 
 .reorder-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 12px 40px rgba(74, 144, 226, 0.15);
 }
 
 .product-image-wrapper {
@@ -1448,7 +1533,7 @@ h6.card-title {
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border-color: var(--color-primary);
   color: white;
-  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
 }
 
 /* ===== Products Grid ===== */
@@ -1470,7 +1555,7 @@ h6.card-title {
 
 .product-grid-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(242, 190, 209, 0.2);
+  box-shadow: 0 12px 40px rgba(74, 144, 226, 0.15);
 }
 
 .product-grid-image {

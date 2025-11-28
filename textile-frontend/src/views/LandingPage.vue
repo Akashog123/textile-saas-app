@@ -156,7 +156,7 @@ defineOptions({
 /* Color Palette Variables */
 .landing-page {
   font-family: 'Outfit', sans-serif;
-  background-color: var(--color-bg);
+  background: var(--gradient-bg);
   color: var(--color-text-dark);
   overflow-x: hidden;
 }
@@ -207,10 +207,10 @@ defineOptions({
 }
 
 .btn-primary:hover {
-  background-color: #e0a3b8;
-  border-color: #e0a3b8;
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
 }
 
 .btn-outline-primary {
@@ -282,24 +282,29 @@ defineOptions({
   background: white;
   padding: 1rem 1.5rem;
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
   display: flex;
   align-items: center;
   gap: 1rem;
   z-index: 2;
   font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text-dark);
   animation: float 6s ease-in-out infinite;
+  border: 1px solid rgba(74, 144, 226, 0.1);
 }
 
 .floating-card i {
   width: 40px;
   height: 40px;
-  background: var(--color-bg-alt);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-dark);
+  color: white;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.25);
 }
 
 .card-1 { top: 10%; left: 0; animation-delay: 0s; }
@@ -330,6 +335,7 @@ defineOptions({
   height: 100%;
   transition: all 0.3s ease;
   border: 1px solid transparent;
+  color: var(--color-text-dark);
 }
 
 .feature-card:hover {
@@ -339,8 +345,9 @@ defineOptions({
 }
 
 .feature-card.highlight {
-  background: var(--color-bg-alt);
-  border: 1px solid var(--color-accent);
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.05) 0%, rgba(179, 217, 255, 0.08) 100%);
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 8px 30px rgba(74, 144, 226, 0.15);
 }
 
 .icon-wrapper {
@@ -360,6 +367,15 @@ defineOptions({
 .feature-card h3 {
   font-weight: 700;
   margin-bottom: 1rem;
+  color: var(--color-text-dark);
+  font-size: 1.5rem;
+}
+
+.feature-card p {
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
 }
 
 .feature-list {
@@ -373,11 +389,15 @@ defineOptions({
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--color-text-dark);
 }
 
 .feature-list i {
-  color: #d63384;
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  font-weight: bold;
 }
 
 /* CTA Section */

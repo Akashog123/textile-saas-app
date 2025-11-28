@@ -3,11 +3,14 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Sales Inventory</h5>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary btn-sm" @click="handleExport" :disabled="loading">
-          <i class="bi bi-download me-1"></i> Export
+        <button class="btn btn-success btn-sm" @click="handleInitialInventoryUpload" :disabled="loading">
+          <i class="bi bi-database-add me-1"></i> Initial Inventory Upload
         </button>
-        <button class="btn btn-primary btn-sm" @click="handleImport" :disabled="loading">
-          <i class="bi bi-upload me-1"></i> Import
+        <button class="btn btn-outline-primary btn-sm" @click="handlePDFReport" :disabled="loading">
+          <i class="bi bi-file-earmark-pdf me-1"></i> PDF Report
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" @click="handleExport" :disabled="loading">
+          <i class="bi bi-download me-1"></i> Export Excel
         </button>
       </div>
     </div>
@@ -38,6 +41,8 @@
                 <th>Sales QTY</th>
                 <th>Price/Meter</th>
                 <th>Stock</th>
+                <th>Min Stock</th>
+                <th>Status</th>
                 <th>SKU ID</th>
                 <th>Actions</th>
               </tr>
@@ -46,8 +51,11 @@
               <tr v-for="(item, idx) in inventoryData" :key="item.id || idx">
                 <td>{{ idx + 1 }}</td>
                 <td>
-                  <div class="product-thumbnail">
+                  <div class="product-thumbnail" v-if="item.image">
                     <img :src="item.image" :alt="item.name" />
+                  </div>
+                  <div class="no-image-placeholder" v-else>
+                    <i class="bi bi-image"></i>
                   </div>
                 </td>
                 <td>
@@ -63,12 +71,20 @@
                   <strong class="price-text">{{ item.price }}</strong>
                 </td>
                 <td>
-                  <span :class="['stock-badge', getStockClass(item.stock)]">
-                    {{ item.stock }}m
+                  <div class="stock-info">
+                    <span class="stock-amount" :class="getStockClass(item.stock, item.minimumStock)">{{ item.stock }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="min-stock-badge">{{ item.minimumStock || 0 }}</span>
+                </td>
+                <td>
+                  <span class="stock-status" :class="getStockStatusClass(item.stock, item.minimumStock)">
+                    {{ getStockStatus(item.stock, item.minimumStock) }}
                   </span>
                 </td>
                 <td>
-                  <small class="text-muted">{{ item.sku }}</small>
+                  <code class="sku-code">{{ item.sku }}</code>
                 </td>
                 <td>
                   <div class="action-buttons">
@@ -77,7 +93,7 @@
                       title="Edit"
                       @click="openEditModal(item)"
                     >
-                      <i class="bi bi pencil"></i>
+                      <i class="bi bi-pencil"></i>
                     </button>
                     <button
                       class="btn btn-sm btn-outline-danger"
@@ -90,7 +106,7 @@
                 </td>
               </tr>
               <tr v-if="inventoryData.length === 0">
-                <td colspan="8" class="text-center text-muted py-4">
+                <td colspan="10" class="text-center text-muted py-4">
                   <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                   No inventory items found. Click Import to add products.
                 </td>
@@ -146,6 +162,15 @@
                 min="0"
               />
             </div>
+            <div class="mb-3">
+              <label class="form-label">Minimum Stock (meters)</label>
+              <input
+                type="number"
+                class="form-control"
+                v-model.number="editForm.minimumStock"
+                min="0"
+              />
+            </div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="closeEditModal">Cancel</button>
@@ -191,7 +216,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { getInventory, importInventory, editInventoryItem, deleteInventoryItem, exportInventory } from '@/api/apiInventory';
+import { getInventory, importInventory, editInventoryItem, deleteInventoryItem, exportInventory, generateInventoryPDF } from '@/api/apiInventory';
 
 // Loading and error states
 const loading = ref(false);
@@ -211,7 +236,7 @@ const shopId = computed(() => {
 // Modals
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
-const editForm = ref({ id: null, name: '', price: 0, stock: 0 });
+const editForm = ref({ id: null, name: '', price: 0, stock: 0, minimumStock: 0 });
 const deleteItem = ref(null);
 
 // Toast
@@ -232,17 +257,20 @@ const fetchInventory = async () => {
   error.value = '';
   try {
     const response = await getInventory(shopId.value);
-    if (response.data && response.data.products) {
-      inventoryData.value = response.data.products.map(p => ({
+    if (response.data && response.data.status === 'success') {
+      const products = response.data.data || [];
+      inventoryData.value = products.map(p => ({
         id: p.id,
         name: p.name,
         category: p.category || 'Uncategorized',
-        image: p.image_url || `https://placehold.co/100x100?text=${encodeURIComponent(p.name)}`,
+        image: p.image || null,
         qty: p.sales_qty || 0,
         price: p.price ? `₹${parseFloat(p.price).toLocaleString()}` : '₹0',
         priceRaw: parseFloat(p.price) || 0,
         stock: p.stock || 0,
-        sku: p.sku || 'N/A'
+        minimumStock: p.minimum_stock || 0,
+        sku: p.sku || 'N/A',
+        rating: p.rating || 0
       }));
     }
   } catch (err) {
@@ -251,6 +279,39 @@ const fetchInventory = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+/**
+ * Handle initial inventory upload
+ */
+const handleInitialInventoryUpload = () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.xlsx,.xls';
+
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 16 * 1024 * 1024) {
+      showToastMessage('File too large (max 16MB)', 'bi bi-exclamation-circle-fill');
+      return;
+    }
+
+    loading.value = true;
+    try {
+      await importInventory(shopId.value, file);
+      showToastMessage('Initial inventory data uploaded successfully!', 'bi bi-check-circle-fill');
+      await fetchInventory();
+    } catch (err) {
+      console.error('[Initial Upload Error]', err);
+      showToastMessage(err.response?.data?.message || 'Initial upload failed', 'bi bi-exclamation-circle-fill');
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  input.click();
 };
 
 /**
@@ -287,6 +348,31 @@ const handleImport = () => {
 };
 
 /**
+ * Handle PDF report generation
+ */
+const handlePDFReport = async () => {
+  try {
+    loading.value = true;
+    const response = await generateInventoryPDF(shopId.value);
+    
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `inventory_report_${shopId.value}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    showToastMessage('PDF report generated successfully!', 'bi bi-check-circle-fill');
+  } catch (err) {
+    console.error('[PDF Report Error]', err);
+    showToastMessage(err.response?.data?.message || 'Failed to generate PDF report', 'bi bi-exclamation-circle-fill');
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
  * Handle export
  */
 const handleExport = async () => {
@@ -319,7 +405,8 @@ const openEditModal = (item) => {
     id: item.id,
     name: item.name,
     price: item.priceRaw,
-    stock: item.stock
+    stock: item.stock,
+    minimumStock: item.minimumStock || 0
   };
   showEditModal.value = true;
 };
@@ -329,15 +416,15 @@ const openEditModal = (item) => {
  */
 const closeEditModal = () => {
   showEditModal.value = false;
-  editForm.value = { id: null, name: '', price: 0, stock: 0 };
+  editForm.value = { id: null, name: '', price: 0, stock: 0, minimumStock: 0 };
 };
 
 /**
  * Save edit
  */
 const saveEdit = async () => {
-  if (editForm.value.price < 0 || editForm.value.stock < 0) {
-    showToastMessage('Price and stock must be non-negative', 'bi bi-exclamation-circle-fill');
+  if (editForm.value.price < 0 || editForm.value.stock < 0 || editForm.value.minimumStock < 0) {
+    showToastMessage('Price, stock, and minimum stock must be non-negative', 'bi bi-exclamation-circle-fill');
     return;
   }
 
@@ -345,9 +432,9 @@ const saveEdit = async () => {
   try {
     await editInventoryItem(editForm.value.id, {
       price: editForm.value.price,
-      stock: editForm.value.stock
+      stock: editForm.value.stock,
+      minimum_stock: editForm.value.minimumStock
     });
-    
     showToastMessage('Product updated successfully!', 'bi bi-check-circle-fill');
     closeEditModal();
     await fetchInventory();
@@ -406,9 +493,9 @@ const showToastMessage = (message, icon) => {
 };
 
 /**
- * Get stock class based on quantity
+ * Get stock class based on quantity (legacy function)
  */
-const getStockClass = (stock) => {
+const getStockClassLegacy = (stock) => {
   if (stock < 20) return 'low';
   if (stock < 50) return 'medium';
   return 'high';
@@ -420,6 +507,33 @@ const getStockClass = (stock) => {
 const totalQuantity = computed(() => {
   return inventoryData.value.reduce((sum, item) => sum + item.qty, 0);
 });
+
+/**
+ * Get stock status class based on stock levels
+ */
+const getStockClass = (stock, minStock) => {
+  if (stock <= minStock) return 'stock-critical';
+  if (stock <= minStock * 2) return 'stock-low';
+  return 'stock-good';
+};
+
+/**
+ * Get stock status text
+ */
+const getStockStatus = (stock, minStock) => {
+  if (stock <= minStock) return 'Critical';
+  if (stock <= minStock * 2) return 'Low';
+  return 'Good';
+};
+
+/**
+ * Get stock status class for badge
+ */
+const getStockStatusClass = (stock, minStock) => {
+  if (stock <= minStock) return 'bg-danger';
+  if (stock <= minStock * 2) return 'bg-warning';
+  return 'bg-success';
+};
 
 // Fetch inventory on mount
 onMounted(() => {
@@ -494,8 +608,8 @@ h5 {
 .table tbody tr:hover {
   background: linear-gradient(
     135deg,
-    rgba(242, 190, 209, 0.05) 0%,
-    rgba(118, 75, 162, 0.05) 100%
+    rgba(74, 144, 226, 0.05) 0%,
+    rgba(179, 217, 255, 0.03) 100%
   );
   transform: scale(1.01);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -520,13 +634,29 @@ h5 {
 .product-thumbnail:hover {
   border-color: var(--color-primary);
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
 }
 
 .product-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.no-image-placeholder {
+  width: 60px;
+  height: 60px;
+  border: 2px dashed #dee2e6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  color: #6c757d;
+}
+
+.no-image-placeholder i {
+  font-size: 1.2rem;
 }
 
 .product-name-cell strong {
@@ -624,6 +754,43 @@ h5 {
   font-size: 1.1rem;
 }
 
+/* Stock Status Styles */
+.stock-status.bg-danger {
+  background-color: #f8d7da !important;
+  color: #ff6b6b !important;
+  font-weight: 700;
+}
+
+.stock-status.bg-warning {
+  background-color: #fff3cd !important;
+  color: #ffa94d !important;
+  font-weight: 600;
+}
+
+.stock-status.bg-success {
+  background-color: #d1e7dd !important;
+  color: #51cf66 !important;
+  font-weight: 500;
+}
+
+.min-stock-badge {
+  background: rgba(13, 110, 253, 0.1);
+  color: var(--color-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.stock-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
 /* Modal Styles */
 .modal-overlay {
   position: fixed;
@@ -701,12 +868,12 @@ h5 {
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(242, 190, 209, 0.3);
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(242, 190, 209, 0.4);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
