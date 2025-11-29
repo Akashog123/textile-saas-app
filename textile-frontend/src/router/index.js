@@ -6,6 +6,7 @@ import DistributorHome from "../views/Distributor.vue";
 import ShopDashboard from "../views/shop/ShopDashboard.vue";
 import ShopInventory from "../views/shop/ShopInventory.vue";
 import ShopMarketing from "../views/shop/ShopMarketing.vue";
+import ShopProfile from "@/views/shop/ShopProfile.vue";
 import ShopInquiry from "../views/shop/ShopInquiry.vue";
 import LandingPage from "../views/LandingPage.vue";
 
@@ -66,6 +67,12 @@ const routes = [
         name: "ShopInquiry",
         component: ShopInquiry,
         meta: { title: "Inquiry - Shop Manager" }
+      },
+      {
+        path: "profile",
+        name: "ShopProfile",
+        component: ShopProfile,
+        meta: { title: "Profile - Shop Manager" }
       },
     ],
   },

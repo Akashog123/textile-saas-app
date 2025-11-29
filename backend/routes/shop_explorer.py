@@ -1,11 +1,13 @@
 # routes/shop_explorer.py
 
 from flask import Blueprint, jsonify, request
-from models.model import db, Shop, Product
+from models.model import db, Shop, Product, User
 from config import Config
 from utils.image_utils import resolve_product_image, resolve_shop_image
+from utils.auth_utils import token_required
 from services.ai_service import generate_ai_caption
 import requests
+import logging
 from math import cos, radians
 
 shop_explorer_bp = Blueprint("shop_explorer", __name__)
@@ -14,85 +16,66 @@ shop_explorer_bp = Blueprint("shop_explorer", __name__)
 # GET: All Shops
 @shop_explorer_bp.route("/shops", methods=["GET"])
 def get_all_shops():
-    """Fetch all registered shops with key summary details."""
     try:
         shops = Shop.query.all()
-        result = []
-
-        for s in shops:
-            result.append({
-                "id": s.id,
-                "name": s.name,
-                "description": s.description or "Trusted textile shop",
-                "location": s.location or "N/A",
-                "rating": round(s.rating or 4.2, 1),
-                "is_popular": s.is_popular,
-                "lat": s.lat,
-                "lon": s.lon,
-                "shortName": s.name.split()[0] if s.name else "Shop",
-                "image": resolve_shop_image(s),
-            })
-
+        result = [_serialize_shop(s) for s in shops]
         return jsonify({"status": "success", "count": len(result), "shops": result}), 200
+    except Exception:
+        logger.exception("[Error - Get All Shops]")
+        return jsonify({"status": "error", "message": "Failed to fetch shops"}), 500
 
-    except Exception as e:
-        print("[Error - Get All Shops]", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
 
-
-# GET: Single Shop Details (with Products)
+# ------------------------------------------------------------------
+# Single Shop details (public)
+# ------------------------------------------------------------------
 @shop_explorer_bp.route("/shop/<int:shop_id>", methods=["GET"])
 def get_shop_details(shop_id):
-    """Fetch detailed shop info with all its listed fabrics."""
     try:
-        shop = Shop.query.filter_by(id=shop_id).first()
+        shop = Shop.query.get(shop_id)
         if not shop:
-            return jsonify({
-                "status": "error",
-                "message": f"Shop with id {shop_id} not found"
-            }), 404
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
 
         products = Product.query.filter_by(shop_id=shop.id).all()
         product_data = []
-
         for product in products:
-            price = _to_float(product.price)
-            caption = generate_ai_caption(product.name, product.category, price)
+            try:
+                price = float(product.price) if product.price is not None else 0.0
+            except Exception:
+                price = 0.0
+
+            caption = ""
+            try:
+                caption = generate_ai_caption(product.name, product.category, price)
+            except Exception:
+                logger.exception("AI caption failed for product %s", getattr(product, "id", "n/a"))
+
             product_data.append({
                 "id": product.id,
                 "name": product.name,
                 "price": f"₹{price:,.0f}",
-                "description": product.description or "Premium textile fabric.",
+                "description": product.description or "",
                 "category": product.category,
                 "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
-                "seller": product.seller.full_name if product.seller else "Independent Seller",
+                "seller": getattr(product, "seller").full_name if getattr(product, "seller", None) else "Independent Seller",
                 "image": resolve_product_image(product),
                 "ai_caption": caption
             })
 
-        shop_data = {
-            "id": shop.id,
-            "name": shop.name,
-            "description": shop.description or "",
-            "rating": round(getattr(shop, "rating", 4.3) or 4.3, 1),
-            "location": shop.location or "N/A",
-            "image": resolve_shop_image(shop),
-            "products": product_data
-        }
-
+        shop_data = _serialize_shop(shop)
+        shop_data["products"] = product_data
         return jsonify({"status": "success", "shop": shop_data}), 200
+    except Exception:
+        logger.exception("[Error - Shop Details]")
+        return jsonify({"status": "error", "message": "Failed to fetch shop details"}), 500
 
-    except Exception as e:
-        print("[Error - Shop Details]", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
 
-
-# GET: Search Shops & Fabrics
+# ------------------------------------------------------------------
+# Search (public)
+# ------------------------------------------------------------------
 @shop_explorer_bp.route("/search", methods=["GET"])
 def search():
-    """Search both shops and fabrics dynamically."""
     try:
-        query = request.args.get("q", "").strip().lower()
+        query = (request.args.get("q") or "").strip()
         if not query:
             return jsonify({"status": "success", "shops": [], "products": []}), 200
 
@@ -107,33 +90,29 @@ def search():
             "id": s.id,
             "name": s.name,
             "description": s.description,
-            "rating": round(s.rating or 4.0, 1),
-            "image": s.image_url
+            "rating": round(getattr(s, "rating", 4.0) or 4.0, 1),
+            "image": getattr(s, "image_url", None)
         } for s in shops]
 
         fabric_results = [{
             "id": p.id,
             "name": p.name,
             "category": p.category,
-            "price": f"₹{p.price:,.0f}",
+            "price": f"₹{(float(p.price) if p.price is not None else 0):,.0f}",
             "image": resolve_product_image(p)
         } for p in products]
 
-        return jsonify({
-            "status": "success",
-            "shops": shop_results,
-            "products": fabric_results
-        }), 200
-
-    except Exception as e:
-        print("[Error - Search]", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "success", "shops": shop_results, "products": fabric_results}), 200
+    except Exception:
+        logger.exception("[Error - Search]")
+        return jsonify({"status": "error", "message": "Search failed"}), 500
 
 
-# GET: Nearby Shops (MapMyIndia)
+# ------------------------------------------------------------------
+# Nearby shops (MapMyIndia or local fallback)
+# ------------------------------------------------------------------
 @shop_explorer_bp.route("/nearby-shops", methods=["GET"])
 def nearby_shops():
-    """Find nearby textile shops using MapMyIndia API."""
     try:
         lat_raw = request.args.get("lat")
         lon_raw = request.args.get("lon")
@@ -147,21 +126,13 @@ def nearby_shops():
             lon = float(lon_raw)
             radius_meters = float(radius_raw) if radius_raw else 3000.0
         except ValueError:
-            return jsonify({
-                "status": "error",
-                "message": "Coordinates and radius must be numeric"
-            }), 400
+            return jsonify({"status": "error", "message": "Coordinates and radius must be numeric"}), 400
 
         api_results = []
-        if Config.MAPMYINDIA_KEY:
+        if getattr(Config, "MAPMYINDIA_KEY", None):
             url = "https://atlas.mapmyindia.com/api/places/nearby/json"
             headers = {"Authorization": f"Bearer {Config.MAPMYINDIA_KEY}"}
-            params = {
-                "keywords": "fabric,textile,shop",
-                "refLocation": f"{lat},{lon}",
-                "radius": int(radius_meters)
-            }
-
+            params = {"keywords": "fabric,textile,shop", "refLocation": f"{lat},{lon}", "radius": int(radius_meters)}
             try:
                 response = requests.get(url, headers=headers, params=params, timeout=4)
                 if response.status_code == 200:
@@ -172,32 +143,22 @@ def nearby_shops():
                         "lat": place.get("latitude"),
                         "lon": place.get("longitude"),
                         "rating": 4.2,
-                        "shortName": place.get("placeName", "Shop")[:10],
+                        "shortName": (place.get("placeName") or "Shop")[:10],
                     } for place in data.get("suggestedLocations", [])]
-            except Exception as exc:
-                print("[MapMyIndia Nearby Shops]", exc)
+            except Exception:
+                logger.exception("[MapMyIndia Nearby Shops]")
 
         if not api_results:
             nearby_shops = _query_local_nearby_shops(lat, lon, radius_meters)
-            return jsonify({
-                "status": "success",
-                "count": len(nearby_shops),
-                "nearby_shops": nearby_shops
-            }), 200
+            return jsonify({"status": "success", "count": len(nearby_shops), "nearby_shops": nearby_shops}), 200
 
-        return jsonify({
-            "status": "success",
-            "count": len(api_results),
-            "nearby_shops": api_results
-        }), 200
-
-    except Exception as e:
-        print("[Error - Nearby Shops]", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "success", "count": len(api_results), "nearby_shops": api_results}), 200
+    except Exception:
+        logger.exception("[Error - Nearby Shops]")
+        return jsonify({"status": "error", "message": "Failed to find nearby shops"}), 500
 
 
 def _query_local_nearby_shops(lat: float, lon: float, radius_meters: float):
-    # Convert meters to approximate degrees. Adjust longitude delta by latitude to reduce distortion.
     radius_degrees_lat = radius_meters / 111_000.0
     radius_degrees_lon = radius_degrees_lat / max(cos(radians(lat)), 0.1)
 
@@ -215,8 +176,8 @@ def _query_local_nearby_shops(lat: float, lon: float, radius_meters: float):
         shops.append({
             "name": shop.name,
             "address": shop.location or shop.address or "Unknown",
-            "lat": shop.lat,
-            "lon": shop.lon,
+            "lat": float(shop.lat) if shop.lat is not None else None,
+            "lon": float(shop.lon) if shop.lon is not None else None,
             "rating": round(shop.rating or 4.0, 1),
             "shortName": (shop.name or "Shop")[:10],
         })
