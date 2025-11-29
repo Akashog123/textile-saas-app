@@ -478,3 +478,216 @@ def export_sales(current_user):
     except Exception as e:
         print(f"[EXPORT ERROR] {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+# ------------------------------------------------------------------
+# Owner endpoints: list, create, get, update, delete
+# All in this file as requested
+# ------------------------------------------------------------------
+
+def _serialize_shop(s: Shop):
+    """Return a safe dict for frontend consumption."""
+    return {
+        "id": s.id,
+        "shop_name": s.name,
+        "name": s.name,
+        "description": s.description or "",
+        "address": s.address or s.location or "",
+        "location": s.location or s.address or "",
+        "city": s.city or "",
+        "state": s.state or "",
+        # "contact": s.contact or "",
+        "gstin": getattr(s, "gstin", "") or "",
+        "latitude": float(s.lat) if s.lat is not None else None,
+        "longitude": float(s.lon) if s.lon is not None else None,
+        "image": getattr(s, "image_url", None) or None,
+        "created_at": s.created_at.isoformat() if getattr(s, "created_at", None) else None,
+        "rating": round(s.rating or 4.0, 1),
+    }
+
+# GET: Owner's Shops (you already have this; keep as-is or use below)
+@shop_bp.route("/my-shops", methods=["GET"])
+@token_required
+def my_shops_list(current_user):
+    # try:
+        user_id = getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
+        if not user_id:
+            return jsonify({"status": "error", "message": "Invalid user"}), 400
+
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 50))
+        if per_page > 200:
+            per_page = 200
+
+        q = Shop.query.filter_by(owner_id=user_id).order_by(Shop.created_at.desc())
+        try:
+            paged = q.paginate(page=page, per_page=per_page, error_out=False)
+            items = paged.items
+            total = paged.total
+        except Exception:
+            items = q.limit(per_page).offset((page - 1) * per_page).all()
+            total = q.count()
+
+        shops_out = [_serialize_shop(s) for s in items]
+
+        return jsonify({
+            "status": "success",
+            "shops": shops_out,
+            "count": len(shops_out),
+            "page": page,
+            "per_page": per_page,
+            "total": total
+        }), 200
+
+    # except Exception:
+        logging.exception("Error fetching owner shops")
+        return jsonify({"status": "error", "message": "Failed to fetch your shops"}), 500
+
+
+# POST: Create new shop
+@shop_bp.route("/my-shops", methods=["POST"])
+@token_required
+def create_my_shop(current_user):
+    """
+    Create a shop owned by the authenticated user.
+    Expected JSON fields (recommended):
+      - name (required)
+      - description, address, location, city, state, contact, gstin
+      - latitude (float), longitude (float)
+    """
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        name = (payload.get("name") or payload.get("shop_name") or "").strip()
+        if not name:
+            return jsonify({"status": "error", "message": "Shop name is required"}), 400
+
+        user_id = getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
+        if not user_id:
+            return jsonify({"status": "error", "message": "Invalid user"}), 400
+
+        # build model
+        s = Shop(
+            name=name,
+            description=payload.get("description"),
+            address=payload.get("address") or payload.get("location"),
+            location=payload.get("location") or payload.get("address"),
+            city=payload.get("city"),
+            state=payload.get("state"),
+            contact=payload.get("contact"),
+            gstin=payload.get("gstin"),
+            image_url=payload.get("image"),
+            owner_id=user_id
+        )
+
+        # optional numeric coords
+        lat = payload.get("latitude")
+        lon = payload.get("longitude")
+        try:
+            s.lat = float(lat) if lat is not None and str(lat) != "" else None
+        except Exception:
+            s.lat = None
+        try:
+            s.lon = float(lon) if lon is not None and str(lon) != "" else None
+        except Exception:
+            s.lon = None
+
+        db.session.add(s)
+        db.session.commit()
+
+        return jsonify({"status": "success", "shop": _serialize_shop(s)}), 201
+
+    except Exception:
+        logging.exception("Error creating shop")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to create shop"}), 500
+
+
+# PUT: Update an existing shop (owner-only)
+@shop_bp.route("/my-shops/<int:shop_id>", methods=["PUT", "PATCH"])
+@token_required
+def update_my_shop(current_user, shop_id):
+    """
+    Update shop fields. Owner only.
+    Accepts same fields as create.
+    """
+    try:
+        user_id = getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
+        if not user_id:
+            return jsonify({"status": "error", "message": "Invalid user"}), 400
+
+        shop = Shop.query.filter_by(id=shop_id).first()
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+
+        if int(shop.owner_id) != int(user_id):
+            return jsonify({"status": "error", "message": "Not authorized to update this shop"}), 403
+
+        payload = request.get_json(force=True, silent=True) or {}
+
+        # update only provided fields
+        for key_map in [
+            ("name", "name"),
+            ("shop_name", "name"),
+            ("description", "description"),
+            ("address", "address"),
+            ("location", "location"),
+            ("city", "city"),
+            ("state", "state"),
+            ("contact", "contact"),
+            ("gstin", "gstin"),
+            ("image", "image_url"),
+        ]:
+            body_key, model_key = key_map
+            if body_key in payload:
+                setattr(shop, model_key, payload.get(body_key))
+
+        # coords
+        if "latitude" in payload:
+            try:
+                shop.lat = float(payload.get("latitude")) if payload.get("latitude") not in (None, "") else None
+            except Exception:
+                shop.lat = None
+        if "longitude" in payload:
+            try:
+                shop.lon = float(payload.get("longitude")) if payload.get("longitude") not in (None, "") else None
+            except Exception:
+                shop.lon = None
+
+        db.session.add(shop)
+        db.session.commit()
+
+        return jsonify({"status": "success", "shop": _serialize_shop(shop)}), 200
+
+    except Exception:
+        logging.exception("Error updating shop")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to update shop"}), 500
+
+
+# DELETE: Delete an owner's shop (owner-only)
+@shop_bp.route("/my-shops/<int:shop_id>", methods=["DELETE"])
+@token_required
+def delete_my_shop(current_user, shop_id):
+    try:
+        user_id = getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
+        if not user_id:
+            return jsonify({"status": "error", "message": "Invalid user"}), 400
+
+        shop = Shop.query.filter_by(id=shop_id).first()
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+
+        if int(shop.owner_id) != int(user_id):
+            return jsonify({"status": "error", "message": "Not authorized to delete this shop"}), 403
+
+        db.session.delete(shop)
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Shop deleted"}), 200
+
+    except Exception:
+        logging.exception("Error deleting shop")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to delete shop"}), 500

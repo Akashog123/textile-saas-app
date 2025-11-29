@@ -71,6 +71,11 @@
                     <i class="bi bi-chat-dots me-2"></i>Inquiry
                   </router-link>
                 </li>
+                <li class="nav-item">
+                  <router-link to="/shop/profile" class="nav-link">
+                    <i class="bi bi-person me-2"></i>Profile
+                  </router-link>
+                </li>
               </template>
 
               <!-- Distributor Navigation -->

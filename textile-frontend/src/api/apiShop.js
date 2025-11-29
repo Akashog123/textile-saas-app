@@ -66,10 +66,79 @@ export const getDemandForecast = (shopId) => {
     });
 };
 
+
+/* -------------------------
+   Owner's shops (my-shops)
+   CRUD helpers used by shop profile UI
+   ------------------------- */
+
+/**
+ * Get all shops for current logged-in owner
+ * - backend: GET /shop/my-shops
+ */
+export const getMyShops = (params = {}) => {
+  // params can include page, per_page, etc.
+  return api.get('/shop/my-shops', { params, timeout: 15000 });
+};
+
+/**
+ * Create a new shop
+ * - backend: POST /shop/my-shops
+ * - If sending image(s), pass FormData and set `isMultipart=true`.
+ * - Example shopData (JSON): { name, description, address, lat, lon, gstin, contact }
+ */
+export const createShop = (shopData, { isMultipart = false } = {}) => {
+  if (isMultipart) {
+    const fd = new FormData();
+    Object.entries(shopData).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) fd.append(k, v);
+    });
+    return api.post('/shop/my-shops', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    });
+  } else {
+    return api.post('/shop/my-shops', shopData, { timeout: 15000 });
+  }
+};
+
+/**
+ * Update shop
+ * - backend: PUT /shop/my-shops/:id
+ * - pass shopData similar to createShop
+ */
+export const updateShop = (shopId, shopData, { isMultipart = false } = {}) => {
+  if (isMultipart) {
+    const fd = new FormData();
+    Object.entries(shopData).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) fd.append(k, v);
+    });
+    return api.put(`/shop/my-shops/${shopId}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    });
+  } else {
+    return api.put(`/shop/my-shops/${shopId}`, shopData, { timeout: 15000 });
+  }
+};
+
+/**
+ * Delete a shop
+ * - backend: DELETE /shop/my-shops/:id
+ */
+export const deleteShop = (shopId) => {
+  return api.delete(`/shop/my-shops/${shopId}`, { timeout: 15000 });
+};
+
+
 export default {
     getShopDashboard,
     uploadSalesData,
     exportSalesData,
     getDistributors,
-    getDemandForecast
+    getDemandForecast,
+    getMyShops,
+    createShop,
+    updateShop,
+    deleteShop,
 };
