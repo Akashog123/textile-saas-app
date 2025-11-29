@@ -192,7 +192,7 @@ def login():
 
 # Session Validation (JWT based)
 @auth_bp.route("/session", methods=["GET"])
-# @token_required
+@token_required
 def session_check(decoded):
     try:
         user = User.query.get(decoded.get("user_id"))

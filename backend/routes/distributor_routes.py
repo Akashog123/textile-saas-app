@@ -17,7 +17,7 @@ from services.ai_service import (
     generate_recommendation,
 )
 from routes.pdf_service import generate_pdf_report
-# from routes.auth_routes import token_required
+from routes.auth_routes import token_required
 from models.model import Product, SalesData
 
 configure(api_key=os.getenv("GEMINI_API_KEY", ""))
@@ -27,7 +27,7 @@ distributor_bp = Blueprint("distributor", __name__)
 
 # POST: Regional Demand & AI Forecast Insights
 @distributor_bp.route("/regional-demand", methods=["POST"])
-# @token_required
+@token_required
 def get_regional_demand(current_user):
     """
     Generate AI-powered regional demand insights and sales forecasting.
@@ -325,7 +325,7 @@ def distributor_export_plan():
 
 # GET: Regional Demand Report PDF (AI Summary)
 @distributor_bp.route("/regional-report", methods=["GET"])
-# @token_required
+@token_required
 def generate_regional_report(current_user):
     """
     Generates a downloadable PDF summary of AI insights and forecast data.
