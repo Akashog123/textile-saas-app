@@ -7,8 +7,69 @@ from utils.image_utils import resolve_product_image, resolve_shop_image
 from utils.auth_utils import token_required
 from services.ai_service import generate_ai_caption
 import requests
-import logging
 from math import cos, radians
+# add near the top of routes/shop_explorer.py
+import logging
+logger = logging.getLogger(__name__)
+
+def _serialize_shop(shop):
+    """
+    Lightweight serializer for Shop model used by the public explorer endpoints.
+    Keeps fields minimal and safe (wraps attribute access).
+    """
+    try:
+        # products_count and reviews_count use relationship queries (lazy/dynamic assumed)
+        try:
+            products_count = shop.products.count() if hasattr(shop, "products") and hasattr(shop.products, "count") else (len(shop.products) if shop.products is not None else 0)
+        except Exception:
+            products_count = None
+
+        try:
+            reviews_count = shop.reviews.count() if hasattr(shop, "reviews") and hasattr(shop.reviews, "count") else (len(shop.reviews) if shop.reviews is not None else 0)
+        except Exception:
+            reviews_count = None
+
+        owner = None
+        try:
+            if getattr(shop, "owner", None):
+                owner = {
+                    "id": getattr(shop.owner, "id", None),
+                    "full_name": getattr(shop.owner, "full_name", None),
+                    "username": getattr(shop.owner, "username", None)
+                }
+        except Exception:
+            owner = None
+
+        return {
+            "id": getattr(shop, "id", None),
+            "name": getattr(shop, "name", None),
+            "description": getattr(shop, "description", "") or "",
+            "address": getattr(shop, "location", None) or getattr(shop, "address", None) or "",
+            "city": getattr(shop, "city", None),
+            "state": getattr(shop, "state", None),
+            "lat": float(getattr(shop, "lat", None)) if getattr(shop, "lat", None) is not None else None,
+            "lon": float(getattr(shop, "lon", None)) if getattr(shop, "lon", None) is not None else None,
+            "rating": round(getattr(shop, "rating", 4.0) or 4.0, 1),
+            "is_popular": bool(getattr(shop, "is_popular", False)),
+            "image": resolve_shop_image(shop) if 'resolve_shop_image' in globals() else getattr(shop, "image_url", None),
+            "owner": owner,
+            "products_count": products_count,
+            "reviews_count": reviews_count,
+            "created_at": getattr(shop, "created_at", None).isoformat() if getattr(shop, "created_at", None) else None,
+        }
+    except Exception:
+        logger.exception("Failed to serialize shop %s", getattr(shop, "id", "n/a"))
+        # return minimal safe shape so endpoints can still respond
+        return {
+            "id": getattr(shop, "id", None),
+            "name": getattr(shop, "name", None),
+            "description": "",
+            "address": "",
+            "lat": None,
+            "lon": None,
+            "rating": 4.0,
+            "image": getattr(shop, "image_url", None)
+        }
 
 shop_explorer_bp = Blueprint("shop_explorer", __name__)
 
@@ -17,6 +78,7 @@ shop_explorer_bp = Blueprint("shop_explorer", __name__)
 @shop_explorer_bp.route("/shops", methods=["GET"])
 def get_all_shops():
     try:
+        
         shops = Shop.query.all()
         result = [_serialize_shop(s) for s in shops]
         return jsonify({"status": "success", "count": len(result), "shops": result}), 200
