@@ -147,14 +147,83 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0">
         <i class="bi bi-shop me-2"></i>Linked Shops
+        <span v-if="shops.length > 0" class="badge bg-secondary ms-2">{{ shops.length }}</span>
       </h5>
       <div>
-        <button class="btn btn-outline-primary me-2" @click="openShopModal()">+ New Shop</button>
-        <button class="btn btn-outline-secondary" @click="fetchShops()">Refresh</button>
+        <button class="btn btn-outline-primary me-2" @click="openShopModal()">
+          <i class="bi bi-plus-lg me-1"></i>New Shop
+        </button>
+        <button class="btn btn-outline-secondary" @click="fetchShops()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
       </div>
     </div>
 
+    <!-- Primary Shop Card (if exists) -->
+    <div v-if="primaryShop" class="card mb-4 border-primary">
+      <div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+        <div>
+          <i class="bi bi-star-fill text-warning me-2"></i>
+          <span class="fw-semibold">Primary Shop</span>
+        </div>
+        <span class="badge bg-primary">Active</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="profile-field">
+              <label class="text-muted small">Shop Name</label>
+              <p class="fw-semibold mb-0">{{ primaryShop.name || primaryShop.shop_name || 'N/A' }}</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="profile-field">
+              <label class="text-muted small">City</label>
+              <p class="fw-semibold mb-0">{{ primaryShop.city || 'N/A' }}</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="profile-field">
+              <label class="text-muted small">Contact</label>
+              <p class="fw-semibold mb-0">{{ primaryShop.contact || 'N/A' }}</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="profile-field">
+              <label class="text-muted small">Rating</label>
+              <p class="fw-semibold mb-0">
+                <i class="bi bi-star-fill text-warning me-1"></i>{{ primaryShop.rating || '4.0' }}
+              </p>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="profile-field">
+              <label class="text-muted small">Address</label>
+              <p class="fw-semibold mb-0">{{ primaryShop.address || primaryShop.location || 'N/A' }}</p>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="d-flex gap-2">
+              <span class="badge bg-light text-dark">
+                <i class="bi bi-box me-1"></i>{{ primaryShop.product_count || 0 }} Products
+              </span>
+              <span class="badge bg-light text-dark">
+                <i class="bi bi-chat-dots me-1"></i>{{ primaryShop.review_count || 0 }} Reviews
+              </span>
+              <span v-if="primaryShop.gstin" class="badge bg-light text-dark">
+                <i class="bi bi-receipt me-1"></i>GSTIN: {{ primaryShop.gstin }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- All Shops Table -->
     <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ul me-2"></i>All Shops</span>
+      </div>
       <div class="card-body">
         <div v-if="loadingShops" class="text-center py-4">
           <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
@@ -163,41 +232,66 @@
 
         <div v-else-if="shops.length === 0" class="text-center py-4 text-muted">
           <i class="bi bi-shop-window fs-1 d-block mb-2 opacity-50"></i>
-          No shops linked to this account.
+          <p class="mb-2">No shops linked to this account.</p>
+          <button class="btn btn-primary btn-sm" @click="openShopModal()">
+            <i class="bi bi-plus-lg me-1"></i>Create Your First Shop
+          </button>
         </div>
 
         <div v-else class="table-responsive">
-          <table class="table table-hover align-middle">
+          <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
+                <th style="width: 40px;"></th>
                 <th>Shop Name</th>
                 <th>Location</th>
                 <th>Contact</th>
-                <th>GSTIN</th>
+                <th>Stats</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="shop in shops" :key="shop.id">
-                <td class="fw-semibold">{{ shop.shop_name }}</td>
+              <tr v-for="shop in shops" :key="shop.id" :class="{ 'table-primary': shop.is_primary }">
                 <td>
-                  <small class="text-muted d-block text-truncate" style="max-width: 300px;">
+                  <i v-if="shop.is_primary" class="bi bi-star-fill text-warning" title="Primary Shop"></i>
+                </td>
+                <td>
+                  <span class="fw-semibold">{{ shop.name || shop.shop_name }}</span>
+                  <span v-if="shop.is_primary" class="badge bg-primary ms-2">Primary</span>
+                </td>
+                <td>
+                  <small class="text-muted d-block text-truncate" style="max-width: 250px;">
                     {{ shop.address || shop.location || 'No address' }}
                   </small>
-                  <small class="text-muted d-block">Lat: {{ shop.latitude ?? '-' }}, Lon: {{ shop.longitude ?? '-' }}</small>
+                  <small class="text-muted">{{ shop.city || '' }}{{ shop.city && shop.state ? ', ' : '' }}{{ shop.state || '' }}</small>
                 </td>
                 <td>{{ shop.contact || '-' }}</td>
-                <td>{{ shop.gstin || '-' }}</td>
+                <td>
+                  <span class="badge bg-light text-dark me-1">
+                    <i class="bi bi-box"></i> {{ shop.product_count || 0 }}
+                  </span>
+                  <span class="badge bg-light text-dark">
+                    <i class="bi bi-star-fill text-warning"></i> {{ shop.rating || '4.0' }}
+                  </span>
+                </td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-outline-primary me-1" @click="openShopModal(shop)">
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <button class="btn btn-sm btn-outline-secondary me-1" @click="goToShop(shop.id)">
-                    <i class="bi bi-eye"></i>
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(shop.id)">
-                    <i class="bi bi-trash"></i>
-                  </button>
+                  <div class="btn-group btn-group-sm">
+                    <button 
+                      v-if="!shop.is_primary" 
+                      class="btn btn-outline-success" 
+                      @click="makePrimary(shop.id)"
+                      title="Set as Primary"
+                      :disabled="settingPrimary"
+                    >
+                      <i class="bi bi-star"></i>
+                    </button>
+                    <button class="btn btn-outline-primary" @click="openShopModal(shop)" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" @click="confirmDelete(shop.id)" title="Delete">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -301,9 +395,9 @@
 
 <script setup>
 /* eslint-disable no-console */
-//import L from 'leaflet';
-import { ref, onMounted, nextTick } from 'vue';
-import { getProfile, updateProfile } from '@/api/apiProfile';
+import L from 'leaflet';
+import { ref, computed, onMounted, nextTick } from 'vue';
+import { getProfile, updateProfile, setPrimaryShop } from '@/api/apiProfile';
 import apiShop, { getMyShops, createShop, updateShop, deleteShop } from '@/api/apiShop';
 import axios from '@/api/axios';
 
@@ -331,6 +425,22 @@ const showToastMessage = (message, icon = 'bi bi-check-circle-fill') => {
 // ---------- shops state ----------
 const shops = ref([]);
 const loadingShops = ref(false);
+const settingPrimary = ref(false);
+
+// Computed: get primary shop from shops list or profile
+const primaryShop = computed(() => {
+  // First check if we have shops loaded with is_primary flag
+  const primary = shops.value.find(s => s.is_primary);
+  if (primary) return primary;
+  
+  // Fallback to profile.shop (for backward compatibility)
+  if (profile.value.shop) return profile.value.shop;
+  
+  // If we have shops but none marked primary, use first one
+  if (shops.value.length > 0) return shops.value[0];
+  
+  return null;
+});
 
 // modal / editing shop
 const showShopModal = ref(false);
@@ -644,13 +754,51 @@ const fetchShops = async () => {
   loadingShops.value = true;
   try {
     const res = await getMyShops();
-    if (res && res.data && res.data.shops) shops.value = res.data.shops;
-    else shops.value = Array.isArray(res?.data) ? res.data : [];
+    if (res && res.data && res.data.shops) {
+      shops.value = res.data.shops;
+    } else {
+      shops.value = Array.isArray(res?.data) ? res.data : [];
+    }
+    
+    // Sync is_primary flag from profile data
+    if (profile.value.primary_shop_id) {
+      shops.value = shops.value.map(s => ({
+        ...s,
+        is_primary: s.id === profile.value.primary_shop_id
+      }));
+    } else if (shops.value.length > 0 && !shops.value.some(s => s.is_primary)) {
+      // If no primary set, mark first shop as primary (UI only)
+      shops.value[0].is_primary = true;
+    }
   } catch (err) {
     console.error('[Shops Error]', err);
     showToastMessage('Failed to load shops', 'bi bi-exclamation-circle-fill');
   } finally {
     loadingShops.value = false;
+  }
+};
+
+// Set a shop as primary
+const makePrimary = async (shopId) => {
+  settingPrimary.value = true;
+  try {
+    const res = await setPrimaryShop(shopId);
+    if (res?.data?.status === 'success') {
+      // Update local state
+      shops.value = shops.value.map(s => ({
+        ...s,
+        is_primary: s.id === shopId
+      }));
+      profile.value.primary_shop_id = shopId;
+      showToastMessage(res.data.message || 'Primary shop updated!', 'bi bi-check-circle-fill');
+    } else {
+      showToastMessage(res?.data?.message || 'Failed to set primary shop', 'bi bi-exclamation-circle-fill');
+    }
+  } catch (err) {
+    console.error('[Set Primary Error]', err);
+    showToastMessage(err?.response?.data?.message || 'Failed to set primary shop', 'bi bi-exclamation-circle-fill');
+  } finally {
+    settingPrimary.value = false;
   }
 };
 
@@ -759,11 +907,6 @@ async function deleteShopById(shopId) {
   }
 }
 
-function goToShop(shopId) {
-  // Hook here to route to shop page if you have one
-  showToastMessage(`Open shop ${shopId}`, 'bi bi-info-circle');
-}
-
 // ---------- lifecycle ----------
 onMounted(() => {
   fetchProfile();
@@ -804,12 +947,12 @@ h5, h6 { background: linear-gradient(135deg, var(--color-primary) 0%, var(--colo
   align-items:center;
   justify-content:center;
   padding: 1.5rem;
-  background: rgba(0,0,0,0.35);
+  background: rgba(0,0,0,0.5);
 }
 .modal-dialog { width: 100%; max-width: 980px; }
-.modal-content { border-radius: 12px; overflow: hidden; }
-.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #eee; }
-.modal-body { padding:1rem 1.25rem; max-height:78vh; overflow:auto; }
+.modal-content { border-radius: 12px; overflow: hidden; background: #ffffff; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #eee; background: #f8f9fa; }
+.modal-body { padding:1rem 1.25rem; max-height:78vh; overflow:auto; background: #ffffff; }
 
 /* toast */
 .toast-notification {

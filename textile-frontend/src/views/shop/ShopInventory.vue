@@ -12,6 +12,9 @@
         <button class="btn btn-outline-secondary btn-sm" @click="handleExport" :disabled="loading">
           <i class="bi bi-download me-1"></i> Export Excel
         </button>
+        <button class="btn btn-outline-info btn-sm" @click="openUploadLogsModal" :disabled="loading">
+          <i class="bi bi-clock-history me-1"></i> Recent Uploads
+        </button>
       </div>
     </div>
 
@@ -211,12 +214,79 @@
       <i :class="toastIcon" class="me-2"></i>
       {{ toastMessage }}
     </div>
+
+    <!-- Upload Logs Modal -->
+    <div v-if="showUploadLogsModal" class="modal-overlay" @click="closeUploadLogsModal">
+      <div class="modal-dialog" style="max-width: 700px;" @click.stop>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Recent Upload Activity</h5>
+            <button class="btn-close" @click="closeUploadLogsModal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <p class="mb-0 text-muted small">Last 6 uploads with SLA insights.</p>
+              <button class="btn btn-sm btn-outline-primary" @click="fetchUploadLogs" :disabled="uploadLogsLoading">
+                <i class="bi bi-arrow-clockwise"></i>
+                Refresh
+              </button>
+            </div>
+
+            <div v-if="uploadLogsLoading" class="text-center py-4">
+              <div class="spinner-border text-primary"></div>
+              <p class="mt-2 mb-0">Fetching logs…</p>
+            </div>
+            <div v-else-if="uploadLogsError" class="alert alert-danger">
+              <i class="bi bi-exclamation-triangle me-2"></i>{{ uploadLogsError }}
+            </div>
+            <div v-else-if="uploadLogs.length === 0" class="text-center py-4 text-muted">
+              <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+              No uploads recorded yet.
+            </div>
+            <div v-else class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Started</th>
+                    <th>Status</th>
+                    <th>Rows</th>
+                    <th>Duration</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="log in uploadLogs" :key="log.id">
+                    <td>
+                      <small class="text-muted">{{ formatLogDate(log.started_at) }}</small>
+                    </td>
+                    <td>
+                      <span :class="['badge', log.status === 'completed' ? 'bg-success-subtle text-success' : log.status === 'failed' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning']">
+                        {{ log.status }}
+                      </span>
+                    </td>
+                    <td>{{ log.rows_processed || 0 }}</td>
+                    <td>
+                      {{ log.duration_ms ? (log.duration_ms / 1000).toFixed(1) + 's' : '—' }}
+                      <small v-if="log.sla_breached" class="text-danger d-block">SLA exceeded</small>
+                    </td>
+                    <td>
+                      <small>{{ log.message || '—' }}</small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { getInventory, importInventory, editInventoryItem, deleteInventoryItem, exportInventory, generateInventoryPDF } from '@/api/apiInventory';
+import { getSalesUploadLogs } from '@/api/apiShop';
 
 // Loading and error states
 const loading = ref(false);
@@ -236,6 +306,7 @@ const shopId = computed(() => {
 // Modals
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
+const showUploadLogsModal = ref(false);
 const editForm = ref({ id: null, name: '', price: 0, stock: 0, minimumStock: 0 });
 const deleteItem = ref(null);
 
@@ -243,6 +314,20 @@ const deleteItem = ref(null);
 const showToast = ref(false);
 const toastMessage = ref('');
 const toastIcon = ref('bi bi-check-circle-fill');
+
+// Upload logs state
+const uploadLogs = ref([]);
+const uploadLogsLoading = ref(false);
+const uploadLogsError = ref('');
+
+const formatLogDate = (timestamp) => {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString();
+  } catch (err) {
+    return timestamp;
+  }
+};
 
 /**
  * Fetch inventory from backend
@@ -279,6 +364,36 @@ const fetchInventory = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const fetchUploadLogs = async () => {
+  if (!shopId.value) return;
+  uploadLogsLoading.value = true;
+  uploadLogsError.value = '';
+  try {
+    const response = await getSalesUploadLogs(shopId.value, 6);
+    if (response.data?.status === 'success') {
+      uploadLogs.value = response.data.logs || [];
+    } else {
+      uploadLogsError.value = response.data?.message || 'Unable to fetch logs';
+    }
+  } catch (err) {
+    console.error('[Upload Logs Error]', err);
+    uploadLogsError.value = err.response?.data?.message || 'Failed to load upload history';
+  } finally {
+    uploadLogsLoading.value = false;
+  }
+};
+
+const openUploadLogsModal = async () => {
+  showUploadLogsModal.value = true;
+  if (uploadLogs.value.length === 0) {
+    await fetchUploadLogs();
+  }
+};
+
+const closeUploadLogsModal = () => {
+  showUploadLogsModal.value = false;
 };
 
 /**

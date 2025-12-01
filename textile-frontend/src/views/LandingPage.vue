@@ -12,12 +12,12 @@
               Connect manufacturers, distributors, shop owners, and customers in one seamless ecosystem. Experience the future of textile supply chain.
             </p>
             <div class="hero-buttons">
-              <router-link to="/login" class="btn btn-primary btn-lg me-3">
-                Start Free Trial <i class="bi bi-arrow-right ms-2"></i>
+              <router-link to="/login" class="btn btn-outline-primary btn-lg me-3">
+              Sign In <i class="bi bi-arrow-right ms-2"></i>
               </router-link>
-              <a href="#features" class="btn btn-outline-primary btn-lg">
-                Learn More
-              </a>
+              <router-link to="/login" class="btn btn-primary btn-lg">
+              Get Started
+              </router-link>
             </div>
           </div>
           <div class="col-lg-6 hero-image">
