@@ -71,7 +71,25 @@ def _serialize_shop(shop):
             "image": getattr(shop, "image_url", None)
         }
 
+logger = logging.getLogger(__name__)
 shop_explorer_bp = Blueprint("shop_explorer", __name__)
+
+
+def _serialize_shop(s: Shop):
+    """Return a safe dict for frontend consumption."""
+    return {
+        "id": s.id,
+        "name": s.name,
+        "description": s.description or "",
+        "address": s.address or s.location or "",
+        "location": s.location or s.address or "",
+        "city": s.city or "",
+        "state": s.state or "",
+        "latitude": float(s.lat) if s.lat is not None else None,
+        "longitude": float(s.lon) if s.lon is not None else None,
+        "image": resolve_shop_image(s),
+        "rating": round(s.rating or 4.0, 1),
+    }
 
 
 # GET: All Shops
@@ -116,7 +134,7 @@ def get_shop_details(shop_id):
                 "description": product.description or "",
                 "category": product.category,
                 "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
-                "seller": getattr(product, "seller").full_name if getattr(product, "seller", None) else "Independent Seller",
+                "seller": product.shop.owner.full_name if product.shop and product.shop.owner else "Independent Seller",
                 "image": resolve_product_image(product),
                 "ai_caption": caption
             })

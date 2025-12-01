@@ -24,7 +24,17 @@ export const updateProfile = (updates) => {
     return api.put('/profile/update', updates);
 };
 
+/**
+ * Set primary/active shop for the user
+ * @param {number} shopId - The shop ID to set as primary
+ * @returns {Promise} Response with confirmation
+ */
+export const setPrimaryShop = (shopId) => {
+    return api.put('/profile/primary-shop', { shop_id: shopId });
+};
+
 export default {
     getProfile,
-    updateProfile
+    updateProfile,
+    setPrimaryShop
 };

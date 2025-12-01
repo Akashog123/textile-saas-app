@@ -1,25 +1,22 @@
 <template>
   <div class="shop-dashboard-tab">
     <!-- Hero Header Section -->
-    <div class="dashboard-hero mb-4">
-      <div class="d-flex align-items-center justify-content-between">
+    <div class="dashboard-hero mb-4 animate-fade-in">
+      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-          <h3 class="hero-title mb-2">
-            <i class="bi bi-speedometer2 me-2"></i>
-            Shop Manager Dashboard
+          <h3 class="hero-title mb-2 d-flex align-items-center">
+            <i class="bi bi-shop-window me-2"></i>
+            Shop Manager
           </h3>
           <p class="hero-subtitle mb-0">
             Welcome back! Here's your business overview.
           </p>
+          <small class="text-muted d-block mt-1">Upload supports CSV/XLS/XLSX files up to 16MB.</small>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-gradient btn-sm" @click="handleUploadSalesData">
-            <i class="bi bi-graph-up-arrow me-1"></i>
-            Upload Periodic Sales Data
-          </button>
-          <button class="btn btn-gradient btn-sm" @click="exportReport">
-            <i class="bi bi-download me-1"></i>
-            Export Report
+          <button class="btn btn-gradient btn-sm d-flex align-items-center" @click="handleUploadSalesData">
+            <i class="bi bi-cloud-arrow-up me-2"></i>
+            Upload Sales Data
           </button>
         </div>
       </div>
@@ -33,10 +30,10 @@
         :key="index"
       >
         <div
-          class="metric-card p-3"
+          class="metric-card p-3 h-100"
           :style="{ animationDelay: (index * 0.1) + 's' }"
         >
-          <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center justify-content-between mb-3">
             <small class="metric-label">{{ metric.label }}</small>
             <div class="metric-icon" :class="metric.iconClass">
               <i :class="metric.icon"></i>
@@ -45,7 +42,7 @@
           <div class="d-flex align-items-end justify-content-between">
             <div class="metric-value">{{ metric.value }}</div>
             <div class="metric-change" :class="metric.changeClass">
-              <i :class="metric.changeIcon"></i>
+              <i :class="metric.changeIcon" class="me-1"></i>
               {{ metric.change }}
             </div>
           </div>
@@ -55,162 +52,357 @@
 
     <!-- Main content grid -->
     <div class="row g-3">
-      <div class="col-lg-6">
-        <div class="card modern-card">
-          <div class="card-body">
-            <div class="d-flex align-items-center justify-content-between mb-3">
+      <div class="col-lg-6 d-flex">
+        <div class="card modern-card w-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between mb-4">
               <h6 class="card-title mb-0">
                 <i class="bi bi-graph-up me-2"></i>
-                Weekly Sales Summary
+                Sales Summary
+                <small class="text-muted ms-2 fw-normal">{{ salesDateRange }}</small>
               </h6>
-              <span class="badge bg-success-soft">
-                <i class="bi bi-arrow-up"></i> 12%
+              <span 
+                class="badge px-3 py-2 rounded-pill" 
+                :class="salesComparison.trend === 'up' ? 'bg-success-soft' : salesComparison.trend === 'down' ? 'bg-danger-soft' : 'bg-secondary-soft'"
+                v-if="salesGrowth"
+              >
+                <i :class="salesComparison.trend === 'up' ? 'bi bi-arrow-up me-1' : salesComparison.trend === 'down' ? 'bi bi-arrow-down me-1' : 'bi bi-dash me-1'"></i>
+                {{ salesGrowth }}
               </span>
             </div>
-            <div class="summary-content p-3 rounded">
-              <div class="summary-item mb-3">
-                <div class="d-flex align-items-start gap-2">
-                  <i class="bi bi-check-circle-fill text-success mt-1"></i>
+            
+            <!-- Loading State -->
+            <div v-if="salesSummaryLoading" class="summary-content p-4 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+              <div class="text-center">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <p class="text-muted mb-0">Loading sales data...</p>
+              </div>
+            </div>
+            
+            <!-- Data State -->
+            <div v-else class="summary-content p-4 rounded flex-grow-1 d-flex flex-column justify-content-center">
+              <div class="summary-item mb-4">
+                <div class="d-flex align-items-start gap-3">
+                  <div class="check-icon-circle" :class="salesComparison.trend === 'down' ? 'bg-danger-soft text-danger' : ''">
+                    <i :class="salesComparison.trend === 'up' ? 'bi bi-graph-up-arrow' : salesComparison.trend === 'down' ? 'bi bi-graph-down-arrow' : 'bi bi-dash-lg'"></i>
+                  </div>
                   <div>
-                    <p class="mb-1">
-                      Sales increased by <strong>12%</strong> compared to last
-                      week
+                    <p class="mb-1 fw-medium">
+                      {{ salesComparison.message || 'Upload sales data to see weekly insights' }}
                     </p>
-                    <small class="text-muted"
-                      >Cotton fabric showing highest demand</small
-                    >
+                    <small class="text-muted" v-if="topCategory">
+                      {{ topCategory.name }} showing highest demand ({{ topCategory.percentage }}%)
+                    </small>
+                    <small class="text-muted" v-else>
+                      Upload data to see category insights
+                    </small>
                   </div>
                 </div>
               </div>
-              <div class="summary-stats row g-2 mb-3">
+              <div class="summary-stats row g-3 mb-4">
                 <div class="col-6">
-                  <div class="stat-box">
-                    <small class="text-muted d-block">Total Orders</small>
-                    <strong class="fs-5">147</strong>
+                  <div class="stat-box h-100">
+                    <small class="text-muted d-block mb-1">Total Quantity</small>
+                    <strong class="fs-4 text-dark">{{ salesSummaryMetrics.totalQuantity.toLocaleString() }}</strong>
                   </div>
                 </div>
                 <div class="col-6">
-                  <div class="stat-box">
-                    <small class="text-muted d-block">Avg. Order Value</small>
-                    <strong class="fs-5">₹1,815</strong>
+                  <div class="stat-box h-100">
+                    <small class="text-muted d-block mb-1">Total Revenue</small>
+                    <strong class="fs-4 text-dark">{{ salesSummaryMetrics.totalRevenue }}</strong>
                   </div>
                 </div>
               </div>
-              <button class="btn btn-gradient w-100" @click="viewSalesReport">
-                <i class="bi bi-file-earmark-bar-graph me-1"></i>
-                View Detailed Report
-              </button>
+              
+              <!-- Daily Breakdown Mini Chart -->
+              <div v-if="salesSummaryData?.daily_breakdown?.length" class="daily-mini-chart">
+                <small class="text-muted d-block mb-2">Daily Breakdown</small>
+                <div class="d-flex align-items-end gap-1" style="height: 40px;">
+                  <div 
+                    v-for="(day, idx) in salesSummaryData.daily_breakdown" 
+                    :key="idx"
+                    class="daily-bar bg-primary"
+                    :style="{ height: `${Math.max(10, (day.revenue / Math.max(...salesSummaryData.daily_breakdown.map(d => d.revenue), 1)) * 100)}%` }"
+                    :title="`${day.day_name}: ${day.revenue_formatted}`"
+                  ></div>
+                </div>
+                <div class="d-flex justify-content-between mt-1">
+                  <small v-for="(day, idx) in salesSummaryData.daily_breakdown" :key="idx" class="text-muted" style="font-size: 0.65rem;">
+                    {{ day.day_name?.substring(0, 2) }}
+                  </small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-lg-6">
-        <div class="card modern-card">
-          <div class="card-body">
-            <h6 class="card-title mb-3">
-              <i class="bi bi-activity me-2"></i>
-              Sales Growth Trend
-            </h6>
-            <div class="chart-placeholder mt-3" @click="viewDetailedChart">
-              <svg viewBox="0 0 400 180" class="w-100" style="height: 180px">
-                <defs>
-                  <linearGradient
-                    id="chartGradient"
-                    x1="0"
-                    x2="0"
-                    y1="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="0%"
-                      stop-color="var(--color-primary)"
-                      stop-opacity="0.15"
-                    />
-                    <stop
-                      offset="100%"
-                      stop-color="var(--color-accent)"
-                      stop-opacity="0.02"
-                    />
-                  </linearGradient>
-                </defs>
-                <!-- Chart line path -->
-                <path
-                  d="M0,140 L50,130 L100,100 L150,110 L200,70 L250,60 L300,50 L350,35 L400,30"
-                  fill="none"
-                  stroke="var(--color-primary)"
-                  stroke-width="3"
-                  class="chart-path"
-                />
-                <!-- Area fill under the line -->
-                <path
-                  d="M0,140 L50,130 L100,100 L150,110 L200,70 L250,60 L300,50 L350,35 L400,30 L400,180 L0,180 Z"
-                  fill="url(#chartGradient)"
-                  class="chart-area"
-                />
-                <!-- Data points -->
-                <circle
-                  v-for="(point, i) in chartPoints"
-                  :key="i"
-                  :cx="point.x"
-                  :cy="point.y"
-                  r="6"
-                  fill="#fff"
-                  stroke="var(--color-primary)"
-                  stroke-width="2.5"
-                  class="chart-point"
-                  @mouseenter="showTooltip(point)"
-                  @mouseleave="hideTooltip"
-                />
-              </svg>
-              <div
-                class="chart-labels d-flex justify-content-between mt-2 px-1"
+      <div class="col-lg-6 d-flex">
+        <div class="card modern-card w-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h6 class="card-title mb-0">
+                <i class="bi bi-activity me-2"></i>
+                Sales Growth Trend
+              </h6>
+              <div class="btn-group btn-group-sm" role="group">
+                <button 
+                  type="button" 
+                  class="btn"
+                  :class="chartPeriod === 'weekly' ? 'btn-primary' : 'btn-outline-secondary'"
+                  @click="changeChartPeriod('weekly')"
+                >
+                  Week
+                </button>
+                <button 
+                  type="button" 
+                  class="btn"
+                  :class="chartPeriod === 'monthly' ? 'btn-primary' : 'btn-outline-secondary'"
+                  @click="changeChartPeriod('monthly')"
+                >
+                  Month
+                </button>
+                <button 
+                  type="button" 
+                  class="btn"
+                  :class="chartPeriod === 'yearly' ? 'btn-primary' : 'btn-outline-secondary'"
+                  @click="changeChartPeriod('yearly')"
+                >
+                  Year
+                </button>
+              </div>
+            </div>
+            
+            <!-- Growth Badge -->
+            <div v-if="salesTrendData?.growth_percent !== undefined" class="mb-2">
+              <span 
+                class="badge px-2 py-1 rounded-pill"
+                :class="salesTrendData.trend === 'up' ? 'bg-success-soft' : salesTrendData.trend === 'down' ? 'bg-danger-soft' : 'bg-secondary-soft'"
               >
-                <small class="text-muted">Mon</small>
-                <small class="text-muted">Tue</small>
-                <small class="text-muted">Wed</small>
-                <small class="text-muted">Thu</small>
-                <small class="text-muted">Fri</small>
-                <small class="text-muted">Sat</small>
-                <small class="text-muted">Sun</small>
+                <i :class="salesTrendData.trend === 'up' ? 'bi bi-arrow-up' : salesTrendData.trend === 'down' ? 'bi bi-arrow-down' : 'bi bi-dash'" class="me-1"></i>
+                {{ salesTrendData.growth_percent_formatted }}
+              </span>
+              <small class="text-muted ms-2">{{ salesTrendData.total_revenue_formatted }} total</small>
+            </div>
+            
+            <!-- Loading State -->
+            <div v-if="chartLoading" class="chart-container flex-grow-1 d-flex align-items-center justify-content-center">
+              <div class="text-center">
+                <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                <p class="text-muted small mb-0">Loading chart...</p>
+              </div>
+            </div>
+            
+            <!-- No Data State -->
+            <div v-else-if="!salesTrendData || salesTrendData.status === 'no_data'" class="chart-container flex-grow-1 d-flex align-items-center justify-content-center">
+              <div class="text-center">
+                <i class="bi bi-bar-chart-line fs-2 text-muted mb-2"></i>
+                <p class="text-muted small mb-0">Upload sales data to see trends</p>
+              </div>
+            </div>
+            
+            <!-- Chart -->
+            <div v-else class="chart-container flex-grow-1 d-flex flex-column justify-content-center" @click="viewDetailedChart">
+              <div class="chart-wrapper">
+                <svg viewBox="0 0 400 180" class="w-100 h-100" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.2"/>
+                      <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path
+                    :d="salesTrendData.chart_area_path || 'M0,160 L400,160 L400,180 L0,180 Z'"
+                    fill="url(#chartGradient)"
+                    class="chart-area"
+                  />
+                  <path
+                    :d="salesTrendData.chart_path || 'M0,160 L400,160'"
+                    fill="none"
+                    stroke="var(--color-primary)"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="chart-path"
+                  />
+                  <circle
+                    v-for="(point, i) in salesTrendData.data_points"
+                    :key="i"
+                    :cx="point.x"
+                    :cy="point.y"
+                    r="5"
+                    class="chart-point"
+                    @mouseenter="showChartTooltip($event, point)"
+                    @mouseleave="hideChartTooltip"
+                  />
+                </svg>
+                <!-- Tooltip -->
+                <div 
+                  v-if="chartTooltip.visible" 
+                  class="chart-tooltip"
+                  :style="{ left: chartTooltip.x + 'px', top: chartTooltip.y + 'px' }"
+                >
+                  <strong>{{ chartTooltip.label }}</strong>
+                  <div>{{ chartTooltip.value }}</div>
+                </div>
+              </div>
+              <div class="chart-labels d-flex justify-content-between mt-3 px-2">
+                <small 
+                  class="text-muted fw-medium" 
+                  v-for="(label, idx) in chartLabels" 
+                  :key="idx"
+                  :style="{ fontSize: chartPeriod === 'monthly' ? '0.6rem' : '0.75rem' }"
+                >{{ label }}</small>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-lg-6">
-        <div class="card modern-card">
-          <div class="card-body">
-            <h6 class="card-title mb-3">
-              <i class="bi bi-graph-up-arrow me-2"></i>
-              Next Quarter Demand Forecast
-            </h6>
-            <div class="forecast-container p-3 rounded">
-              <div class="row g-3">
+      <div class="col-lg-6 d-flex">
+        <div class="card modern-card w-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+              <h6 class="card-title mb-0">
+                <i class="bi bi-graph-up-arrow me-2"></i>
+                Next Quarter Demand Forecast
+              </h6>
+              <span v-if="quarterlyForecastData?.summary?.confidence_level" class="badge" :class="{
+                'bg-success-soft': quarterlyForecastData.summary.confidence_level === 'High',
+                'bg-warning-soft': quarterlyForecastData.summary.confidence_level === 'Medium',
+                'bg-danger-soft': quarterlyForecastData.summary.confidence_level === 'Low'
+              }">
+                {{ quarterlyForecastData.summary.confidence_level }} Confidence
+              </span>
+            </div>
+            
+            <!-- Loading State -->
+            <div v-if="quarterlyForecastLoading" class="forecast-container p-3 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+              <div class="text-center">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <p class="text-muted mb-0">Generating forecast...</p>
+              </div>
+            </div>
+            
+            <!-- Error State -->
+            <div v-else-if="quarterlyForecastError" class="forecast-container p-4 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+              <div class="text-center">
+                <i class="bi bi-exclamation-triangle fs-1 text-warning mb-2"></i>
+                <p class="text-muted mb-2">{{ quarterlyForecastError }}</p>
+                <button class="btn btn-outline-primary btn-sm" @click="fetchQuarterlyForecast">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                </button>
+              </div>
+            </div>
+            
+            <!-- No Data State -->
+            <div v-else-if="!quarterlyForecastData || quarterlyForecastData.status === 'no_data'" class="forecast-container p-4 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+              <div class="text-center">
+                <i class="bi bi-bar-chart-line fs-1 text-muted mb-2"></i>
+                <p class="fw-medium mb-1">No Forecast Data Available</p>
+                <small class="text-muted d-block mb-3">Upload at least 30 days of sales data to generate demand forecasts</small>
+              </div>
+            </div>
+            
+            <!-- Data State -->
+            <div v-else class="forecast-container p-3 rounded flex-grow-1">
+              <!-- Total Predicted Revenue -->
+              <div v-if="quarterlyForecastData?.summary" class="forecast-total mb-3 p-3 bg-primary-soft rounded text-center">
+                <small class="text-muted d-block">Predicted Quarter Revenue</small>
+                <strong class="fs-4 text-primary">{{ quarterlyForecastData.summary.total_predicted_revenue_formatted || '₹0' }}</strong>
+                <div v-if="quarterlyForecastData.summary.total_predicted_quantity" class="mt-1">
+                  <small class="text-muted">Est. {{ quarterlyForecastData.summary.total_predicted_quantity.toLocaleString() }} units</small>
+                </div>
+              </div>
+              
+              <!-- Category Forecasts - Show actionable items -->
+              <div v-if="actionableForecasts.length > 0">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <small class="text-muted">Top Categories</small>
+                  <button 
+                    v-if="quarterlyForecastData?.category_forecast?.length > 3" 
+                    class="btn btn-link btn-sm p-0 text-primary"
+                    @click="showAllCategories = !showAllCategories"
+                  >
+                    {{ showAllCategories ? 'Show Less' : `View All (${quarterlyForecastData.category_forecast.length})` }}
+                  </button>
+                </div>
+                <div class="row g-2">
+                  <div
+                    :class="showAllCategories ? 'col-6 col-md-4' : 'col-4'"
+                    v-for="(forecast, index) in displayedForecasts"
+                    :key="index"
+                  >
+                    <div
+                      class="forecast-item h-100 d-flex flex-column align-items-center justify-content-center text-center p-2"
+                      :class="{ 'border-primary': forecast.is_actionable }"
+                      @click="viewForecastDetails(forecast)"
+                    >
+                      <div class="forecast-icon mb-1" :class="getTrendIconBg(forecast.trend)">
+                        <i :class="getTrendIcon(forecast.trend)" :style="{ color: getTrendColor(forecast.trend) }"></i>
+                      </div>
+                      <small class="d-block fw-bold mb-1 text-dark text-truncate" style="max-width: 100%; font-size: 0.75rem;">{{ forecast.name }}</small>
+                      <div class="forecast-badge small" :class="getTrendBadgeClass(forecast.trend)">
+                        <i :class="forecast.trend === 'up' ? 'bi bi-arrow-up' : forecast.trend === 'down' ? 'bi bi-arrow-down' : 'bi bi-dash'" class="me-1"></i>
+                        {{ formatTrendPercent(forecast) }}
+                      </div>
+                      <small class="text-muted mt-1" style="font-size: 0.65rem;">{{ forecast.predicted }}</small>
+                      <small v-if="forecast.insight" class="text-primary mt-1 d-none d-md-block" style="font-size: 0.6rem;">{{ forecast.insight }}</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Fallback to static forecasts if no data -->
+              <div v-else class="row g-3">
                 <div
                   class="col-4"
                   v-for="(forecast, index) in forecasts"
                   :key="index"
                 >
                   <div
-                    class="forecast-item text-center"
+                    class="forecast-item h-100 d-flex flex-column align-items-center justify-content-center text-center p-3"
                     @click="viewForecastDetails(forecast)"
                   >
                     <div class="forecast-icon mb-2" :class="forecast.iconBg">
-                      <i
-                        :class="forecast.icon"
-                        :style="{ color: forecast.color }"
-                      ></i>
+                      <i :class="forecast.icon" :style="{ color: forecast.color }"></i>
                     </div>
-                    <small class="d-block fw-semibold mb-1">{{
-                      forecast.name
-                    }}</small>
+                    <small class="d-block fw-bold mb-1 text-dark text-truncate" style="max-width: 100%;">{{ forecast.name }}</small>
                     <div class="forecast-badge" :class="forecast.badgeClass">
-                      <i :class="forecast.trendIcon"></i>
+                      <i :class="forecast.trendIcon" class="me-1"></i>
                       {{ forecast.trend }}
                     </div>
+                    <small v-if="forecast.predicted" class="text-muted mt-1" style="font-size: 0.7rem;">{{ forecast.predicted }}</small>
                   </div>
+                </div>
+              </div>
+              
+              <!-- Monthly Breakdown -->
+              <div v-if="quarterlyForecastData?.monthly_forecast?.length" class="mt-3">
+                <small class="text-muted d-block mb-2">Monthly Breakdown</small>
+                <div class="d-flex gap-2">
+                  <div 
+                    v-for="(month, idx) in quarterlyForecastData.monthly_forecast" 
+                    :key="idx"
+                    class="flex-fill p-2 rounded text-center monthly-breakdown-item"
+                    :class="idx === 0 ? 'bg-primary-soft' : 'bg-light'"
+                  >
+                    <small class="text-muted d-block" style="font-size: 0.65rem;">{{ month.month?.split(' ')[0] }}</small>
+                    <strong class="small">{{ month.predicted_revenue_formatted }}</strong>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Insights from Forecast -->
+              <div v-if="quarterlyForecastData?.insights?.length" class="mt-3">
+                <div 
+                  v-for="(insight, idx) in quarterlyForecastData.insights.slice(0, 2)" 
+                  :key="idx"
+                  class="d-flex align-items-start gap-2 p-2 rounded mb-2"
+                  :class="insight.type === 'warning' ? 'bg-warning-soft' : 'bg-light'"
+                >
+                  <i :class="insight.icon || 'bi bi-lightbulb'" class="text-primary mt-1"></i>
+                  <small class="text-muted">{{ insight.message }}</small>
                 </div>
               </div>
             </div>
@@ -218,35 +410,35 @@
         </div>
       </div>
 
-      <div class="col-lg-6">
-        <div class="card modern-card ai-insights-card">
-          <div class="card-body">
-            <h6 class="card-title mb-3">
-              <i class="bi bi-stars me-2"></i>
-              AI-Powered Insights
-            </h6>
-            <div class="insights-container">
+      <div class="col-lg-6 d-flex">
+        <div class="card modern-card ai-insights-card w-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h6 class="card-title mb-0">
+                <i class="bi bi-stars me-2"></i>
+                AI-Powered Insights
+              </h6>
+              <button class="btn btn-outline-primary btn-sm" @click="generateInsightsPDF" :disabled="generatingPDF">
+                <span v-if="generatingPDF"><span class="spinner-border spinner-border-sm me-1"></span>Generating...</span>
+                <span v-else><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</span>
+              </button>
+            </div>
+            <div class="insights-container flex-grow-1 custom-scrollbar">
               <div
                 class="insight-item mb-3"
                 v-for="(insight, index) in aiInsights"
                 :key="index"
               >
                 <div class="d-flex align-items-start gap-3">
-                  <div class="insight-icon">
+                  <div class="insight-icon flex-shrink-0">
                     <i :class="insight.icon"></i>
                   </div>
                   <div class="flex-grow-1">
-                    <strong class="d-block mb-1">{{ insight.title }}</strong>
-                    <p class="mb-0 small text-muted">
+                    <strong class="d-block mb-1 text-dark">{{ insight.title }}</strong>
+                    <p class="mb-0 small text-muted lh-sm">
                       {{ insight.description }}
                     </p>
                   </div>
-                  <button
-                    class="btn btn-sm btn-outline-gradient"
-                    @click="applyInsight(insight)"
-                  >
-                    Apply
-                  </button>
                 </div>
               </div>
             </div>
@@ -270,165 +462,86 @@
                 View All
               </button>
             </div>
-            <div class="reorder-carousel">
-              <button
-                class="carousel-nav-btn prev"
-                @click="scrollCarousel('left')"
-                v-show="showLeftArrow"
+            
+            <!-- Grouped reorder suggestions -->
+            <div v-if="Object.keys(groupedReorderSuggestions).length === 0" class="text-center py-5 text-muted">
+              <div class="empty-state-icon mb-3">
+                <i class="bi bi-inbox"></i>
+              </div>
+              <p class="mb-0">No reorder suggestions at this time</p>
+            </div>
+            
+            <div v-else class="distributor-groups">
+              <div 
+                v-for="(products, distributorName) in groupedReorderSuggestions" 
+                :key="distributorName"
+                class="distributor-group mb-4"
               >
-                <i class="bi bi-chevron-left"></i>
-              </button>
-              <div
-                class="carousel-track"
-                ref="carouselTrack"
-                @scroll="updateArrows"
-              >
-                <div
-                  class="reorder-card"
-                  v-for="(product, index) in reorderProducts"
-                  :key="index"
-                  @click="viewProduct(product)"
-                >
-                  <div class="product-image-wrapper">
-                    <img
-                      :src="product.image"
-                      :alt="product.name"
-                      class="product-image"
-                    />
-                    <div class="product-badge">
-                      <i class="bi bi-lightning-fill"></i>
-                      Hot
+                <div class="distributor-header p-3 rounded-top bg-light-subtle border-bottom">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                      <div class="distributor-icon">
+                        <i class="bi bi-building"></i>
+                      </div>
+                      <div>
+                        <h6 class="mb-0 fw-bold text-dark">{{ distributorName }}</h6>
+                        <small class="text-muted">{{ products.length }} item(s) to reorder</small>
+                      </div>
                     </div>
-                  </div>
-                  <div class="product-details p-3">
-                    <h6 class="product-name mb-1">{{ product.name }}</h6>
-                    <p class="product-supplier mb-2">
-                      <i class="bi bi-shop me-1"></i>
-                      {{ product.supplier }}
-                    </p>
-                    <div
-                      class="d-flex align-items-center justify-content-between mb-2"
+                    <button 
+                      class="btn btn-sm btn-primary d-flex align-items-center"
+                      @click="reorderFromDistributor(distributorName, products)"
                     >
-                      <span class="product-quantity"
-                        >Qty: {{ product.quantity }}</span
-                      >
-                      <span class="product-price">{{ product.price }}</span>
-                    </div>
-                    <div class="product-sku mb-3">
-                      <small class="text-muted">SKU: {{ product.sku }}</small>
-                    </div>
-                    <button
-                      class="btn btn-gradient btn-sm w-100"
-                      @click.stop="addToCart(product)"
-                    >
-                      <i class="bi bi-cart-plus me-1"></i>
-                      Reorder Now
+                      <i class="bi bi-cart-plus me-2"></i>
+                      Order All
                     </button>
                   </div>
                 </div>
-              </div>
-              <button
-                class="carousel-nav-btn next"
-                @click="scrollCarousel('right')"
-                v-show="showRightArrow"
-              >
-                <i class="bi bi-chevron-right"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Browse Available Products Section -->
-    <div class="mt-4">
-      <div class="card modern-card">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <h5 class="section-title mb-0">
-              <i class="bi bi-grid-3x3 me-2"></i>
-              Browse Available Products
-            </h5>
-            <div class="d-flex gap-2">
-              <button
-                v-for="filter in productFilters"
-                :key="filter.id"
-                class="filter-chip"
-                :class="{ active: selectedFilter === filter.id }"
-                @click="selectFilter(filter.id)"
-              >
-                <i :class="filter.icon" class="me-1"></i>
-                {{ filter.label }}
-              </button>
-            </div>
-          </div>
-
-          <div class="products-grid">
-            <div
-              class="product-grid-card"
-              v-for="(product, index) in availableProducts"
-              :key="index"
-              @click="viewProductDetails(product)"
-            >
-              <div class="product-grid-image">
-                <img :src="product.image" :alt="product.name" />
-                <div class="product-overlay">
-                  <button
-                    class="btn btn-light btn-sm"
-                    @click.stop="quickView(product)"
-                  >
-                    <i class="bi bi-eye"></i> Quick View
-                  </button>
-                </div>
-                <div class="product-discount-badge" v-if="product.discount">
-                  ₹{{ product.discount }} OFF
-                </div>
-              </div>
-              <div class="product-grid-info p-3">
-                <div
-                  class="d-flex justify-content-between align-items-start mb-2"
-                >
-                  <h6 class="product-grid-name mb-0">{{ product.name }}</h6>
-                  <div class="rating">
-                    <i class="bi bi-star-fill text-warning"></i>
-                    <span class="small">{{ product.rating }}</span>
-                  </div>
-                </div>
-                <p class="product-description mb-2">
-                  {{ product.description }}
-                </p>
-                <div
-                  class="d-flex justify-content-between align-items-center mb-2"
-                >
-                  <div class="supplier-info">
-                    <small class="text-muted d-block">Sold by</small>
-                    <strong class="small">{{ product.soldBy }}</strong>
-                  </div>
-                  <div class="stock-info text-end">
-                    <small class="text-muted d-block">Stock</small>
-                    <strong
-                      class="small"
-                      :class="
-                        product.stock > 10 ? 'text-success' : 'text-warning'
-                      "
+                
+                <div class="reorder-carousel">
+                  <div class="carousel-track" style="overflow-x: auto;">
+                    <div
+                      class="reorder-card"
+                      v-for="(product, index) in products"
+                      :key="index"
+                      @click="viewProduct(product)"
                     >
-                      {{ product.stock }} units
-                    </strong>
+                      <div class="product-image-wrapper">
+                        <img
+                          :src="product.image"
+                          :alt="product.name"
+                          class="product-image"
+                        />
+                        <div class="product-badge">
+                          <i class="bi bi-lightning-fill"></i>
+                          Low Stock
+                        </div>
+                      </div>
+                      <div class="product-details p-3">
+                        <h6 class="product-name mb-1">{{ product.name }}</h6>
+                        <p class="product-supplier mb-2">
+                          <i class="bi bi-tag me-1"></i>
+                          {{ product.category }}
+                        </p>
+                        <div class="mb-2">
+                          <small class="text-muted d-block">Current: {{ product.currentStock }} units</small>
+                          <small class="text-danger d-block">Min Required: {{ product.minimumStock }} units</small>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                          <span class="product-quantity text-success fw-bold"
+                            >Reorder: {{ product.quantity }}</span
+                          >
+                          <span class="product-price">{{ product.price }}</span>
+                        </div>
+                        <div class="product-sku mb-3">
+                          <small class="text-muted">SKU: {{ product.sku }}</small>
+                        </div>
+                        <div class="text-muted small mt-2">
+                          Review supplier contact to place the order directly.
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="product-grid-footer">
-                  <div class="price-section">
-                    <span class="current-price">{{ product.price }}</span>
-                    <span class="original-price" v-if="product.originalPrice">{{
-                      product.originalPrice
-                    }}</span>
-                  </div>
-                  <button
-                    class="btn btn-gradient btn-sm"
-                    @click.stop="addToCart(product)"
-                  >
-                    <i class="bi bi-cart-plus"></i>
-                  </button>
                 </div>
               </div>
             </div>
@@ -473,14 +586,73 @@
                   >Sold by: {{ selectedProduct.soldBy }}</small
                 >
               </div>
-              <button
-                class="btn btn-gradient btn-lg w-100"
-                @click="addToCart(selectedProduct)"
-              >
-                <i class="bi bi-cart-plus me-2"></i>
-                Add to Cart
-              </button>
+              <div class="alert alert-info mt-3 mb-0">
+                Reach out to the distributor to place this reorder.
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- AI Insights Modal -->
+    <transition name="modal-fade">
+      <div v-if="showInsightsModal" class="modal-overlay" @click="closeInsightsModal">
+        <div class="quick-view-modal" @click.stop style="max-width: 600px;">
+          <button class="modal-close-btn" @click="closeInsightsModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <div class="text-center mb-4">
+            <div class="insight-icon-large mb-3 text-primary">
+              <i class="bi bi-stars fs-1"></i>
+            </div>
+            <h4 class="mb-2">AI Sales Analysis</h4>
+            <p class="text-muted" v-if="!insightsLoading">Insights generated from your latest upload</p>
+            <p class="text-muted" v-else>Processing your data...</p>
+          </div>
+          
+          <div v-if="insightsLoading" class="text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mb-0">Analyzing sales patterns...</p>
+            <small class="text-muted">This may take a moment</small>
+          </div>
+          
+          <div class="insights-list" v-else-if="uploadInsights">
+            <div class="card bg-light border-0 mb-3" v-if="uploadInsights.demand_summary">
+              <div class="card-body">
+                <h6 class="card-title text-primary mb-2">
+                  <i class="bi bi-graph-up-arrow me-2"></i>Demand Summary
+                </h6>
+                <p class="mb-0 small">{{ uploadInsights.demand_summary }}</p>
+              </div>
+            </div>
+
+            <div class="card bg-light border-0 mb-3" v-if="uploadInsights.recommendation">
+              <div class="card-body">
+                <h6 class="card-title text-success mb-2">
+                  <i class="bi bi-lightbulb me-2"></i>Recommendation
+                </h6>
+                <p class="mb-0 small">{{ uploadInsights.recommendation }}</p>
+              </div>
+            </div>
+
+            <div class="d-flex flex-column gap-2">
+              <div v-for="(insight, idx) in uploadInsights.ai_insights" :key="idx" class="d-flex align-items-start gap-2 p-2 border rounded bg-white">
+                <i class="bi bi-check-circle-fill text-primary mt-1"></i>
+                <div>
+                  <strong>{{ insight.title }}</strong>
+                  <p class="mb-0 small text-muted">{{ insight.description }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <button class="btn btn-gradient w-100" @click="closeInsightsModal">
+              Got it
+            </button>
           </div>
         </div>
       </div>
@@ -498,7 +670,16 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { getShopDashboard, uploadSalesData as uploadSalesDataAPI, exportSalesData, getDemandForecast } from '@/api/apiShop';
+import { 
+  getShopDashboard, 
+  uploadSalesData as uploadSalesDataAPI, 
+  getDemandForecast, 
+  getSalesUploadLogs, 
+  generateSalesReportPdf,
+  getSalesSummary,
+  getQuarterlyForecast,
+  getSalesGrowthTrend
+} from '@/api/apiShop';
 
 // Loading and error states
 const loading = ref(false);
@@ -507,10 +688,187 @@ const error = ref('');
 // Dashboard data from backend
 const dashboardData = ref(null);
 
-// Demand forecast data
+// NEW: Sales Summary (Last 7 Days) data
+const salesSummaryData = ref(null);
+const salesSummaryLoading = ref(false);
+const salesSummaryError = ref('');
+
+// NEW: Quarterly Forecast data
+const quarterlyForecastData = ref(null);
+const quarterlyForecastLoading = ref(false);
+const quarterlyForecastError = ref('');
+
+// NEW: Sales Growth Trend chart data
+const salesTrendData = ref(null);
+const chartLoading = ref(false);
+const chartPeriod = ref('weekly');
+const chartTooltip = ref({ visible: false, x: 0, y: 0, label: '', value: '' });
+
+// Demand forecast data (legacy)
 const demandForecast = ref([]);
 const forecastLoading = ref(false);
 const forecastError = ref('');
+
+// Upload logs for audit transparency
+const uploadLogs = ref([]);
+const uploadLogsLoading = ref(false);
+const uploadLogsError = ref('');
+
+// PDF generation state
+const generatingPDF = ref(false);
+
+// Sales summary computed properties
+const salesDateRange = computed(() => {
+  if (salesSummaryData.value?.period?.label) {
+    return salesSummaryData.value.period.label;
+  }
+  if (!dashboardData.value) return 'Last 7 days';
+  return dashboardData.value.date_range || 'Last 7 days';
+});
+
+const salesGrowth = computed(() => {
+  if (salesSummaryData.value?.comparison?.revenue_change_percent) {
+    return salesSummaryData.value.comparison.revenue_change_percent;
+  }
+  if (!dashboardData.value) return null;
+  return dashboardData.value.growth || null;
+});
+
+// NEW: Computed properties for sales summary display
+const salesSummaryMetrics = computed(() => {
+  if (!salesSummaryData.value?.metrics) {
+    return {
+      totalRevenue: '₹0',
+      totalQuantity: 0,
+      avgOrderValue: '₹0',
+      totalOrders: 0
+    };
+  }
+  const m = salesSummaryData.value.metrics;
+  return {
+    totalRevenue: m.total_revenue_formatted || '₹0',
+    totalQuantity: m.total_quantity || 0,
+    avgOrderValue: m.average_order_value_formatted || '₹0',
+    totalOrders: m.total_orders || 0
+  };
+});
+
+const salesComparison = computed(() => {
+  if (!salesSummaryData.value?.comparison) {
+    return { trend: 'stable', changePercent: '0%', message: '' };
+  }
+  const c = salesSummaryData.value.comparison;
+  return {
+    trend: c.trend || 'stable',
+    changePercent: c.revenue_change_percent || '0%',
+    message: c.trend === 'up' 
+      ? `Sales increased by ${c.revenue_change_percent} compared to last week`
+      : c.trend === 'down'
+      ? `Sales decreased by ${c.revenue_change_percent.replace('-', '')} compared to last week`
+      : 'Sales remained stable compared to last week'
+  };
+});
+
+const topCategory = computed(() => {
+  if (!salesSummaryData.value?.top_categories?.length) {
+    return null;
+  }
+  return salesSummaryData.value.top_categories[0];
+});
+
+// Chart labels based on period
+const chartLabels = computed(() => {
+  if (salesTrendData.value?.labels?.length) {
+    // For monthly, show fewer labels to avoid crowding
+    if (chartPeriod.value === 'monthly' && salesTrendData.value.labels.length > 10) {
+      const labels = salesTrendData.value.labels;
+      const step = Math.ceil(labels.length / 10);
+      return labels.filter((_, idx) => idx % step === 0 || idx === labels.length - 1);
+    }
+    return salesTrendData.value.labels;
+  }
+  // Default labels based on period
+  if (chartPeriod.value === 'weekly') {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  } else if (chartPeriod.value === 'monthly') {
+    return Array.from({ length: 10 }, (_, i) => `${(i + 1) * 3}`);
+  } else {
+    return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  }
+});
+
+// NEW: Category forecast computed properties
+const showAllCategories = ref(false);
+
+// Transform category forecast data for display
+const actionableForecasts = computed(() => {
+  if (!quarterlyForecastData.value?.category_forecast?.length) {
+    return [];
+  }
+  return quarterlyForecastData.value.category_forecast.map(cat => ({
+    name: cat.category,
+    predicted: cat.predicted_revenue_formatted,
+    trend: cat.trend,
+    growth_rate: cat.growth_rate,
+    proportion: cat.proportion_percent,
+    insight: cat.insight,
+    is_actionable: cat.is_actionable,
+    priority: cat.priority
+  }));
+});
+
+// Show top 3 by default, all when expanded
+const displayedForecasts = computed(() => {
+  if (showAllCategories.value) {
+    return actionableForecasts.value;
+  }
+  // Show top 3 actionable items, or just top 3 if none are actionable
+  const actionable = actionableForecasts.value.filter(f => f.is_actionable);
+  if (actionable.length >= 3) {
+    return actionable.slice(0, 3);
+  }
+  return actionableForecasts.value.slice(0, 3);
+});
+
+// Helper functions for trend display
+const getTrendIcon = (trend) => {
+  switch (trend) {
+    case 'up': return 'bi bi-graph-up-arrow fs-4';
+    case 'down': return 'bi bi-graph-down-arrow fs-4';
+    default: return 'bi bi-dash-lg fs-4';
+  }
+};
+
+const getTrendColor = (trend) => {
+  switch (trend) {
+    case 'up': return '#10b981';
+    case 'down': return '#ef4444';
+    default: return '#6b7280';
+  }
+};
+
+const getTrendIconBg = (trend) => {
+  switch (trend) {
+    case 'up': return 'bg-success-soft';
+    case 'down': return 'bg-danger-soft';
+    default: return 'bg-secondary-soft';
+  }
+};
+
+const getTrendBadgeClass = (trend) => {
+  switch (trend) {
+    case 'up': return 'bg-success-soft text-success';
+    case 'down': return 'bg-danger-soft text-danger';
+    default: return 'bg-secondary-soft text-secondary';
+  }
+};
+
+const formatTrendPercent = (forecast) => {
+  if (forecast.growth_rate !== undefined && forecast.growth_rate !== 0) {
+    return forecast.growth_rate > 0 ? `+${forecast.growth_rate}%` : `${forecast.growth_rate}%`;
+  }
+  return `${forecast.proportion}%`;
+};
 
 // Shop ID - get from logged-in user
 const shopId = computed(() => {
@@ -530,15 +888,6 @@ const metrics = ref([
     iconClass: 'bg-success-soft',
   },
   {
-    label: 'Avg Order Value',
-    value: '₹0',
-    change: '+0%',
-    changeClass: 'positive',
-    changeIcon: 'bi bi-arrow-up',
-    icon: 'bi bi-receipt',
-    iconClass: 'bg-info-soft',
-  },
-  {
     label: 'Pending Reorders',
     value: '0',
     change: '-0',
@@ -546,15 +895,6 @@ const metrics = ref([
     changeIcon: 'bi bi-arrow-down',
     icon: 'bi bi-cart-check',
     iconClass: 'bg-warning-soft',
-  },
-  {
-    label: 'Total Orders',
-    value: '0',
-    change: '+0%',
-    changeClass: 'positive',
-    changeIcon: 'bi bi-arrow-up',
-    icon: 'bi bi-bag-check',
-    iconClass: 'bg-primary-soft',
   },
   {
     label: 'Customer Rating',
@@ -622,32 +962,14 @@ const forecasts = ref([
 // AI Insights - from backend
 const aiInsights = ref([]);
 
-// Reorder Products with Images
-const reorderProducts = ref([
-  {
-    name: 'Premium Banarasi Silk',
-    image: 'https://images.unsplash.com/photo-1757382642968-0c8c9adbde0b?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=500',
-    supplier: 'Varanasi Textiles',
-    quantity: 23,
-    price: '₹1,999',
-    sku: 'KMC7k1237938',
-  },
-]);
+// Reorder Products
+const reorderProducts = ref([]);
 
-// Available Products with Images
-const availableProducts = ref([
-  {
-    name: 'Handwoven Banarasi Silk',
-    image: 'https://images.unsplash.com/photo-1630961680768-998a170045fa?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=500',
-    description: 'Premium quality silk fabric with intricate golden patterns',
-    price: '₹2,499',
-    originalPrice: '₹2,999',
-    discount: 500,
-    soldBy: 'Heritage Textiles',
-    rating: 4.8,
-    stock: 15,
-  },
-]);
+// Grouped reorder suggestions by distributor (Story 2)
+const groupedReorderSuggestions = ref({});
+
+// Available Products
+const availableProducts = ref([]);
 
 // Product Filters
 const productFilters = ref([
@@ -668,10 +990,67 @@ const showRightArrow = ref(true);
 const showQuickView = ref(false);
 const selectedProduct = ref(null);
 
+// AI Insights Modal
+const showInsightsModal = ref(false);
+const insightsLoading = ref(false);
+const uploadInsights = ref(null);
+
+const closeInsightsModal = () => {
+  if (insightsLoading.value) return; // Prevent closing while loading
+  showInsightsModal.value = false;
+  uploadInsights.value = null;
+};
+
 // Toast
 const showToast = ref(false);
 const toastMessage = ref('');
 const toastIcon = ref('bi bi-check-circle-fill');
+
+const formatUploadTiming = (log) => {
+  if (!log) return '';
+  const duration = log.duration_ms ? (log.duration_ms / 1000).toFixed(1) : null;
+  const sla = log.sla_limit_ms ? log.sla_limit_ms / 1000 : 120;
+  if (!duration) return '';
+  const breached = log.sla_breached ? ' (SLA exceeded)' : '';
+  return `Processed in ${duration}s (SLA ${sla}s)${breached}`;
+};
+
+const limitSentences = (text, max = 4) => {
+  if (!text) return text;
+  const sentences = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return sentences.slice(0, max).join(' ');
+};
+
+const formatLogDate = (timestamp) => {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString();
+  } catch {
+    return timestamp;
+  }
+};
+
+const fetchUploadLogs = async () => {
+  if (!shopId.value) return;
+  uploadLogsLoading.value = true;
+  uploadLogsError.value = '';
+  try {
+    const response = await getSalesUploadLogs(shopId.value, 6);
+    if (response.data?.status === 'success') {
+      uploadLogs.value = response.data.logs || [];
+    } else {
+      uploadLogsError.value = response.data?.message || 'Unable to fetch logs';
+    }
+  } catch (err) {
+    console.error('[Upload Logs Error]', err);
+    uploadLogsError.value = err.response?.data?.message || 'Failed to load upload history';
+  } finally {
+    uploadLogsLoading.value = false;
+  }
+};
 
 /**
  * Fetch dashboard data from backend
@@ -686,12 +1065,19 @@ const fetchDashboard = async () => {
   error.value = '';
   try {
     const response = await getShopDashboard(shopId.value);
-    if (response.data) {
-      dashboardData.value = response.data;
-      updateMetricsFromData(response.data);
-      updateReorderSuggestions(response.data);
-      updateForecastsFromData(response.data);
-      updateInsightsFromData(response.data);
+    const payload = response.data?.data || response.data;
+    if (payload) {
+      dashboardData.value = payload;
+      updateMetricsFromData(payload);
+      updateReorderSuggestions(payload);
+      updateForecastsFromData(payload);
+      updateInsightsFromData(payload);
+      if (response.data?.warning) {
+        toastMessage.value = response.data.warning;
+        toastIcon.value = 'bi bi-exclamation-triangle';
+        showToast.value = true;
+        setTimeout(() => (showToast.value = false), 5000);
+      }
     }
   } catch (err) {
     console.error('[Dashboard Error]', err);
@@ -706,39 +1092,67 @@ const fetchDashboard = async () => {
  * Update metrics from dashboard data
  */
 const updateMetricsFromData = (data) => {
+  // metrics[0] = Weekly Sales
   if (data.weekly_sales !== undefined) {
     metrics.value[0].value = data.weekly_sales || '₹0';
   }
-  if (data.avg_order_value !== undefined) {
-    metrics.value[1].value = data.avg_order_value || '₹0';
-  }
+  // metrics[1] = Pending Reorders
   if (data.pending_reorders !== undefined) {
-    metrics.value[2].value = data.pending_reorders || 0;
+    metrics.value[1].value = data.pending_reorders || 0;
   }
-  if (data.total_orders !== undefined) {
-    metrics.value[3].value = data.total_orders || 0;
-  }
+  // metrics[2] = Customer Rating
   if (data.customer_rating !== undefined) {
-    metrics.value[4].value = `${data.customer_rating}★` || '4.0★';
+    metrics.value[2].value = `${data.customer_rating}★`;
   }
+  // metrics[3] = Growth
   if (data.growth !== undefined) {
-    metrics.value[5].value = data.growth || '0%';
+    metrics.value[3].value = data.growth || '0%';
+    // Update change indicator based on growth direction
+    const growthNum = parseFloat(data.growth);
+    if (!isNaN(growthNum)) {
+      metrics.value[3].changeClass = growthNum >= 0 ? 'positive' : 'negative';
+      metrics.value[3].changeIcon = growthNum >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+    }
   }
 };
 
 const updateReorderSuggestions = (data) => {
-  if (data.reorder_suggestions && data.reorder_suggestions.length > 0) {
-    reorderProducts.value = data.reorder_suggestions.map(item => ({
-      name: item.product_name,
-      image: `https://placehold.co/100x100?text=${encodeURIComponent(item.product_name)}`,
-      supplier: `SKU: ${item.sku}`,
-      quantity: item.reorder_quantity,
-      price: `₹${parseFloat(item.price).toLocaleString()}`,
-      sku: item.sku,
-      currentStock: item.current_stock,
-      minimumStock: item.minimum_stock,
-      category: item.category
-    }));
+  // Backend returns grouped suggestions as a dictionary:
+  // { "Distributor Name (ID: X)": { distributor_id, distributor_name, products: [...] }, ... }
+  if (data.reorder_suggestions && typeof data.reorder_suggestions === 'object') {
+    const grouped = {};
+    
+    // Process each distributor's products
+    for (const [distributorKey, distributorData] of Object.entries(data.reorder_suggestions)) {
+      // Handle both old format (array) and new format (object with products array)
+      const products = Array.isArray(distributorData) 
+        ? distributorData 
+        : (distributorData.products || []);
+      
+      if (products.length > 0) {
+        grouped[distributorKey] = products.map(item => ({
+          name: item.product_name,
+          image: item.image || `https://placehold.co/100x100?text=${encodeURIComponent(item.product_name?.substring(0, 10) || 'Product')}`,
+          supplier: distributorData.distributor_name || distributorKey,
+          quantity: item.reorder_quantity,
+          price: `₹${parseFloat(item.price || 0).toLocaleString()}`,
+          sku: item.sku,
+          currentStock: item.current_stock,
+          minimumStock: item.minimum_stock,
+          category: item.category,
+          distributorContact: distributorData.distributor_contact,
+          distributorEmail: distributorData.distributor_email
+        }));
+      }
+    }
+    
+    groupedReorderSuggestions.value = grouped;
+    
+    // Also create a flat list for compatibility
+    reorderProducts.value = Object.values(grouped).flat();
+  } else {
+    groupedReorderSuggestions.value = {};
+    reorderProducts.value = [];
   }
 };
 
@@ -760,22 +1174,24 @@ const updateForecastsFromData = (data) => {
 /**
  * Update AI insights from dashboard data
  */
+/**
+ * Update AI insights from dashboard data
+ */
 const updateInsightsFromData = (data) => {
-  if (data.ai_insights) {
-    aiInsights.value = [
-      {
-        icon: 'bi bi-lightbulb-fill',
-        title: 'AI Recommendation',
-        description: data.ai_insights
-      }
-    ];
+  if (data.ai_insights && data.ai_insights.length > 0) {
+    aiInsights.value = data.ai_insights.map(insight => ({
+      icon: insight.category === 'Trend' ? 'bi bi-graph-up-arrow' : 
+            insight.category === 'Inventory' ? 'bi bi-box-seam' : 'bi bi-lightbulb',
+      title: insight.title,
+      description: limitSentences(insight.description || insight.impact, 4)
+    }));
   } else {
     // Default insights
     aiInsights.value = [
       {
         icon: 'bi bi-lightbulb-fill',
         title: 'Upload Sales Data',
-        description: 'Upload your sales data to get AI-powered insights and forecasts.'
+        description: limitSentences('Upload your sales data to get AI-powered insights and forecasts.', 4)
       }
     ];
   }
@@ -803,24 +1219,62 @@ const handleUploadSalesData = async () => {
     }
 
     loading.value = true;
-    try {
-      toastMessage.value = 'Uploading periodic sales data...';
-      toastIcon.value = 'bi bi-upload';
-      showToast.value = true;
+    
+    // Open modal immediately in loading state
+    showInsightsModal.value = true;
+    insightsLoading.value = true;
+    uploadInsights.value = null;
 
-      await uploadSalesDataAPI(shopId.value, file);
+    try {
+      // toastMessage.value = 'Uploading periodic sales data...';
+      // toastIcon.value = 'bi bi-upload';
+      // showToast.value = true;
+
+      const response = await uploadSalesDataAPI(shopId.value, file);
       
-      toastMessage.value = 'Periodic sales data uploaded successfully!';
-      toastIcon.value = 'bi bi-check-circle-fill';
+      const timingMessage = formatUploadTiming(response.data?.upload_log);
+      toastMessage.value = timingMessage || 'Analysis complete!';
+      toastIcon.value = response.data?.upload_log?.sla_breached
+        ? 'bi bi-exclamation-circle-fill'
+        : 'bi bi-check-circle-fill';
+      showToast.value = true;
+      
+      // Update Modal Content
+      if (response.data && (response.data.ai_insights || response.data.demand_summary)) {
+        uploadInsights.value = {
+          ai_insights: (response.data.ai_insights || []).map(item => ({
+            ...item,
+            description: limitSentences(item.description || item.impact, 4)
+          })),
+          demand_summary: limitSentences(response.data.demand_summary, 4),
+          recommendation: limitSentences(response.data.recommendation, 4)
+        };
+      } else {
+         // Fallback if no specific insights returned
+         uploadInsights.value = {
+            demand_summary: "Data uploaded successfully.",
+            ai_insights: []
+         };
+      }
       
       // Refresh dashboard after upload
       await fetchDashboard();
+      await fetchUploadLogs();
     } catch (err) {
       console.error('[Upload Error]', err);
-      toastMessage.value = err.response?.data?.message || 'Upload failed';
+      if (err.response?.status === 409 && err.response?.data?.upload_log) {
+        const duplicateOf = err.response.data.duplicate_of;
+        const timingMessage = formatUploadTiming(err.response.data.upload_log);
+        toastMessage.value = `${err.response.data.message} ${timingMessage}`.trim();
+      } else {
+        toastMessage.value = err.response?.data?.message || 'Upload failed';
+      }
       toastIcon.value = 'bi bi-exclamation-circle-fill';
+      showToast.value = true;
+      showInsightsModal.value = false; // Close modal on error
     } finally {
       loading.value = false;
+      insightsLoading.value = false;
       setTimeout(() => (showToast.value = false), 3000);
     }
   };
@@ -829,41 +1283,48 @@ const handleUploadSalesData = async () => {
 };
 
 /**
- * Export sales report
+ * Generate PDF report for AI insights and dashboard summary
  */
-const exportReport = async () => {
-  try {
-    toastMessage.value = 'Exporting report...';
-    toastIcon.value = 'bi bi-download';
+const generateInsightsPDF = async () => {
+  if (!shopId.value) {
+    toastMessage.value = 'Shop ID not found';
+    toastIcon.value = 'bi bi-exclamation-circle-fill';
     showToast.value = true;
+    setTimeout(() => (showToast.value = false), 3000);
+    return;
+  }
 
-    const response = await exportSalesData(shopId.value);
+  generatingPDF.value = true;
+  try {
+    const payload = {
+      shop_id: shopId.value,
+      report_type: 'dashboard_insights',
+      include_sections: ['sales_summary', 'ai_insights', 'forecast', 'reorder_suggestions']
+    };
+
+    const response = await generateSalesReportPdf(payload);
     
     // Create download link
-    const blob = new Blob([response.data], { type: 'text/csv' });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `sales_report_${shopId.value}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `shop_insights_${shopId.value}_${new Date().toISOString().split('T')[0]}.pdf`;
     link.click();
     window.URL.revokeObjectURL(url);
 
-    toastMessage.value = 'Report exported successfully!';
+    toastMessage.value = 'PDF report downloaded successfully!';
     toastIcon.value = 'bi bi-check-circle-fill';
+    showToast.value = true;
   } catch (err) {
-    console.error('[Export Error]', err);
-    toastMessage.value = err.response?.data?.message || 'Export failed';
+    console.error('[PDF Generation Error]', err);
+    toastMessage.value = err.response?.data?.message || 'Failed to generate PDF';
     toastIcon.value = 'bi bi-exclamation-circle-fill';
+    showToast.value = true;
   } finally {
+    generatingPDF.value = false;
     setTimeout(() => (showToast.value = false), 3000);
   }
-};
-
-const viewSalesReport = () => {
-  toastMessage.value = 'Opening detailed sales report...';
-  toastIcon.value = 'bi bi-file-earmark-bar-graph';
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
 };
 
 const viewDetailedChart = () => {
@@ -880,16 +1341,16 @@ const viewForecastDetails = (forecast) => {
   setTimeout(() => (showToast.value = false), 3000);
 };
 
-const applyInsight = (insight) => {
-  toastMessage.value = `Applied: ${insight.title}`;
-  toastIcon.value = 'bi bi-check-circle-fill';
+const viewAllSuggestions = () => {
+  toastMessage.value = 'Loading all suggestions...';
+  toastIcon.value = 'bi bi-grid-3x3-gap';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
 
-const viewAllSuggestions = () => {
-  toastMessage.value = 'Loading all suggestions...';
-  toastIcon.value = 'bi bi-grid-3x3-gap';
+const reorderFromDistributor = (distributorName, products) => {
+  toastMessage.value = `Reordering ${products.length} items from ${distributorName}`;
+  toastIcon.value = 'bi bi-cart-check-fill';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
@@ -918,12 +1379,6 @@ const viewProduct = (product) => {
   showQuickView.value = true;
 };
 
-const addToCart = (product) => {
-  toastMessage.value = `${product.name} added to cart!`;
-  toastIcon.value = 'bi bi-cart-check-fill';
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
-};
 
 const selectFilter = (filterId) => {
   selectedFilter.value = filterId;
@@ -948,12 +1403,14 @@ const closeQuickView = () => {
   selectedProduct.value = null;
 };
 
+// Tooltip handlers for chart points (can be enhanced with proper tooltip UI)
+const tooltipData = ref(null);
 const showTooltip = (point) => {
-  console.log('Sales:', point.value);
+  tooltipData.value = point;
 };
 
 const hideTooltip = () => {
-  console.log('Hide tooltip');
+  tooltipData.value = null;
 };
 
 /**
@@ -990,20 +1447,225 @@ const getConfidenceClass = (confidence) => {
   }
 };
 
+/**
+ * NEW: Fetch comprehensive sales summary for last 7 days
+ */
+const fetchSalesSummary = async () => {
+  if (!shopId.value) return;
+  
+  salesSummaryLoading.value = true;
+  salesSummaryError.value = '';
+  
+  try {
+    const response = await getSalesSummary(shopId.value);
+    if (response.data?.status === 'success') {
+      salesSummaryData.value = response.data.data;
+      
+      // Update chart points from daily breakdown
+      if (salesSummaryData.value?.daily_breakdown?.length > 0) {
+        updateChartFromDailyData(salesSummaryData.value.daily_breakdown);
+      }
+      
+      // Update AI insights from sales summary
+      if (salesSummaryData.value?.insights?.length > 0) {
+        // Merge with existing AI insights
+        const summaryInsights = salesSummaryData.value.insights.map(i => ({
+          title: i.title,
+          icon: i.icon || 'bi bi-lightbulb',
+          description: i.message
+        }));
+        aiInsights.value = [...summaryInsights, ...aiInsights.value.slice(0, 2)];
+      }
+    } else {
+      salesSummaryError.value = response.data?.message || 'Failed to load sales summary';
+    }
+  } catch (err) {
+    console.error('[Sales Summary Error]', err);
+    salesSummaryError.value = err.response?.data?.message || 'Failed to load sales summary';
+  } finally {
+    salesSummaryLoading.value = false;
+  }
+};
+
+/**
+ * NEW: Fetch quarterly demand forecast
+ */
+const fetchQuarterlyForecast = async () => {
+  if (!shopId.value) return;
+  
+  quarterlyForecastLoading.value = true;
+  quarterlyForecastError.value = '';
+  
+  try {
+    const response = await getQuarterlyForecast(shopId.value);
+    if (response.data?.status === 'success') {
+      quarterlyForecastData.value = response.data.data;
+      
+      // Update forecast cards from category data
+      if (quarterlyForecastData.value?.category_forecast?.length > 0) {
+        updateForecastCardsFromData(quarterlyForecastData.value.category_forecast);
+      }
+    } else {
+      quarterlyForecastError.value = response.data?.message || 'Failed to load forecast';
+    }
+  } catch (err) {
+    console.error('[Quarterly Forecast Error]', err);
+    quarterlyForecastError.value = err.response?.data?.message || 'Failed to load forecast';
+  } finally {
+    quarterlyForecastLoading.value = false;
+  }
+};
+
+/**
+ * Update chart points from daily sales data
+ */
+const updateChartFromDailyData = (dailyData) => {
+  if (!dailyData || dailyData.length === 0) return;
+  
+  // Get max revenue for scaling
+  const maxRevenue = Math.max(...dailyData.map(d => d.revenue || 0), 1);
+  
+  // Map to chart points (7 days)
+  const newPoints = [];
+  const xSpacing = 400 / Math.max(dailyData.length - 1, 1);
+  
+  dailyData.forEach((day, index) => {
+    // Scale Y from 30 (top) to 160 (bottom)
+    const yValue = 160 - ((day.revenue / maxRevenue) * 130);
+    newPoints.push({
+      x: index * xSpacing,
+      y: Math.max(30, Math.min(160, yValue)),
+      value: day.revenue,
+      label: day.day_name
+    });
+  });
+  
+  if (newPoints.length > 0) {
+    chartPoints.value = newPoints;
+  }
+};
+
+/**
+ * Update forecast cards from category forecast data
+ */
+const updateForecastCardsFromData = (categoryData) => {
+  if (!categoryData || categoryData.length === 0) return;
+  
+  const iconConfigs = [
+    { icon: 'bi bi-graph-up-arrow fs-3', color: '#10b981', iconBg: 'bg-success-soft' },
+    { icon: 'bi bi-bar-chart-fill fs-3', color: 'var(--color-primary)', iconBg: 'bg-primary-soft' },
+    { icon: 'bi bi-graph-down-arrow fs-3', color: '#ef4444', iconBg: 'bg-danger-soft' }
+  ];
+  
+  const newForecasts = categoryData.slice(0, 3).map((cat, index) => {
+    const config = iconConfigs[index] || iconConfigs[0];
+    let trendIcon, badgeClass;
+    
+    if (cat.trend === 'up') {
+      trendIcon = 'bi bi-arrow-up';
+      badgeClass = 'trend-up';
+    } else if (cat.trend === 'down') {
+      trendIcon = 'bi bi-arrow-down';
+      badgeClass = 'trend-down';
+    } else {
+      trendIcon = 'bi bi-dash';
+      badgeClass = 'trend-stable';
+    }
+    
+    return {
+      name: cat.category,
+      icon: config.icon,
+      color: config.color,
+      iconBg: config.iconBg,
+      trend: cat.trend === 'up' ? `+${cat.proportion_percent}%` 
+           : cat.trend === 'down' ? `-${cat.proportion_percent}%` 
+           : `${cat.proportion_percent}%`,
+      trendIcon,
+      badgeClass,
+      predicted: cat.predicted_revenue_formatted
+    };
+  });
+  
+  if (newForecasts.length > 0) {
+    forecasts.value = newForecasts;
+  }
+};
+
+/**
+ * NEW: Fetch sales growth trend data for chart
+ */
+const fetchSalesGrowthTrend = async () => {
+  if (!shopId.value) return;
+  
+  chartLoading.value = true;
+  
+  try {
+    const response = await getSalesGrowthTrend(shopId.value, chartPeriod.value);
+    if (response.data?.status === 'success') {
+      salesTrendData.value = response.data.data;
+    } else {
+      salesTrendData.value = null;
+    }
+  } catch (err) {
+    console.error('[Sales Growth Trend Error]', err);
+    salesTrendData.value = null;
+  } finally {
+    chartLoading.value = false;
+  }
+};
+
+/**
+ * Change chart period and refetch data
+ */
+const changeChartPeriod = (period) => {
+  if (chartPeriod.value === period) return;
+  chartPeriod.value = period;
+  fetchSalesGrowthTrend();
+};
+
+/**
+ * Show tooltip on chart point hover
+ */
+const showChartTooltip = (event, point) => {
+  const rect = event.target.closest('.chart-wrapper').getBoundingClientRect();
+  const targetRect = event.target.getBoundingClientRect();
+  chartTooltip.value = {
+    visible: true,
+    x: targetRect.left - rect.left + 10,
+    y: targetRect.top - rect.top - 40,
+    label: point.label,
+    value: point.value_formatted || `₹${point.value?.toLocaleString() || 0}`
+  };
+};
+
+/**
+ * Hide chart tooltip
+ */
+const hideChartTooltip = () => {
+  chartTooltip.value.visible = false;
+};
+
 // Fetch dashboard data on mount
 onMounted(() => {
   fetchDashboard();
   updateArrows();
-  fetchDemandForecast();
+  fetchSalesSummary();
+  fetchQuarterlyForecast();
+  fetchSalesGrowthTrend();
+  fetchUploadLogs();
 });
 </script>
 
 <style scoped>
 /* ===== Base Styles ===== */
-.shop-dashboard {
+.shop-dashboard-tab {
   background: var(--gradient-bg);
   min-height: calc(100vh - 80px);
   padding: 2rem;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeIn {
@@ -1019,27 +1681,28 @@ onMounted(() => {
 
 /* ===== Card Styles ===== */
 .card {
-  border-radius: 16px;
-  border: none;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border-color: rgba(255, 255, 255, 0.9);
 }
 
 .modern-card {
-  animation: slideUp 0.5s ease-out;
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(40px);
   }
   to {
     opacity: 1;
@@ -1052,139 +1715,146 @@ h6.card-title {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 /* ===== Hero Header ===== */
 .dashboard-hero {
   background: linear-gradient(
     135deg,
-    rgba(74, 144, 226, 0.1) 0%,
-    rgba(179, 217, 255, 0.05) 100%
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.4) 100%
   );
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid rgba(74, 144, 226, 0.2);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.icon-box {
+  width: 48px;
+  height: 48px;
+  background: var(--gradient-primary);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
 }
 
 .hero-title {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: linear-gradient(135deg, var(--color-text-dark) 0%, var(--color-primary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  font-weight: 700;
+  font-weight: 800;
   margin: 0;
+  letter-spacing: -0.03em;
 }
 
 .hero-subtitle {
   color: var(--color-text-muted);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
+  font-weight: 500;
 }
 
 /* ===== Buttons ===== */
 .btn-gradient {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: var(--gradient-primary);
   border: none;
   color: white;
-  font-weight: 500;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.6rem 1.2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
 .btn-gradient:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
-  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
   color: white;
 }
 
 .btn-outline-gradient {
-  border: 1.5px solid var(--color-primary);
-  background: transparent;
+  border: 2px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+              var(--gradient-primary) border-box;
   color: var(--color-primary);
-  font-weight: 500;
-  border-radius: 8px;
+  font-weight: 600;
+  border-radius: 12px;
   transition: all 0.3s ease;
 }
 
 .btn-outline-gradient:hover {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  border-color: var(--color-primary);
+  background: var(--gradient-primary) padding-box,
+              var(--gradient-primary) border-box;
   color: white;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.25);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
 }
 
 /* ===== Metric Cards ===== */
 .metric-card {
-  border-radius: 16px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
   overflow: hidden;
-}
-
-.metric-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.3s ease;
-}
-
-.metric-card:hover::before {
-  transform: scaleX(1);
+  animation: fadeIn 0.6s backwards;
 }
 
 .metric-card:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 8px 30px rgba(0, 0, 0, 0.12),
-    0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+  background: white;
+  z-index: 1;
 }
 
 .metric-label {
   color: var(--color-text-muted);
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
 }
 
 .metric-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  transition: transform 0.3s ease;
+}
+
+.metric-card:hover .metric-icon {
+  transform: rotate(10deg) scale(1.1);
 }
 
 .metric-value {
-  font-size: 2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text-dark);
+  letter-spacing: -0.02em;
 }
 
 .metric-change {
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
 }
 
 .metric-change.positive {
@@ -1198,175 +1868,237 @@ h6.card-title {
 }
 
 /* ===== Background Utilities ===== */
-.bg-success-soft {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  color: #059669;
-}
-
-.bg-warning-soft {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  color: #d97706;
-}
-
-.bg-primary-soft {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  color: #2563eb;
-}
-
-.bg-info-soft {
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-  color: #0284c7;
-}
-
-.bg-danger-soft {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #dc2626;
-}
+.bg-success-soft { background: rgba(16, 185, 129, 0.1); color: #059669; }
+.bg-warning-soft { background: rgba(245, 158, 11, 0.1); color: #d97706; }
+.bg-primary-soft { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
+.bg-info-soft { background: rgba(6, 182, 212, 0.1); color: #0891b2; }
+.bg-danger-soft { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.bg-secondary-soft { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
 
 /* ===== Sales Summary ===== */
 .summary-content {
-  background: linear-gradient(
-    135deg,
-    rgba(74, 144, 226, 0.05) 0%,
-    rgba(179, 217, 255, 0.03) 100%
-  );
-  border: 1px solid rgba(74, 144, 226, 0.1);
-  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(248, 250, 252, 0) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  border-radius: 16px;
 }
 
-.summary-item i {
-  font-size: 1.2rem;
-}
-
-.stat-box {
-  background: white;
-  padding: 0.75rem;
-  border-radius: 8px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-/* ===== Chart ===== */
-.chart-placeholder {
-  background: linear-gradient(135deg, rgba(74, 144, 226, 0.15) 0%, rgba(107, 163, 229, 0.15) 100%);
-  border-radius: 12px;
-  padding: 1.5rem 1rem 0.5rem 1rem;
-}
-
-.chart-path {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.chart-area {
-  pointer-events: none;
-}
-
-.chart-point {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.chart-point:hover {
-  r: 8;
-  filter: drop-shadow(0 2px 8px rgba(74, 144, 226, 0.4));
-}
-
-/* ===== Forecast Section ===== */
-.forecast-container {
-  background: linear-gradient(
-    135deg,
-    rgba(74, 144, 226, 0.05) 0%,
-    rgba(179, 217, 255, 0.03) 100%
-  );
-  border: 1px solid rgba(74, 144, 226, 0.1);
-  border-radius: 12px;
-}
-
-.forecast-item {
-  cursor: pointer;
-  transition: all 0.3s ease;
-  padding: 1rem;
-  border-radius: 12px;
-}
-
-.forecast-item:hover {
-  background: rgba(255, 255, 255, 0.8);
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.forecast-icon {
-  width: 60px;
-  height: 60px;
+.check-icon-circle {
+  width: 32px;
+  height: 32px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 1.1rem;
+}
+
+.stat-box {
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* ===== Chart ===== */
+.chart-container {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(248, 250, 252, 0) 100%);
+  border-radius: 16px;
+  padding: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.chart-wrapper {
+  height: 200px;
+  width: 100%;
+  position: relative;
+}
+
+.chart-path {
+  filter: drop-shadow(0 4px 6px rgba(59, 130, 246, 0.3));
+  animation: drawLine 2s ease-out forwards;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+}
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+.chart-point {
+  fill: white;
+  stroke: var(--color-primary);
+  stroke-width: 3px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+.chart-point:hover {
+  r: 8;
+  stroke-width: 4px;
+  filter: drop-shadow(0 4px 10px rgba(59, 130, 246, 0.5));
+}
+
+/* Chart Tooltip */
+.chart-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.chart-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(0, 0, 0, 0.85);
+}
+
+/* Period Button Group */
+.btn-group-sm > .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 6px;
+}
+
+.btn-group > .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.btn-group > .btn:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+/* ===== Forecast Section ===== */
+.forecast-container {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(248, 250, 252, 0) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  border-radius: 16px;
+}
+
+.forecast-item {
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px;
+  background: white;
+  border: 1px solid transparent;
+}
+
+.forecast-item:hover {
+  background: white;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+.forecast-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 0 auto;
+  font-size: 1.75rem;
+  transition: transform 0.3s ease;
+}
+
+.forecast-item:hover .forecast-icon {
+  transform: scale(1.1) rotate(5deg);
 }
 
 .forecast-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
   font-size: 0.75rem;
-  font-weight: 600;
-  display: inline-block;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
 }
 
-.trend-up {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-}
-
-.trend-stable {
-  background: rgba(74, 144, 226, 0.08);
-  color: var(--color-primary);
-}
-
-.trend-down {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-}
+.trend-up { background: rgba(16, 185, 129, 0.1); color: #059669; }
+.trend-stable { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
+.trend-down { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
 
 /* ===== AI Insights ===== */
-.ai-insights-card {
-  background: white;
+.insights-container {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
 }
 
 .insight-item {
-  padding: 1rem;
-  background: linear-gradient(
-    135deg,
-    rgba(74, 144, 226, 0.03) 0%,
-    rgba(179, 217, 255, 0.02) 100%
-  );
-  border-radius: 12px;
-  border: 1px solid rgba(74, 144, 226, 0.08);
+  padding: 1.25rem;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
 }
 
 .insight-item:hover {
-  border-color: rgba(74, 144, 226, 0.25);
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.08);
-  transform: translateX(4px);
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.1);
+  transform: translateX(5px);
 }
 
 .insight-icon {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  width: 42px;
+  height: 42px;
+  background: var(--gradient-primary);
   color: white;
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.2rem;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
 /* ===== Carousel ===== */
 .reorder-carousel {
   position: relative;
+  padding: 0.5rem 0;
 }
 
 .carousel-track {
@@ -1374,81 +2106,36 @@ h6.card-title {
   gap: 1.5rem;
   overflow-x: auto;
   scroll-behavior: smooth;
-  padding: 1rem 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-primary) #f1f1f1;
+  padding: 1rem 0.5rem;
+  scrollbar-width: none; /* Firefox */
 }
 
 .carousel-track::-webkit-scrollbar {
-  height: 8px;
-}
-
-.carousel-track::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.carousel-track::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  border-radius: 10px;
-}
-
-.carousel-track::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
-}
-
-.carousel-nav-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  background: white;
-  border: 1px solid rgba(74, 144, 226, 0.15);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 10;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.carousel-nav-btn:hover {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: white;
-  transform: translateY(-50%) scale(1.1);
-}
-
-.carousel-nav-btn.prev {
-  left: -20px;
-}
-
-.carousel-nav-btn.next {
-  right: -20px;
+  display: none; /* Chrome/Safari */
 }
 
 /* ===== Reorder Product Cards ===== */
 .reorder-card {
-  min-width: 260px;
+  min-width: 280px;
   background: white;
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .reorder-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(74, 144, 226, 0.15);
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  z-index: 2;
 }
 
 .product-image-wrapper {
   position: relative;
   width: 100%;
-  height: 180px;
+  height: 200px;
   overflow: hidden;
 }
 
@@ -1456,112 +2143,107 @@ h6.card-title {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .reorder-card:hover .product-image {
-  transform: scale(1.1);
+  transform: scale(1.15);
 }
 
 .product-badge {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  top: 12px;
+  right: 12px;
+  background: rgba(239, 68, 68, 0.9);
+  backdrop-filter: blur(4px);
   color: white;
-  padding: 0.35rem 0.65rem;
-  border-radius: 20px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 50px;
   font-size: 0.75rem;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .product-details {
-  background: white;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
 .product-name {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--color-text-dark);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
 }
 
 .product-supplier {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--color-text-muted);
-  margin-bottom: 0.75rem;
-}
-
-.product-quantity,
-.product-price {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.product-price {
-  color: var(--color-primary);
-}
-
-.product-sku {
-  font-size: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
 }
 
 /* ===== Filter Chips ===== */
 .filter-chip {
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  border: 1.5px solid #e9ecef;
+  padding: 0.6rem 1.2rem;
+  border-radius: 50px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   background: white;
   color: var(--color-text-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .filter-chip:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
   transform: translateY(-2px);
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .filter-chip.active {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  border-color: var(--color-primary);
+  background: var(--gradient-primary);
+  border-color: transparent;
   color: white;
-  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
 /* ===== Products Grid ===== */
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
 }
 
 .product-grid-card {
   background: white;
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .product-grid-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(74, 144, 226, 0.15);
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
 }
 
 .product-grid-image {
   position: relative;
   width: 100%;
-  height: 220px;
+  height: 240px;
   overflow: hidden;
 }
 
@@ -1569,17 +2251,18 @@ h6.card-title {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .product-grid-card:hover .product-grid-image img {
-  transform: scale(1.1);
+  transform: scale(1.15);
 }
 
 .product-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1593,115 +2276,64 @@ h6.card-title {
 
 .product-discount-badge {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  top: 12px;
+  left: 12px;
+  background: rgba(220, 38, 38, 0.9);
+  backdrop-filter: blur(4px);
   color: white;
-  padding: 0.4rem 0.75rem;
+  padding: 0.4rem 0.8rem;
   border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
-}
-
-.product-grid-info {
-  background: white;
-  padding: 1rem;
-}
-
-.product-grid-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text-dark);
-}
-
-.rating {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.product-description {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.supplier-info strong,
-.stock-info strong {
-  color: var(--color-text-dark);
-}
-
-.product-grid-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.current-price {
-  font-size: 1.25rem;
   font-weight: 700;
-  color: var(--color-primary);
-}
-
-.original-price {
-  font-size: 0.875rem;
-  color: #9ca3af;
-  text-decoration: line-through;
-  margin-left: 0.5rem;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 /* ===== Quick View Modal ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1050;
   padding: 2rem;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .quick-view-modal {
   background: white;
-  border-radius: 20px;
+  border-radius: 24px;
   max-width: 900px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  padding: 2rem;
+  padding: 2.5rem;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: modalSlideUp 0.3s ease-out;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalSlideUp {
   from {
     opacity: 0;
-    transform: translateY(50px);
+    transform: translateY(40px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .modal-close-btn {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 1.5rem;
+  right: 1.5rem;
   width: 40px;
   height: 40px;
-  background: white;
-  border: 1px solid #e9ecef;
+  background: #f3f4f6;
+  border: none;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1709,21 +2341,13 @@ h6.card-title {
   cursor: pointer;
   transition: all 0.3s ease;
   z-index: 10;
+  color: var(--color-text-muted);
 }
 
 .modal-close-btn:hover {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: white;
+  background: #fee2e2;
+  color: #ef4444;
   transform: rotate(90deg);
-}
-
-.price-large {
-  font-size: 2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 /* ===== Toast Notification ===== */
@@ -1733,61 +2357,175 @@ h6.card-title {
   right: 2rem;
   background: white;
   padding: 1rem 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
+  gap: 0.75rem;
+  font-weight: 600;
   z-index: 1100;
-  animation: toastSlideIn 0.3s ease-out;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes toastSlideIn {
   from {
     opacity: 0;
-    transform: translateX(100px);
+    transform: translateX(100px) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
   }
 }
 
-/* ===== Vue Transitions ===== */
-.toast-enter-active,
-.toast-leave-active {
+/* ===== Sales Summary Enhanced Styles ===== */
+.daily-mini-chart {
+  background: rgba(248, 250, 252, 0.5);
+  border-radius: 12px;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.daily-bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  min-width: 20px;
+  max-width: 40px;
   transition: all 0.3s ease;
+  opacity: 0.8;
 }
 
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(100px);
+.daily-bar:hover {
+  opacity: 1;
+  transform: scaleY(1.05);
+  transform-origin: bottom;
 }
 
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: all 0.3s ease;
+.summary-item {
+  animation: fadeInUp 0.4s ease-out;
 }
 
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.modal-fade-enter-from .quick-view-modal,
-.modal-fade-leave-to .quick-view-modal {
-  transform: translateY(50px);
+/* ===== Forecast Enhanced Styles ===== */
+.forecast-container {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(248, 250, 252, 0) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
-/* ===== Section Title ===== */
-.section-title {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 700;
+.forecast-total {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.forecast-item {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.forecast-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  border-color: var(--color-primary);
+}
+
+.forecast-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  transition: transform 0.3s ease;
+}
+
+.forecast-item:hover .forecast-icon {
+  transform: scale(1.1);
+}
+
+.forecast-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.forecast-badge.bg-success-soft {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.forecast-badge.bg-danger-soft {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.forecast-badge.bg-warning-soft {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+/* Monthly breakdown styles */
+.monthly-breakdown-item {
+  transition: all 0.2s ease;
+}
+
+.monthly-breakdown-item:hover {
+  transform: scale(1.02);
+}
+
+/* ===== Loading States ===== */
+.spinner-border {
+  --bs-spinner-width: 2rem;
+  --bs-spinner-height: 2rem;
+  --bs-spinner-border-width: 0.2em;
+}
+
+.spinner-border-sm {
+  --bs-spinner-width: 1rem;
+  --bs-spinner-height: 1rem;
+}
+
+/* Skeleton loading animation */
+.skeleton-loader {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* ===== Responsive Design ===== */
@@ -1796,17 +2534,13 @@ h6.card-title {
     padding: 1rem;
   }
 
-  .carousel-nav-btn {
-    display: none;
-  }
-
   .products-grid {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 1rem;
   }
 
   .dashboard-hero {
-    padding: 1rem;
+    padding: 1.5rem;
   }
 
   .hero-title {
@@ -1819,6 +2553,10 @@ h6.card-title {
 
   .quick-view-modal {
     padding: 1.5rem;
+  }
+  
+  .metric-value {
+    font-size: 1.5rem;
   }
 }
 </style>

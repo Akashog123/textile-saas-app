@@ -2,12 +2,17 @@
 """
 AI Service Layer - Provider-agnostic AI operations
 Supports multiple AI providers (Gemini, NVIDIA) configured via environment
+Includes response caching to minimize redundant API calls.
 """
 
 import os
-import random
+import re
+import hashlib
+import time
 import pandas as pd
 import traceback
+from functools import lru_cache
+from typing import Dict, Any, Optional, Tuple
 from services.ai_providers import get_provider
 from services.prophet_service import prophet_manager
 
@@ -21,6 +26,71 @@ DEFAULT_PRIORITIES = [
     {"title": "Maintain stable cotton blends", "detail": "Keep inventory consistent for steady sellers.", "level": "maintain"},
     {"title": "Reduce low-selling SKUs", "detail": "Optimize resources by limiting underperformers.", "level": "reduce"},
 ]
+
+
+# ============================================================================
+# AI Response Cache
+# ============================================================================
+class AIResponseCache:
+    """
+    In-memory cache for AI API responses to minimize redundant calls.
+    Uses TTL-based expiration and input hashing for cache keys.
+    """
+    def __init__(self, ttl_seconds: int = 1800, max_size: int = 100):
+        self._cache: Dict[str, Tuple[Any, float]] = {}
+        self.ttl = ttl_seconds  # 30 minutes default
+        self.max_size = max_size
+    
+    def _generate_key(self, func_name: str, *args, **kwargs) -> str:
+        """Generate cache key from function name and arguments."""
+        key_data = f"{func_name}:{str(args)}:{str(sorted(kwargs.items()))}"
+        return hashlib.md5(key_data.encode()).hexdigest()
+    
+    def get(self, func_name: str, *args, **kwargs) -> Optional[Any]:
+        """Get cached response if valid."""
+        key = self._generate_key(func_name, *args, **kwargs)
+        if key in self._cache:
+            value, timestamp = self._cache[key]
+            if time.time() - timestamp < self.ttl:
+                print(f"[AI Cache HIT] {func_name}")
+                return value
+            else:
+                del self._cache[key]  # Expired
+        return None
+    
+    def set(self, func_name: str, value: Any, *args, **kwargs):
+        """Store response in cache."""
+        # Evict oldest if at capacity
+        if len(self._cache) >= self.max_size:
+            oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+            del self._cache[oldest_key]
+        
+        key = self._generate_key(func_name, *args, **kwargs)
+        self._cache[key] = (value, time.time())
+        print(f"[AI Cache SET] {func_name}")
+    
+    def clear(self):
+        """Clear all cached responses."""
+        self._cache.clear()
+
+
+# Global cache instance
+ai_cache = AIResponseCache(ttl_seconds=1800)  # 30-minute TTL
+
+
+def _limit_sentences(text: str, max_sentences: int = 4) -> str:
+    """Keep AI responses within a reasonable sentence count."""
+    if not text:
+        return text
+
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    if not sentences:
+        return text.strip()
+
+    truncated = sentences[:max_sentences]
+    return " ".join(truncated)
 
 
 def generate_ai_caption(product_name: str = None, category: str = None, price: float = None, image_path: str = None, description: str = None):
@@ -390,8 +460,13 @@ def forecast_trends(df: pd.DataFrame):
 
 
 def generate_demand_summary(region_data, top_product, engine="auto"):
-    """Generate concise AI-powered regional demand summary."""
+    """Generate concise AI-powered regional demand summary with caching."""
     try:
+        # Check cache first
+        cached = ai_cache.get("demand_summary", str(region_data), str(top_product))
+        if cached:
+            return cached
+        
         provider = get_provider()
         region_text = str(region_data)[:800]
         top_product = str(top_product or "N/A")
@@ -401,15 +476,20 @@ def generate_demand_summary(region_data, top_product, engine="auto"):
         Regional Summary: {region_text}
         Top Product: {top_product}
         
-        Write a concise 60-word business summary:
-        - Top performing regions
-        - Growth insights
-        - Expected sales trend
-        Tone: professional and analytical.
+        Write a concise business summary in 2-3 sentences (max 80 words):
+        - Highlight top performing regions
+        - Call out growth insights
+        - Mention expected sales trend
+        Keep the tone professional and analytical.
         """
         
         result = provider.generate_text(prompt)
-        return result if result and result.strip() else DEFAULT_SUMMARY
+        trimmed = _limit_sentences(result, max_sentences=4) if result else None
+        summary = trimmed if trimmed and trimmed.strip() else DEFAULT_SUMMARY
+        
+        # Cache the result
+        ai_cache.set("demand_summary", summary, str(region_data), str(top_product))
+        return summary
     
     except Exception as e:
         print("AI Summary Generation Error:", e)
@@ -417,8 +497,13 @@ def generate_demand_summary(region_data, top_product, engine="auto"):
 
 
 def generate_recommendation(region_data, trending_products, engine="auto"):
-    """Generate actionable short business recommendations."""
+    """Generate actionable short business recommendations with caching."""
     try:
+        # Check cache first
+        cached = ai_cache.get("recommendation", str(region_data), str(trending_products))
+        if cached:
+            return cached
+        
         provider = get_provider()
         region_text = str(region_data)[:500]
         trending_text = str(trending_products)[:500]
@@ -428,14 +513,19 @@ def generate_recommendation(region_data, trending_products, engine="auto"):
         Regions: {region_text}
         Trending: {trending_text}
         
-        Give 2–3 concise recommendations (max 30 words):
-        - Inventory
-        - Marketing focus
-        - Regional strategy
+        Provide 2 concise sentences (max 35 words total):
+        - Inventory action to take
+        - Marketing or regional strategy tweak
+        Avoid bullet points and keep it actionable.
         """
         
         result = provider.generate_text(prompt)
-        return result if result and result.strip() else DEFAULT_RECOMMENDATION
+        trimmed = _limit_sentences(result, max_sentences=4) if result else None
+        recommendation = trimmed if trimmed and trimmed.strip() else DEFAULT_RECOMMENDATION
+        
+        # Cache the result
+        ai_cache.set("recommendation", recommendation, str(region_data), str(trending_products))
+        return recommendation
     
     except Exception as e:
         print("AI Recommendation Error:", e)
@@ -443,41 +533,99 @@ def generate_recommendation(region_data, trending_products, engine="auto"):
 
 
 def generate_production_priorities(df: pd.DataFrame):
-    """AI-driven production scaling suggestions."""
+    """AI-driven production scaling suggestions.
+    
+    Returns defaults immediately if DataFrame is empty or insufficient.
+    """
     try:
+        # Early return if DataFrame is empty or too small
+        if df is None or df.empty or len(df) < 3:
+            print("[Production Priorities] Skipping - insufficient data")
+            return DEFAULT_PRIORITIES, [], []
+        
+        # Check for required columns
+        if "Product" not in df.columns or "Sales" not in df.columns:
+            print("[Production Priorities] Skipping - missing required columns (Product, Sales)")
+            return DEFAULT_PRIORITIES, [], []
+        
         products = df.groupby("Product")["Sales"].sum().reset_index().sort_values("Sales", ascending=False)
+        
+        # Skip if no meaningful product data
+        if products.empty or products["Sales"].sum() < 1:
+            print("[Production Priorities] Skipping - no meaningful sales data")
+            return DEFAULT_PRIORITIES, [], []
+        
+        # Calculate real growth/decline from data if we have region info
+        # Group by product and region for regional analysis
+        region_data = {}
+        if "Region" in df.columns:
+            region_data = df.groupby(["Product", "Region"])["Sales"].sum().reset_index()
+        
+        # Get top region per product for display
+        def get_top_region(product_name):
+            if not region_data.empty if isinstance(region_data, pd.DataFrame) else not region_data:
+                prod_regions = region_data[region_data["Product"] == product_name]
+                if not prod_regions.empty:
+                    return prod_regions.loc[prod_regions["Sales"].idxmax(), "Region"]
+            return "N/A"
+        
+        # Calculate relative performance (% of total sales)
+        total_sales = products["Sales"].sum()
+        
         top_selling, underperforming = [], []
         
-        for _, row in products.head(5).iterrows():
+        # Top selling products with real data
+        top_count = min(5, len(products))
+        for idx, (_, row) in enumerate(products.head(top_count).iterrows()):
+            market_share = (row["Sales"] / total_sales * 100) if total_sales > 0 else 0
             top_selling.append({
                 "name": row["Product"],
-                "growth": f"+{random.randint(5,15)}% MoM",
-                "region": random.choice(df["Region"].unique()) if "Region" in df.columns else "N/A",
-                "volume": f"{int(row['Sales'])} m",
-                "image": f"https://source.unsplash.com/400x300/?{row['Product']},fabric"
+                "growth": f"+{market_share:.1f}% share",  # market share percentage
+                "region": get_top_region(row["Product"]),  # top region for this product
+                "volume": f"{int(row['Sales']):,}",  # actual sales volume
+                "image": None  # Will be populated by frontend from product database
             })
         
-        for _, row in products.tail(5).iterrows():
+        # Underperforming products with real data
+        bottom_count = min(5, len(products))
+        for idx, (_, row) in enumerate(products.tail(bottom_count).iterrows()):
+            market_share = (row["Sales"] / total_sales * 100) if total_sales > 0 else 0
             underperforming.append({
                 "name": row["Product"],
-                "region": random.choice(df["Region"].unique()) if "Region" in df.columns else "N/A",
-                "decline": f"-{random.randint(5,15)}%",
-                "volume": f"{int(row['Sales'])} m",
-                "image": f"https://source.unsplash.com/400x300/?{row['Product']},fabric"
+                "region": get_top_region(row["Product"]),  # Real: top region for this product  
+                "decline": f"{market_share:.1f}% share",  # Real: low market share
+                "volume": f"{int(row['Sales']):,}",  # Real: actual sales volume
+                "image": None  # Will be populated by frontend from product database
             })
         
-        try:
-            provider = get_provider()
-            prompt = f"""
-            You are a textile production planner analyzing product data.
-            Data: {products.head(10).to_dict(orient='records')}
-            Suggest 3 key actions (increase, maintain, reduce).
-            """
-            provider.generate_text(prompt)
-        except Exception:
-            pass  # Use defaults if AI fails
+        # Skip redundant AI call - data already analyzed
+        # Production priorities can be derived from the data itself
+        priorities = []
+        if len(top_selling) > 0:
+            priorities.append({
+                "title": f"Scale up {top_selling[0]['name']}",
+                "detail": f"Top performer with {top_selling[0]['growth']} - increase production capacity.",
+                "level": "increase"
+            })
+        if len(products) > 2:
+            mid_product = products.iloc[len(products)//2]["Product"]
+            priorities.append({
+                "title": f"Maintain {mid_product} inventory",
+                "detail": "Steady performer - keep current stock levels.",
+                "level": "maintain"
+            })
+        if len(underperforming) > 0:
+            priorities.append({
+                "title": f"Review {underperforming[0]['name']} SKU",
+                "detail": f"Low performer with {underperforming[0]['decline']} - consider reducing or repositioning.",
+                "level": "reduce"
+            })
         
-        return DEFAULT_PRIORITIES, top_selling, underperforming
+        # Use defaults if we couldn't generate enough priorities
+        if len(priorities) < 3:
+            priorities = DEFAULT_PRIORITIES
+        
+        return priorities, top_selling, underperforming
     
     except Exception as e:
         print("Production Priority Generation Error:", e)

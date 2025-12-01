@@ -6,6 +6,8 @@ from sqlalchemy import or_
 from werkzeug.exceptions import NotFound
 from utils.image_utils import resolve_product_image
 from utils.performance_utils import cached_ai_caption, batch_ai_captions, performance_monitor
+from services.ai_service import generate_ai_caption
+from services.forecasting_service import top_trending_products
 import pandas as pd
 
 product_bp = Blueprint("product", __name__)
@@ -51,9 +53,8 @@ def get_all_products():
                 )
             )
 
-        # Execute query with proper session management
-        with db.session.begin():
-            products = query.limit(50).all()
+        # Execute query
+        products = query.limit(50).all()
 
         # Generate AI captions efficiently using batch processing
         ai_captions = batch_ai_captions(products, generate_captions)
@@ -103,9 +104,8 @@ def get_product_detail(product_id):
             if not current_user or current_user.role not in ["shop_owner", "admin", "manager"]:
                 generate_captions = False
 
-        # Use joined query with proper session management
-        with db.session.begin():
-            product = db.session.query(Product).join(Shop, Product.shop_id == Shop.id).filter(Product.id == product_id).first()
+        # Use joined query
+        product = db.session.query(Product).join(Shop, Product.shop_id == Shop.id).filter(Product.id == product_id).first()
         
         if not product:
             return jsonify({"status": "error", "message": f"Product with id {product_id} not found."}), 404
@@ -125,7 +125,7 @@ def get_product_detail(product_id):
             "badge": product.badge,
             "is_trending": product.is_trending,
             "is_active": product.is_active,
-            "seller": product.seller.full_name if product.seller else "Independent Seller",
+            "seller": product.shop.owner.full_name if product.shop and product.shop.owner else "Independent Seller",
             "shop_id": product.shop_id,
             "shop_location": product.shop.location if product.shop else "Unknown",
             "shop_city": product.shop.city if product.shop else "Unknown",
