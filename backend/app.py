@@ -106,7 +106,7 @@ app.register_blueprint(pdf_bp, url_prefix="/api/v1/pdf")
 app.register_blueprint(catalog_bp, url_prefix="/api/v1/catalog")
 app.register_blueprint(nearby_bp)
 app.register_blueprint(performance_bp, url_prefix="/api/v1/performance")
-app.register_blueprint(reviews_bp, url_prefix="/api/v1") 
+app.register_blueprint(reviews_bp, url_prefix="/api/v1")
 
 # Utility Routes
 @app.route("/uploads/<path:filename>")

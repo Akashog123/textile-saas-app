@@ -1,14 +1,18 @@
 <template>
   <div class="navbar-wrapper">
-    <nav class="navbar navbar-expand-lg fixed-top">
-      <div class="container">
+    <nav class="navbar navbar-expand fixed-top" :class="{ 'scrolled': isScrolled }">
+      <div class="container-fluid">
+        <!-- Brand Logo -->
         <router-link to="/" class="navbar-brand">
-          <div class="brand-icon">
-            <i class="bi bi-flower1"></i>
+          <div class="brand-icon-wrapper">
+            <div class="brand-icon">
+              <i class="bi bi-flower1"></i>
+            </div>
           </div>
           <span class="brand-text">SE Textile</span>
         </router-link>
 
+        <!-- Mobile Toggle Button -->
         <button
           class="navbar-toggler"
           type="button"
@@ -18,33 +22,42 @@
           aria-expanded="false"
           aria-label="Toggle navigation"
         >
-          <span class="navbar-toggler-icon"></span>
+          <div class="hamburger-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
         </button>
 
+        <!-- Navigation Content -->
         <div class="collapse navbar-collapse" id="mainNav">
-          <ul class="navbar-nav ms-auto">
+          <ul class="navbar-nav ms-auto align-items-center">
             <!-- Navigation links for authenticated users -->
             <template v-if="isAuthenticated && user">
               <!-- Customer Navigation -->
               <template v-if="user.role === 'customer'">
                 <li class="nav-item">
                   <router-link to="/customer" class="nav-link">
-                    <i class="bi bi-house-door me-2"></i>Home
+                    <span class="nav-icon"><i class="bi bi-house-door"></i></span>
+                    <span class="nav-text">Home</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/customer/products" class="nav-link">
-                    <i class="bi bi-grid me-2"></i>Products
+                    <span class="nav-icon"><i class="bi bi-grid"></i></span>
+                    <span class="nav-text">Products</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/customer/shops" class="nav-link">
-                    <i class="bi bi-shop me-2"></i>Shops
+                    <span class="nav-icon"><i class="bi bi-shop"></i></span>
+                    <span class="nav-text">Shops</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/customer/profile" class="nav-link">
-                    <i class="bi bi-person me-2"></i>Profile
+                    <span class="nav-icon"><i class="bi bi-person"></i></span>
+                    <span class="nav-text">Profile</span>
                   </router-link>
                 </li>
               </template>
@@ -53,22 +66,26 @@
               <template v-if="user.role === 'shop_owner' || user.role === 'manager'">
                 <li class="nav-item">
                   <router-link to="/shop/dashboard" class="nav-link">
-                    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    <span class="nav-icon"><i class="bi bi-speedometer2"></i></span>
+                    <span class="nav-text">Dashboard</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/shop/inventory" class="nav-link">
-                    <i class="bi bi-box-seam me-2"></i>Inventory
+                    <span class="nav-icon"><i class="bi bi-box-seam"></i></span>
+                    <span class="nav-text">Inventory</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/shop/marketing" class="nav-link">
-                    <i class="bi bi-megaphone me-2"></i>Marketing
+                    <span class="nav-icon"><i class="bi bi-megaphone"></i></span>
+                    <span class="nav-text">Marketing</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/shop/inquiry" class="nav-link">
-                    <i class="bi bi-chat-dots me-2"></i>Inquiry
+                    <span class="nav-icon"><i class="bi bi-chat-dots"></i></span>
+                    <span class="nav-text">Inquiry</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
@@ -82,36 +99,41 @@
               <template v-if="user.role === 'distributor' || user.role === 'manufacturer'">
                 <li class="nav-item">
                   <router-link to="/distributor" class="nav-link">
-                    <i class="bi bi-house-door me-2"></i>Home
+                    <span class="nav-icon"><i class="bi bi-house-door"></i></span>
+                    <span class="nav-text">Home</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/distributor/planning" class="nav-link">
-                    <i class="bi bi-graph-up me-2"></i>Planning
+                    <span class="nav-icon"><i class="bi bi-graph-up"></i></span>
+                    <span class="nav-text">Planning</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
                   <router-link to="/distributor/regional-demand" class="nav-link">
-                    <i class="bi bi-geo-alt me-2"></i>Regional Demand
+                    <span class="nav-icon"><i class="bi bi-geo-alt"></i></span>
+                    <span class="nav-text">Regional Demand</span>
                   </router-link>
                 </li>
               </template>
             </template>
 
             <!-- User Menu -->
-            <li class="nav-item dropdown" v-if="isAuthenticated && user">
+            <li class="nav-item dropdown ms-lg-3" v-if="isAuthenticated && user">
               <a 
-                class="nav-link dropdown-toggle d-flex align-items-center" 
+                class="nav-link dropdown-toggle user-profile-link" 
                 href="#" 
                 role="button" 
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
               >
-                <i class="bi bi-person-circle me-2"></i>
-                {{ user.username || user.email }}
+                <div class="user-avatar">
+                  <i class="bi bi-person-fill"></i>
+                </div>
+                <span class="user-name">{{ user.username || user.email }}</span>
               </a>
-              <ul class="dropdown-menu dropdown-menu-end">
-                <li><h6 class="dropdown-header">Welcome, {{ user.username || user.email }}</h6></li>
+              <ul class="dropdown-menu dropdown-menu-end animate slideIn">
+                <li><h6 class="dropdown-header">Signed in as <br><strong>{{ user.username || user.email }}</strong></h6></li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
                   <a class="dropdown-item" href="#" @click.prevent="$emit('logout')">
@@ -120,20 +142,6 @@
                 </li>
               </ul>
             </li>
-
-            <!-- Login/Register for non-authenticated users -->
-            <template v-if="!isAuthenticated">
-              <li class="nav-item">
-                <router-link to="/login" class="nav-link">
-                  <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link to="/login" class="btn btn-primary btn-sm ms-2">
-                  Get Started
-                </router-link>
-              </li>
-            </template>
           </ul>
         </div>
       </div>
@@ -142,7 +150,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 
 // Props
 const props = defineProps({
@@ -159,198 +167,332 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['logout', 'refresh-auth'])
 
+// State for scroll effect
+const isScrolled = ref(false)
+
+const handleScroll = () => {
+  isScrolled.value = window.scrollY > 20
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
+
 // Computed properties
 const userRole = computed(() => props.user?.role || '')
-const userName = computed(() => props.user?.username || props.user?.email || 'User')
-
-// Role-based helpers
-const isShopRole = computed(() => ['shop_owner', 'manager'].includes(userRole.value))
-const isCustomerRole = computed(() => userRole.value === 'customer')
-const isDistributorRole = computed(() => ['distributor', 'manufacturer'].includes(userRole.value))
-
-// Handle logout
-const handleLogout = () => {
-  emit('logout')
-}
 </script>
 
 <style scoped>
 .navbar-wrapper {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1030;
+  position: relative;
+  height: 8px; /* Prevent layout shift */
 }
 
 .navbar {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-glass);
-  padding: 0.8rem 0;
-  transition: all 0.4s ease;
+  padding: 1rem 0;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid transparent;
 }
 
+.navbar.scrolled {
+  padding: 0.6rem 0;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Brand Styling */
 .navbar-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  text-decoration: none;
+  gap: 1rem;
+  font-weight: 700;
+  font-size: 1.35rem;
   color: var(--color-text-dark);
-  font-weight: 800;
-  font-size: 1.5rem;
-  letter-spacing: -0.03em;
+  transition: transform 0.3s ease;
+}
+
+.brand-icon-wrapper {
+  position: relative;
 }
 
 .brand-icon {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   background: var(--gradient-primary);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 1.25rem;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 1.2rem;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .navbar-brand:hover .brand-icon {
   transform: rotate(15deg) scale(1.1);
+  box-shadow: 0 12px 25px rgba(59, 130, 246, 0.35);
 }
 
 .brand-text {
-  background: linear-gradient(90deg, var(--color-text-dark), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-text-dark) 0%, var(--color-primary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  letter-spacing: -0.5px;
 }
 
+/* Navigation Links */
 .nav-link {
-  color: var(--color-text-muted);
-  font-weight: 600;
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius-full);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-decoration: none;
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
   margin: 0 0.2rem;
-  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  font-size: 1.1rem;
+  transition: transform 0.3s ease;
+}
+
+.nav-link:hover .nav-icon,
+.nav-link.router-link-active .nav-icon {
+  transform: translateY(-2px);
 }
 
 .nav-link:hover,
 .nav-link.router-link-active {
   color: var(--color-primary);
-  background: rgba(59, 130, 246, 0.08);
-  transform: translateY(-1px);
+  background: rgba(59, 130, 246, 0.06);
 }
 
-.nav-link i {
-  font-size: 1.1rem;
-  transition: transform 0.3s ease;
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--color-primary);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+  opacity: 0;
 }
 
-.nav-link:hover i {
-  transform: scale(1.1);
+.nav-link.router-link-active::after {
+  width: 40%;
+  opacity: 1;
+  bottom: 6px;
 }
 
-.dropdown-menu {
-  border: none;
-  box-shadow: var(--shadow-xl);
-  border-radius: var(--radius-xl);
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-border);
-  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  transform-origin: top center;
-  margin-top: 10px;
-}
-
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.dropdown-header {
-  color: var(--color-text-dark);
-  font-weight: 700;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.5rem 1rem;
-}
-
-.dropdown-item {
-  border-radius: var(--radius-lg);
-  padding: 0.6rem 1rem;
-  transition: all 0.2s ease;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.dropdown-item:hover {
-  background: var(--gradient-primary);
-  color: white;
-  transform: translateX(4px);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-primary {
-  background: var(--gradient-primary);
-  border: none;
-  color: white;
-  font-weight: 600;
-  padding: 0.6rem 1.8rem;
-  border-radius: var(--radius-full);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
-}
-
-/* Mobile responsive */
-@media (max-width: 991px) {
-  .navbar-collapse {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(24px);
-    padding: 1rem;
-    border-radius: var(--radius-xl);
-    margin-top: 1rem;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--glass-border);
-  }
-  
-  .nav-link {
-    border-radius: var(--radius-lg);
-    margin: 0.2rem 0;
-  }
-}
-
-.navbar-toggler {
-  border: none;
-  padding: 0.5rem;
-  border-radius: 12px;
-  background: rgba(59, 130, 246, 0.08);
+/* User Profile Link */
+.user-profile-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 50px;
   transition: all 0.3s ease;
 }
 
-.navbar-toggler:hover {
-  background: rgba(59, 130, 246, 0.12);
+.user-profile-link:hover {
+  background: white;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  border-color: transparent;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  background: var(--color-bg-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+}
+
+/* Dropdown Menu */
+.dropdown-menu {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  padding: 0.5rem;
+  margin-top: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  min-width: 220px;
+}
+
+.dropdown-item {
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background: var(--color-bg-light);
+  color: var(--color-primary);
+  transform: translateX(4px);
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.dropdown-divider {
+  margin: 0.5rem 0;
+  border-color: rgba(0,0,0,0.05);
+}
+
+/* Buttons */
+.btn-animate {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 1.5rem;
+  border-radius: 50px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+}
+
+.btn-animate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+}
+
+.btn-animate i {
+  transition: transform 0.3s ease;
+}
+
+.btn-animate:hover i {
+  transform: translateX(4px);
+}
+
+/* Mobile Toggler */
+.navbar-toggler {
+  border: none;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .navbar-toggler:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: none;
 }
 
-.navbar-toggler-icon {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%233B82F6' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+.hamburger-icon {
+  width: 24px;
+  height: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hamburger-icon span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: var(--color-text-dark);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.navbar-toggler[aria-expanded="true"] .hamburger-icon span:nth-child(1) {
+  transform: translateY(9px) rotate(45deg);
+}
+
+.navbar-toggler[aria-expanded="true"] .hamburger-icon span:nth-child(2) {
+  opacity: 0;
+}
+
+.navbar-toggler[aria-expanded="true"] .hamburger-icon span:nth-child(3) {
+  transform: translateY(-9px) rotate(-45deg);
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate.slideIn {
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 991px) {
+  .navbar-collapse {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 20px;
+    margin-top: 1rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .nav-link {
+    padding: 0.8rem 1rem;
+    margin: 0.2rem 0;
+    border-radius: 12px;
+  }
+
+  .nav-link:hover {
+    background: var(--color-bg-light);
+  }
+
+  .user-profile-link {
+    margin-top: 1rem;
+    border: none;
+    background: var(--color-bg-light);
+    justify-content: center;
+  }
+
+  .dropdown-menu {
+    box-shadow: none;
+    border: 1px solid rgba(0,0,0,0.05);
+    background: transparent;
+    margin-top: 0.5rem;
+  }
 }
 </style>

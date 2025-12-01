@@ -1,13 +1,15 @@
 import os
-import random
+import hashlib
+import time
+import logging
 import pandas as pd
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, send_file
-from io import StringIO
+from io import StringIO, BytesIO
 from utils.auth_utils import token_required, roles_required, check_shop_ownership
 from utils.validation import validate_file_upload
 from utils.performance_utils import performance_monitor
-from models.model import db, Product, Inventory, SalesData, Shop, User
+from models.model import db, Product, Inventory, SalesData, Shop, User, SalesUploadLog
 from config import Config
 from services.ai_service import (
     forecast_trends,
@@ -15,9 +17,48 @@ from services.ai_service import (
     generate_recommendation,
     generate_production_priorities,
 )
+from services.sales_analytics_service import get_sales_analytics_service, invalidate_shop_cache
 
 shop_bp = Blueprint("shop", __name__)
 INSTANCE_FOLDER = Config.DATA_DIR
+
+
+def _default_dashboard_data():
+    return {
+        "weekly_sales": "₹0",
+        "pending_reorders": 0,
+        "total_orders": 0,
+        "customer_rating": 4.0,
+        "trend_chart": [],
+        "ai_insights": [],
+        "forecast": [],
+        "reorder_suggestions": {},
+        "production_priorities": [],
+        "top_selling": [],
+        "underperforming": [],
+        "demand_summary": "No recent sales data available. Please upload weekly sales to unlock insights.",
+        "recommendation": "Upload the latest sales sheet to refresh AI recommendations."
+    }
+
+
+def _load_sales_dataframe(path):
+    if not os.path.exists(path):
+        return None
+    try:
+        df = pd.read_csv(path)
+        if df.empty:
+            return None
+        df.columns = [c.lower() for c in df.columns]
+        if "date" not in df.columns:
+            return None
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df.dropna(subset=["date"], inplace=True)
+        if df.empty:
+            return None
+        return df
+    except Exception as exc:
+        print(f"[Sales File Load Error] {exc}")
+        return None
 
 
 # GET: AI-POWERED SHOP DASHBOARD + AUTO NEXT-MONTH FORECAST
@@ -38,32 +79,22 @@ def shop_dashboard(current_user):
     if not check_shop_ownership(current_user.get("id"), shop_id):
         return jsonify({"status": "error", "message": "You don't have permission to access this shop"}), 403
 
+    # Get shop's actual rating from database
+    shop = Shop.query.get(shop_id)
+    actual_rating = round(shop.rating or 0.0, 1) if shop else 0.0
+
     sales_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
 
-    if not os.path.exists(sales_path):
+    df = _load_sales_dataframe(sales_path)
+    if df is None:
         return jsonify({
             "status": "success",
-            "data": {
-                "weekly_sales": "₹0",
-                "pending_reorders": 0,
-                "total_orders": 0,
-                "customer_rating": 4.0,
-                "trend_chart": [],
-                "ai_insights": [],
-                "forecast": [],
-                "reorder_suggestions": [],
-                "production_priorities": []
-            }
+            "data": _default_dashboard_data(),
+            "warning": "Sales data file missing or malformed. Please upload a valid weekly sales sheet."
         }), 200
 
     try:
         # Load & Clean Data
-        df = pd.read_csv(sales_path)
-        if "date" not in df.columns:
-            return jsonify({"status": "error", "message": "Invalid sales file format."}), 400
-
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df.dropna(subset=["date"], inplace=True)
         df["revenue"] = pd.to_numeric(df.get("revenue", 0), errors="coerce").fillna(0)
         df["quantity_sold"] = pd.to_numeric(df.get("quantity_sold", 0), errors="coerce").fillna(0)
 
@@ -91,11 +122,7 @@ def shop_dashboard(current_user):
             .to_dict(orient="records")
         )
 
-        # Forecast & AI Insights
-        df_forecast = df[["date", "revenue"]].rename(columns={"date": "Date", "revenue": "Sales"})
-        forecast_data = forecast_trends(df_forecast)
-
-        # Summarize by fabric or category
+        # Forecast (Top Fabrics/Categories) - Simple aggregation for dashboard
         if "fabric_type" in df.columns:
             forecast = (
                 df.groupby("fabric_type")["revenue"]
@@ -117,42 +144,15 @@ def shop_dashboard(current_user):
         else:
             forecast = []
 
-        # AI insights
-        top_item = forecast[0].get("fabric_type", "Cotton") if forecast else "Cotton"
-        ai_insights = [
-            {
-                "title": f"{top_item} sales up {abs(int(growth))}%",
-                "impact": "Positive" if growth >= 0 else "Negative",
-                "category": "Trend",
-            },
-            {
-                "title": "Consider restocking top-selling fabrics",
-                "impact": "Inventory",
-                "category": "Action",
-            },
-            {
-                "title": f"Customer satisfaction steady at {round(random.uniform(3.8, 4.5), 1)}★",
-                "impact": "Stable",
-                "category": "Sentiment",
-            },
-        ]
-
-        # AI Demand Summary & Recommendations
-        demand_summary = generate_demand_summary(
-            region_data=df.groupby("region")["revenue"].sum().to_dict() if "region" in df.columns else {},
-            top_product=forecast[0].get("fabric_type", "Cotton") if forecast else "Cotton",
-        )
-        recommendation = generate_recommendation(
-            region_data=df.groupby("region")["revenue"].sum().to_dict() if "region" in df.columns else {},
-            trending_products=df.groupby("product_name")["revenue"].sum().sort_values(ascending=False).head(5).to_dict(),
-        )
-
         # AI Production Priorities
         prod_df = df.rename(columns={"product_name": "Product", "revenue": "Sales", "region": "Region"})
         production_priorities, top_selling, underperforming = generate_production_priorities(prod_df)
 
-        # Reorder Suggestions based on minimum stock
-        reorder_suggestions = []
+        # Reorder Suggestions grouped by Distributor
+        # Products WITH a distributor are grouped by distributor name for bulk ordering
+        # Products WITHOUT a distributor are grouped as "Unassigned" for manual reorder
+        reorder_suggestions = {}
+        unassigned_products = []  # Products without a registered distributor
         
         # Get all products for this shop with low stock
         low_stock_products = db.session.query(Product, Inventory).join(
@@ -163,96 +163,258 @@ def shop_dashboard(current_user):
         ).all()
         
         for product, inventory in low_stock_products:
-            reorder_suggestions.append({
+            # Get product's primary image URL from database
+            product_image_url = product.get_primary_image_url() if hasattr(product, 'get_primary_image_url') else None
+            
+            product_info = {
+                "product_id": product.id,
                 "product_name": product.name,
                 "sku": product.sku,
                 "current_stock": inventory.qty_available,
                 "minimum_stock": inventory.safety_stock,
                 "reorder_quantity": max(inventory.safety_stock * 2 - inventory.qty_available, 10),
                 "category": product.category,
-                "price": float(product.price)
-            })
+                "price": float(product.price),
+                "distributor_id": product.distributor_id,
+                "has_distributor": product.distributor_id is not None,
+                "image": product_image_url
+            }
+            
+            # Group by distributor if assigned, otherwise add to unassigned list
+            if product.distributor_id and product.distributor:
+                distributor_name = product.distributor.full_name
+                distributor_key = f"{distributor_name} (ID: {product.distributor_id})"
+                
+                if distributor_key not in reorder_suggestions:
+                    reorder_suggestions[distributor_key] = {
+                        "distributor_id": product.distributor_id,
+                        "distributor_name": distributor_name,
+                        "distributor_contact": product.distributor.contact,
+                        "distributor_email": product.distributor.email,
+                        "products": []
+                    }
+                reorder_suggestions[distributor_key]["products"].append(product_info)
+            else:
+                unassigned_products.append(product_info)
         
-        # Sort by urgency (stock level vs minimum stock ratio)
-        reorder_suggestions.sort(key=lambda x: x["current_stock"] / max(x["minimum_stock"], 1))
+        # Add unassigned products as a separate group if any exist
+        if unassigned_products:
+            reorder_suggestions["Unassigned (Manual Reorder)"] = {
+                "distributor_id": None,
+                "distributor_name": "No Distributor Assigned",
+                "distributor_contact": None,
+                "distributor_email": None,
+                "products": unassigned_products,
+                "note": "These products don't have a registered distributor. You can assign one via inventory management or reorder manually."
+            }
+        
+        # Calculate total pending reorders count
+        total_pending_reorders = sum(
+            len(group["products"]) if isinstance(group, dict) else len(group) 
+            for group in reorder_suggestions.values()
+        )
 
-        # Auto-Generate Next Month Synthetic Forecast
-        last_date = df["date"].max()
-        next_month = (last_date + pd.offsets.MonthBegin(1)).month
-        next_year = (last_date + pd.offsets.MonthBegin(1)).year
-
-        synthetic_rows = []
-        for _, row in df.sample(min(len(df), 30)).iterrows():
-            new_date = (row["date"] + pd.offsets.MonthBegin(1)).replace(month=next_month)
-            synthetic_rows.append({
-                "date": new_date.strftime("%Y-%m-%d"),
-                "product_name": row["product_name"],
-                "category": row.get("category", ""),
-                "region": row.get("region", ""),
-                "fabric_type": row.get("fabric_type", ""),
-                "quantity_sold": round(row["quantity_sold"] * random.uniform(0.9, 1.2)),
-                "revenue": round(row["revenue"] * random.uniform(0.9, 1.25)),
-            })
-
-        synthetic_df = pd.DataFrame(synthetic_rows)
-        combined_df = pd.concat([df, synthetic_df], ignore_index=True)
-        combined_df.to_csv(sales_path, index=False)
-
-        print(f"[AUTO] Synthetic next-month forecast appended for shop {shop_id}")
-
-        # Final Dashboard Data
-        dashboard_data = {
-            "weekly_sales": f"₹{int(weekly_sales):,}",
-            "avg_order_value": f"₹{int(avg_order_value):,}",
-            "pending_reorders": random.randint(2, 5),
-            "total_orders": total_orders,
-            "customer_rating": round(random.uniform(3.9, 4.6), 1),
-            "growth": f"{growth:.1f}%",
-            "trend_chart": trend_chart,
-            "forecast": forecast,
-            "ai_insights": ai_insights,
-            "demand_summary": demand_summary,
-            "recommendation": recommendation,
-            "production_priorities": production_priorities,
-            "reorder_suggestions": reorder_suggestions,
-            "top_selling": top_selling,
-            "underperforming": underperforming,
-            "forecast_chart": forecast_data,
-        }
-
-        return jsonify({"status": "success", "data": dashboard_data}), 200
+        # Generate Insights using helper
+        insights_data = _generate_insights(df)
+        
+        return jsonify({
+            "status": "success",
+            "data": {
+                "weekly_sales": f"₹{weekly_sales:,.2f}",
+                "pending_reorders": total_pending_reorders,
+                "total_orders": total_orders,
+                "customer_rating": actual_rating,
+                "growth": f"{growth:+.1f}%",
+                "trend_chart": trend_chart,
+                "ai_insights": insights_data["ai_insights"],
+                "forecast": forecast,
+                "reorder_suggestions": reorder_suggestions,
+                "production_priorities": production_priorities,
+                "top_selling": top_selling,
+                "underperforming": underperforming,
+                "demand_summary": insights_data["demand_summary"],
+                "recommendation": insights_data["recommendation"]
+            }
+        }), 200
 
     except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"[Dashboard Error] {e}")
+        return jsonify({
+            "status": "success",
+            "data": _default_dashboard_data(),
+            "warning": "Sales data could not be processed. Please verify the uploaded sheet."
+        }), 200
 
+def _generate_insights(df):
+    """Helper to generate AI insights from sales dataframe
+    
+    IMPORTANT: This function checks for data sufficiency before calling
+    NVIDIA AI models to avoid unnecessary API calls.
+    """
+    try:
+        # Early return if DataFrame is empty or too small
+        if df is None or df.empty or len(df) < 3:
+            logging.info("[Insights] Skipping AI generation - insufficient data rows")
+            return {
+                "ai_insights": [],
+                "demand_summary": "Not enough sales data to generate insights. Please upload more sales records.",
+                "recommendation": "Upload at least a week of sales data to unlock AI-powered recommendations."
+            }
+        
+        # Ensure revenue exists
+        if "revenue" not in df.columns:
+            # Try to calculate if quantity and price exist
+            if "quantity_sold" in df.columns and "selling_price" in df.columns:
+                df["revenue"] = df["quantity_sold"] * df["selling_price"]
+            else:
+                df["revenue"] = 0
+
+        # Calculate basic metrics for context
+        total_revenue = float(df["revenue"].sum())
+        
+        # Skip AI if total revenue is negligible (no meaningful data)
+        if total_revenue < 1:
+            logging.info("[Insights] Skipping AI generation - zero or negligible revenue")
+            return {
+                "ai_insights": [],
+                "demand_summary": "No revenue data found. Please ensure your sales data includes revenue information.",
+                "recommendation": "Upload sales data with revenue/price information to enable AI insights."
+            }
+        
+        # Summarize by fabric/category for top item
+        if "fabric_type" in df.columns:
+            top_items = df.groupby("fabric_type")["revenue"].sum().sort_values(ascending=False)
+        elif "category" in df.columns:
+            top_items = df.groupby("category")["revenue"].sum().sort_values(ascending=False)
+        else:
+            top_items = pd.Series()
+            
+        top_item = top_items.index[0] if not top_items.empty else "General"
+        
+        # AI Demand Summary & Recommendations
+        region_summary = (
+            df.groupby("region")["revenue"].sum().to_dict()
+            if "region" in df.columns else {}
+        )
+        if not region_summary:
+            region_summary = {"Overall": total_revenue}
+
+        trending_products = (
+            df.groupby("product_name")["revenue"].sum().sort_values(ascending=False).head(5).to_dict()
+            if "product_name" in df.columns else {}
+        )
+        if not trending_products:
+            trending_products = {top_item: total_revenue}
+
+        demand_summary = generate_demand_summary(
+            region_data=region_summary,
+            top_product=top_item,
+        )
+        
+        recommendation = generate_recommendation(
+            region_data=region_summary,
+            trending_products=trending_products,
+        )
+        
+        # Construct AI Insights list
+        ai_insights = [
+            {
+                "title": f"Strong demand for {top_item}",
+                "impact": "Positive",
+                "category": "Trend",
+                "description": demand_summary
+            },
+            {
+                "title": "Restocking Recommendation",
+                "impact": "Action",
+                "category": "Inventory",
+                "description": recommendation
+            }
+        ]
+        
+        return {
+            "ai_insights": ai_insights,
+            "demand_summary": demand_summary,
+            "recommendation": recommendation
+        }
+        
+    except Exception as e:
+        print(f"[Insight Generation Error] {e}")
+        return {
+            "ai_insights": [],
+            "demand_summary": "Could not generate summary",
+            "recommendation": "Could not generate recommendation"
+        }
 
 # Upload Sales CSV
 @shop_bp.route("/upload_sales_data", methods=["POST"])
 @token_required
 @roles_required('shop_owner', 'shop_manager')
 def upload_sales_data(current_user):
+    start_time = time.perf_counter()
+    log_entry = None
     try:
-        shop_id = request.form.get("shop_id")
+        shop_id_raw = request.form.get("shop_id")
         file = request.files.get("file")
-        if not shop_id or not file:
+        if not shop_id_raw or not file:
             return jsonify({"status": "error", "message": "Missing shop_id or file."}), 400
+
+        try:
+            shop_id = int(shop_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "Invalid shop_id"}), 400
         
         # Validate ownership
         if not check_shop_ownership(current_user.get("id"), shop_id):
             return jsonify({"status": "error", "message": "You don't have permission to manage this shop"}), 403
         
-        # Validate file upload
-        is_valid, message = validate_file_upload(file, ['.csv'], max_size_mb=16)
+        # Validate file upload (supports CSV/XLS/XLSX)
+        allowed_exts = ['.csv', '.xlsx', '.xls']
+        is_valid, message = validate_file_upload(file, allowed_exts, max_size_mb=16)
         if not is_valid:
             return jsonify({"status": "error", "message": message}), 400
 
-        # Read and process sales data
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(file)
+        file_bytes = file.read()
+        if not file_bytes:
+            return jsonify({"status": "error", "message": "Uploaded file is empty"}), 400
+
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+        duplicate_log = SalesUploadLog.query.filter_by(
+            shop_id=shop_id,
+            file_hash=file_hash,
+            status='completed'
+        ).order_by(SalesUploadLog.completed_at.desc()).first()
+
+        log_entry = SalesUploadLog(
+            shop_id=shop_id,
+            file_name=file.filename,
+            file_hash=file_hash,
+            status='duplicate' if duplicate_log else 'in_progress',
+            duplicate_of=duplicate_log.id if duplicate_log else None
+        )
+        db.session.add(log_entry)
+        db.session.flush()
+
+        if duplicate_log:
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            log_entry.completed_at = datetime.utcnow()
+            log_entry.duration_ms = duration_ms
+            log_entry.sla_breached = duration_ms > SalesUploadLog.SLA_LIMIT_MS
+            log_entry.message = f"Duplicate of upload #{duplicate_log.id}"
+            db.session.commit()
+            return jsonify({
+                "status": "duplicate",
+                "message": "This sales file matches a previously processed upload.",
+                "duplicate_of": duplicate_log.id,
+                "upload_log": log_entry.to_dict()
+            }), 409
+
+        ext = os.path.splitext(file.filename)[1].lower()
+        buffer = BytesIO(file_bytes)
+        if ext == '.csv':
+            df = pd.read_csv(buffer)
         else:
-            return jsonify({"status": "error", "message": "Only CSV files are supported"}), 400
+            df = pd.read_excel(buffer)
 
         # Normalize columns to lowercase
         df.columns = [c.lower() for c in df.columns]
@@ -262,37 +424,72 @@ def upload_sales_data(current_user):
         if not required_cols.issubset(set(df.columns)):
             return jsonify({"status": "error", "message": f"File must contain columns: {', '.join(required_cols)}"}), 400
 
+        # Calculate revenue for insights
+        df["quantity_sold"] = pd.to_numeric(df["quantity_sold"], errors="coerce").fillna(0)
+        df["selling_price"] = pd.to_numeric(df["selling_price"], errors="coerce").fillna(0)
+        df["revenue"] = df["quantity_sold"] * df["selling_price"]
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df.dropna(subset=["date"], inplace=True)
+
         # Process each row and update inventory
         stock_updates = []
         for _, row in df.iterrows():
             try:
                 sku = row.get("sku", "")
                 quantity_sold = int(row.get("quantity_sold", 0) or 0)
-                
-                if quantity_sold <= 0:
+                sale_date = row.get("date")
+                if pd.isna(sale_date):
                     continue
+                if hasattr(sale_date, "date"):
+                    sale_date = sale_date.date()
                 
                 # Find product by SKU and shop_id
                 product = Product.query.filter_by(sku=sku, shop_id=shop_id).first()
                 if not product:
-                    print(f"[Sales Upload] Product with SKU {sku} not found for shop {shop_id}")
                     continue
                 
                 # Get inventory record
                 inventory = Inventory.query.filter_by(product_id=product.id).first()
-                if not inventory:
-                    print(f"[Sales Upload] No inventory record for product {product.id}")
-                    continue
                 
-                # Decrease stock based on sales
+                # Upsert into SalesData for delta tracking
+                sales_entry = SalesData.query.filter_by(
+                    shop_id=shop_id,
+                    product_id=product.id,
+                    date=sale_date
+                ).first()
+
+                previous_qty = sales_entry.quantity_sold if sales_entry else 0
+                delta_qty = quantity_sold - previous_qty
+
+                if sales_entry:
+                    sales_entry.quantity_sold = quantity_sold
+                    sales_entry.revenue = float(row.get("revenue", 0))
+                else:
+                    sales_entry = SalesData(
+                        date=sale_date,
+                        product_id=product.id,
+                        shop_id=shop_id,
+                        quantity_sold=quantity_sold,
+                        revenue=float(row.get("revenue", 0)),
+                        fabric_type=row.get("fabric_type"),
+                        region=row.get("region")
+                    )
+                    db.session.add(sales_entry)
+
+                if not inventory or delta_qty == 0:
+                    continue
+
+                # Adjust stock based on delta (positive delta reduces stock, negative increases)
                 old_stock = inventory.qty_available
-                new_stock = max(0, old_stock - quantity_sold)
+                new_stock = max(0, old_stock - delta_qty)
                 inventory.qty_available = new_stock
                 
                 stock_updates.append({
                     "product_name": product.name,
                     "sku": sku,
-                    "quantity_sold": quantity_sold,
+                    "sale_date": sale_date.isoformat(),
+                    "delta_quantity": -delta_qty,
+                    "recorded_quantity": quantity_sold,
                     "old_stock": old_stock,
                     "new_stock": new_stock
                 })
@@ -301,25 +498,85 @@ def upload_sales_data(current_user):
                 print(f"[Sales Upload] Error processing row: {e}")
                 continue
 
-        # Commit all stock changes
+        # Save normalized CSV for downstream analytics
+        save_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        df.to_csv(save_path, index=False)
+        
+        # Generate AI Insights immediately
+        insights_data = _generate_insights(df)
+
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
+        log_entry.rows_processed = len(df)
+        log_entry.completed_at = datetime.utcnow()
+        log_entry.duration_ms = duration_ms
+        log_entry.status = 'completed'
+        log_entry.message = f"Updated stock for {len(stock_updates)} products."
+        log_entry.sla_breached = duration_ms > SalesUploadLog.SLA_LIMIT_MS
+        
         db.session.commit()
         
-        # Save sales data file
-        save_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
-        file.save(save_path)
+        # Invalidate cache after new data upload so next requests get fresh data
+        invalidate_shop_cache(shop_id)
         
         print(f"[Sales Upload] Processed {len(stock_updates)} stock updates for shop {shop_id}")
         
         return jsonify({
             "status": "success", 
             "message": f"Sales data uploaded successfully! Updated stock for {len(stock_updates)} products.",
-            "stock_updates": stock_updates
+            "stock_updates": stock_updates,
+            "ai_insights": insights_data["ai_insights"],
+            "demand_summary": insights_data["demand_summary"],
+            "recommendation": insights_data["recommendation"],
+            "upload_log": log_entry.to_dict()
         }), 200
         
     except Exception as e:
         db.session.rollback()
+        if log_entry:
+            try:
+                duration_ms = int((time.perf_counter() - start_time) * 1000)
+                log_entry.status = 'failed'
+                log_entry.completed_at = datetime.utcnow()
+                log_entry.duration_ms = duration_ms
+                log_entry.sla_breached = duration_ms > SalesUploadLog.SLA_LIMIT_MS
+                log_entry.message = str(e)[:250]
+                db.session.add(log_entry)
+                db.session.commit()
+            except Exception as log_err:
+                db.session.rollback()
+                print(f"[Sales Upload Log Error] {log_err}")
         print(f"[Upload Error] {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@shop_bp.route("/upload_sales_data/logs", methods=["GET"])
+@token_required
+@roles_required('shop_owner', 'shop_manager')
+def get_sales_upload_logs(current_user):
+    try:
+        shop_id = request.args.get("shop_id", type=int)
+        limit = request.args.get("limit", default=5, type=int)
+        if not shop_id:
+            return jsonify({"status": "error", "message": "shop_id is required"}), 400
+
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to access this shop"}), 403
+
+        logs = (SalesUploadLog.query
+                .filter_by(shop_id=shop_id)
+                .order_by(SalesUploadLog.started_at.desc())
+                .limit(min(limit, 25))
+                .all())
+
+        return jsonify({
+            "status": "success",
+            "count": len(logs),
+            "logs": [log.to_dict() for log in logs]
+        })
+    except Exception as e:
+        print(f"[Sales Upload Logs Error] {e}")
+        return jsonify({"status": "error", "message": "Failed to fetch upload logs"}), 500
 
 
 # Get Distributors for Search
@@ -367,11 +624,135 @@ def get_distributors(current_user):
         return jsonify({"status": "error", "message": "Failed to fetch distributors"}), 500
 
 
+# =============================================================================
+# SALES ANALYTICS ENDPOINTS
+# =============================================================================
+
+@shop_bp.route("/sales-summary", methods=["GET"])
+@token_required
+def get_sales_summary(current_user):
+    """
+    Get comprehensive weekly sales summary for last 7 days.
+    Returns detailed metrics, daily breakdown, top products, and insights.
+    """
+    try:
+        shop_id = request.args.get("shop_id", type=int)
+        if not shop_id:
+            return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Access denied"}), 403
+        
+        # Get analytics service for this shop
+        analytics = get_sales_analytics_service(shop_id)
+        summary = analytics.get_weekly_sales_summary()
+        
+        return jsonify({
+            "status": "success",
+            "data": summary
+        }), 200
+        
+    except Exception as e:
+        logging.exception(f"[Sales Summary Error] Shop {request.args.get('shop_id')}")
+        return jsonify({
+            "status": "error",
+            "message": "Failed to generate sales summary",
+            "error": str(e)
+        }), 500
+
+
+@shop_bp.route("/quarterly-forecast", methods=["GET"])
+@token_required
+def get_quarterly_forecast(current_user):
+    """
+    Get next quarter (90 days) demand forecast.
+    Returns weekly and monthly predictions with confidence intervals.
+    """
+    try:
+        shop_id = request.args.get("shop_id", type=int)
+        if not shop_id:
+            return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Access denied"}), 403
+        
+        # Get analytics service for this shop
+        analytics = get_sales_analytics_service(shop_id)
+        forecast = analytics.get_quarterly_demand_forecast()
+        
+        return jsonify({
+            "status": "success",
+            "data": forecast
+        }), 200
+        
+    except Exception as e:
+        logging.exception(f"[Quarterly Forecast Error] Shop {request.args.get('shop_id')}")
+        return jsonify({
+            "status": "error",
+            "message": "Failed to generate quarterly forecast",
+            "error": str(e)
+        }), 500
+
+
+@shop_bp.route("/sales-growth-trend", methods=["GET"])
+@token_required
+def get_sales_growth_trend(current_user):
+    """
+    Get sales growth trend data for charting.
+    
+    Query params:
+        shop_id: Shop ID (required)
+        period: 'weekly', 'monthly', or 'yearly' (default: 'weekly')
+    
+    Returns:
+        Chart data with labels, values, SVG paths, and growth metrics
+    """
+    try:
+        shop_id = request.args.get("shop_id", type=int)
+        period = request.args.get("period", "weekly")
+        
+        if not shop_id:
+            return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        
+        # Validate period
+        if period not in ['weekly', 'monthly', 'yearly']:
+            return jsonify({"status": "error", "message": "period must be 'weekly', 'monthly', or 'yearly'"}), 400
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Access denied"}), 403
+        
+        # Get analytics service for this shop
+        analytics = get_sales_analytics_service(shop_id)
+        trend_data = analytics.get_sales_growth_trend(period)
+        
+        return jsonify({
+            "status": "success",
+            "data": trend_data
+        }), 200
+        
+    except Exception as e:
+        logging.exception(f"[Sales Growth Trend Error] Shop {request.args.get('shop_id')}")
+        return jsonify({
+            "status": "error",
+            "message": "Failed to generate sales growth trend",
+            "error": str(e)
+        }), 500
+
+
 # Next Quarter Demand Forecast
 @shop_bp.route("/demand-forecast", methods=["GET"])
 @token_required
 def get_demand_forecast(current_user):
-    """Generate next quarter demand forecast for top 10 products"""
+    """
+    Generate next quarter demand forecast using Prophet on database sales data.
+    
+    NOTE: The newer /quarterly-forecast endpoint is preferred. This endpoint
+    is maintained for backward compatibility but now uses database data
+    instead of CSV files.
+    """
     try:
         shop_id = request.args.get("shop_id")
         if not shop_id:
@@ -381,75 +762,65 @@ def get_demand_forecast(current_user):
         if not check_shop_ownership(current_user.get("id"), shop_id):
             return jsonify({"status": "error", "message": "You don't have permission to access this shop"}), 403
 
-        # Get sales data for this shop
-        sales_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
+        # Use database instead of CSV files
+        from sqlalchemy import func
         
-        if not os.path.exists(sales_path):
+        # Query sales data from database
+        sales_records = db.session.query(
+            func.date(SalesData.date).label('date'),
+            func.sum(SalesData.quantity_sold).label('quantity_sold')
+        ).filter(
+            SalesData.shop_id == int(shop_id)
+        ).group_by(
+            func.date(SalesData.date)
+        ).order_by(
+            func.date(SalesData.date)
+        ).all()
+        
+        # Check if we have enough data to run Prophet
+        if not sales_records or len(sales_records) < 7:
+            logging.info(f"[Demand Forecast] Skipping Prophet - insufficient data ({len(sales_records) if sales_records else 0} days)")
             return jsonify({
-                "status": "success", 
-                "message": "No sales data available for forecasting",
-                "forecast": []
+                "status": "success",
+                "message": "Not enough sales data for forecasting. Need at least 7 days of data.",
+                "forecast": [],
+                "data_points": len(sales_records) if sales_records else 0
             }), 200
-
-        # Load and process sales data
-        df = pd.read_csv(sales_path)
-        if "product_name" not in df.columns or "quantity_sold" not in df.columns:
-            return jsonify({"status": "error", "message": "Invalid sales data format"}), 400
-
-        # Aggregate sales by product
-        product_sales = df.groupby("product_name")["quantity_sold"].sum().reset_index()
-        product_sales = product_sales.sort_values("quantity_sold", ascending=False)
         
-        # Get top 10 products
-        top_products = product_sales.head(10)
+        # Convert to DataFrame for Prophet
+        df = pd.DataFrame([{
+            "date": r.date,
+            "quantity_sold": float(r.quantity_sold or 0)
+        } for r in sales_records])
         
-        # Generate forecast for next quarter (3 months)
-        forecast_data = []
-        for _, row in top_products.iterrows():
-            product_name = row["product_name"]
-            current_sales = row["quantity_sold"]
-            
-            # Simple forecast: assume 10-30% growth based on trend
-            growth_factor = random.uniform(1.1, 1.3)
-            forecast_quantity = int(current_sales * growth_factor)
-            
-            # Get product details if available
-            product = Product.query.filter_by(name=product_name, shop_id=shop_id).first()
-            
-            forecast_data.append({
-                "product_name": product_name,
-                "category": product.category if product else "Unknown",
-                "current_quarter_sales": int(current_sales),
-                "next_quarter_forecast": forecast_quantity,
-                "growth_percentage": round((growth_factor - 1) * 100, 1),
-                "confidence": random.choice(["High", "Medium", "Low"]),
-                "recommendation": _get_recommendation(forecast_quantity, current_sales)
+        df["date"] = pd.to_datetime(df["date"])
+        daily_sales = df.rename(columns={"date": "Date", "quantity_sold": "Sales"})
+        
+        # Generate Forecast using Prophet (via AI Service)
+        forecast_data = forecast_trends(daily_sales)
+        
+        # Format for frontend
+        formatted_forecast = []
+        for item in forecast_data:
+            formatted_forecast.append({
+                "date": item["ds"].strftime("%Y-%m-%d") if hasattr(item["ds"], "strftime") else str(item["ds"]),
+                "predicted_sales": int(item["yhat"]),
+                "confidence": "High"
             })
         
         return jsonify({
             "status": "success",
             "message": "Demand forecast generated successfully",
-            "forecast": forecast_data,
-            "quarter": "Q2 2025",  # Dynamic based on current date
-            "generated_at": datetime.now().isoformat()
+            "forecast": formatted_forecast,
+            "quarter": "Next Quarter",
+            "generated_at": datetime.now().isoformat(),
+            "data_source": "database",
+            "data_points": len(sales_records)
         }), 200
         
     except Exception as e:
-        print(f"[Demand Forecast Error] {e}")
+        logging.error(f"[Demand Forecast Error] {e}")
         return jsonify({"status": "error", "message": "Failed to generate demand forecast"}), 500
-
-def _get_recommendation(forecast_qty, current_qty):
-    """Generate recommendation based on forecast"""
-    growth = (forecast_qty - current_qty) / current_qty if current_qty > 0 else 0
-    
-    if growth > 0.25:
-        return "Significant growth expected - increase inventory and marketing"
-    elif growth > 0.10:
-        return "Moderate growth expected - plan for increased stock"
-    elif growth > 0:
-        return "Slight growth expected - maintain current inventory levels"
-    else:
-        return "Decline expected - consider promotional activities"
 
 
 # Export Sales Report
@@ -498,8 +869,8 @@ def _serialize_shop(s: Shop):
         "location": s.location or s.address or "",
         "city": s.city or "",
         "state": s.state or "",
-        # "contact": s.contact or "",
-        "gstin": getattr(s, "gstin", "") or "",
+        "contact": getattr(s, "contact", None) or "",
+        "gstin": getattr(s, "gstin", None) or "",
         "latitude": float(s.lat) if s.lat is not None else None,
         "longitude": float(s.lon) if s.lon is not None else None,
         "image": getattr(s, "image_url", None) or None,
@@ -507,11 +878,11 @@ def _serialize_shop(s: Shop):
         "rating": round(s.rating or 4.0, 1),
     }
 
-# GET: Owner's Shops (you already have this; keep as-is or use below)
+# GET: Owner's Shops
 @shop_bp.route("/my-shops", methods=["GET"])
 @token_required
 def my_shops_list(current_user):
-    # try:
+    try:
         user_id = getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
         if not user_id:
             return jsonify({"status": "error", "message": "Invalid user"}), 400
@@ -541,7 +912,7 @@ def my_shops_list(current_user):
             "total": total
         }), 200
 
-    # except Exception:
+    except Exception:
         logging.exception("Error fetching owner shops")
         return jsonify({"status": "error", "message": "Failed to fetch your shops"}), 500
 

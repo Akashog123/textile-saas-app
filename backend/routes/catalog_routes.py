@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from models.model import db, ProductCatalog
-from utils.auth_utils import token_required
+from utils.auth_utils import token_required, roles_required
 import pandas as pd
 from pathlib import Path
 import random
@@ -11,6 +11,7 @@ catalog_bp = Blueprint("catalog", __name__)
 # LOAD CATALOG INTO DATABASE
 @catalog_bp.route("/load", methods=["POST"])
 @token_required
+@roles_required('admin')
 def load_catalog(current_user):
     """
     Dangerous operation: Clears and reloads entire product catalog.

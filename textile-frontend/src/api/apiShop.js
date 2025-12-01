@@ -66,6 +66,54 @@ export const getDemandForecast = (shopId) => {
     });
 };
 
+/**
+ * Get comprehensive weekly sales summary (Last 7 days)
+ * @param {number} shopId - Shop ID
+ * @returns {Promise} Response with sales summary including metrics, daily breakdown, insights
+ */
+export const getSalesSummary = (shopId) => {
+    return api.get(`/shop/sales-summary`, {
+        params: { shop_id: shopId },
+        timeout: 15000
+    });
+};
+
+/**
+ * Get next quarter (90 days) demand forecast with confidence intervals
+ * @param {number} shopId - Shop ID
+ * @returns {Promise} Response with weekly/monthly forecasts, category predictions, insights
+ */
+export const getQuarterlyForecast = (shopId) => {
+    return api.get(`/shop/quarterly-forecast`, {
+        params: { shop_id: shopId },
+        timeout: 30000
+    });
+};
+
+/**
+ * Get sales growth trend data for charting
+ * @param {number} shopId - Shop ID
+ * @param {string} period - 'weekly', 'monthly', or 'yearly'
+ * @returns {Promise} Response with chart data, labels, SVG paths, and growth metrics
+ */
+export const getSalesGrowthTrend = (shopId, period = 'weekly') => {
+    return api.get(`/shop/sales-growth-trend`, {
+        params: { shop_id: shopId, period },
+        timeout: 15000
+    });
+};
+
+export const generateSalesReportPdf = (payload) => {
+    return api.post('/pdf/generate', payload, {
+        responseType: 'blob'
+    });
+};
+
+export const getSalesUploadLogs = (shopId, limit = 5) => {
+    return api.get(`/shop/upload_sales_data/logs`, {
+        params: { shop_id: shopId, limit }
+    });
+};
 
 /* -------------------------
    Owner's shops (my-shops)
@@ -130,13 +178,17 @@ export const deleteShop = (shopId) => {
   return api.delete(`/shop/my-shops/${shopId}`, { timeout: 15000 });
 };
 
-
 export default {
     getShopDashboard,
     uploadSalesData,
     exportSalesData,
     getDistributors,
     getDemandForecast,
+    getSalesSummary,
+    getQuarterlyForecast,
+    getSalesGrowthTrend,
+    generateSalesReportPdf,
+    getSalesUploadLogs,
     getMyShops,
     createShop,
     updateShop,

@@ -45,8 +45,12 @@ ENV/
 
 # Python cache
 *.pyc
-**/__pycache__/
+**/__pycache__
 
+# SQLite database files
+*.db
+backend/instance/*.db
+backend/se_textile.db
 
 # Cypress
 /cypress/videos/

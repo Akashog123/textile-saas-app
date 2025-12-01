@@ -2,8 +2,7 @@
 Database Management and Seeding Script
 
 This script provides commands for database management:
-- seed: Run comprehensive role-based seeding
-- seed-minimal: Run minimal seeding (existing logic)
+- seed: Run account creation seeding
 - reset: Clear all data
 - status: Show database status
 """
@@ -11,36 +10,20 @@ This script provides commands for database management:
 import click
 from flask.cli import with_appcontext
 
-from utils.seed_data import seed_minimal_data
 from utils.comprehensive_seeding import seed_comprehensive_data
 from models.model import db, User, Shop, Product, SalesData
 
 @click.command()
 @with_appcontext
 def seed():
-    """Run comprehensive role-based data seeding (mainly for development/reset)."""
-    print("Starting comprehensive role-based seeding...")
+    """Run account creation seeding (mainly for development/reset)."""
+    print("Starting account creation seeding...")
     try:
         result = seed_comprehensive_data()
-        print("Comprehensive seeding completed successfully!")
+        print("Account seeding completed successfully!")
         print(f"Summary: {result}")
-        print("Note: Seeding normally runs automatically on app startup")
     except Exception as e:
         print(f"Seeding failed: {e}")
-        raise
-
-@click.command()
-@with_appcontext
-def seed_minimal():
-    """Run minimal data seeding (legacy - for testing only)."""
-    print("Starting minimal seeding...")
-    try:
-        result = seed_minimal_data()
-        print("Minimal seeding completed!")
-        print(f"Summary: {result}")
-        print("Note: Comprehensive seeding runs automatically on app startup")
-    except Exception as e:
-        print(f"Minimal seeding failed: {e}")
         raise
 
 @click.command()
@@ -181,7 +164,6 @@ def seed_demo():
 def register_commands(app):
     """Register CLI commands with Flask app."""
     app.cli.add_command(seed)
-    app.cli.add_command(seed_minimal)
     app.cli.add_command(reset_db)
     app.cli.add_command(db_status)
     app.cli.add_command(seed_demo)

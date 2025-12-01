@@ -5,6 +5,7 @@ Performance monitoring and health check endpoints
 from flask import Blueprint, jsonify, request
 from utils.performance_utils import get_cache_stats, clear_cache
 from models.model import db
+from sqlalchemy import text
 import psutil
 import time
 from datetime import datetime
@@ -17,7 +18,7 @@ def health_check():
     try:
         # Database health
         try:
-            db.session.execute("SELECT 1")
+            db.session.execute(text("SELECT 1"))
             db_status = "healthy"
         except Exception as e:
             db_status = f"unhealthy: {str(e)}"
