@@ -5,6 +5,7 @@
       v-model="searchQuery"
       placeholder="Search fabrics and products..."
       @nearby-search="handleNearbySearch"
+      @find-similar="openComparisonModal"
     />
 
     <!-- Filters -->
@@ -21,6 +22,18 @@
       </button>
       <button class="filter-btn">
         <i class="bi bi-tag-fill"></i> Availability
+      </button>
+      <button v-if="searchActive" class="filter-btn ms-auto" @click="clearComparison" title="Clear search results">
+        <i class="bi bi-x-circle"></i> Clear Search
+      </button>
+    </div>
+
+    <!-- Search Status -->
+    <div v-if="searchActive" class="alert alert-info mb-4" role="alert">
+      <i class="bi bi-search me-2"></i>
+      Showing {{ products.length }} similar products. 
+      <button class="btn btn-sm btn-outline-secondary ms-2" @click="clearComparison">
+        Clear Search
       </button>
     </div>
 
@@ -52,6 +65,9 @@
                   <div class="image-indicator">
                     {{ currentImageIndex[idx] + 1 }} /
                     {{ product.imageUrls.length }}
+                  </div>
+                  <div v-if="product.similarity_score" class="similarity-badge">
+                    {{ Math.round(product.similarity_score * 100) }}% match
                   </div>
                 </div>
 
@@ -102,12 +118,68 @@
     <div class="text-center mt-4">
       <button class="btn btn-outline-primary">Load More Products</button>
     </div>
+
+    <!-- Image Comparison Modal -->
+    <div v-if="showComparisonModal" class="modal-overlay" @click="closeComparisonModal">
+      <div class="comparison-modal" @click.stop>
+        <button class="btn-close-modal" @click="closeComparisonModal">✕</button>
+        
+        <!-- Upload/Camera Section -->
+        <div class="comparison-upload-section" v-if="!comparisonInProgress">
+          <h5 class="mb-3">Find Similar Products</h5>
+          <p class="text-muted mb-4">Upload or take a photo of a fabric to find similar products in our catalog</p>
+          
+          <div class="upload-area" @click="triggerFileInput" @dragover.prevent="() => {}" @drop.prevent="handleImageDrop">
+            <input 
+              ref="imageInput" 
+              type="file" 
+              accept="image/*" 
+              @change="handleImageSelect"
+              style="display: none"
+            />
+            <div class="upload-content text-center">
+              <i class="bi bi-cloud-arrow-up upload-icon"></i>
+              <p class="mb-2"><strong>Click to upload</strong> or drag and drop</p>
+              <p class="text-muted small">SVG, PNG, JPG, GIF up to 10MB</p>
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex gap-2 justify-content-center">
+            <button class="btn btn-outline-primary" @click="triggerFileInput">
+              <i class="bi bi-folder-open me-2"></i>Choose Image
+            </button>
+            <button class="btn btn-outline-secondary" @click="openCamera">
+              <i class="bi bi-camera-fill me-2"></i>Take Photo
+            </button>
+          </div>
+
+          <!-- Camera Input (hidden) -->
+          <input 
+            ref="cameraInput" 
+            type="file" 
+            accept="image/*" 
+            capture="environment"
+            @change="handleImageSelect"
+            style="display: none"
+          />
+        </div>
+
+        <!-- Loading Section -->
+        <div v-if="comparisonInProgress" class="text-center py-5">
+          <div class="spinner-border mb-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="text-muted">Analyzing image and finding matches...</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { getProducts } from '@/api/apiProducts';
+import { compareImages } from '@/api/apiImages';
 import { formatPricePerMeter } from '@/utils/priceUtils';
 import { validateProductData } from '@/utils/dataValidation';
 import { handleApiError, executeWithRetry, createRetryConfig, showErrorNotification } from '@/utils/errorHandling';
@@ -119,6 +191,16 @@ const currentImageIndex = reactive({});
 // Loading and error states
 const loading = ref(false);
 const error = ref('');
+
+// Search state
+const searchActive = ref(false);
+
+// Image comparison states
+const showComparisonModal = ref(false);
+const comparisonInProgress = ref(false);
+const comparisonResults = ref([]);
+const imageInput = ref(null);
+const cameraInput = ref(null);
 
 // Filter states
 const filters = reactive({
@@ -258,6 +340,114 @@ const handleNearbySearch = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+// Image Comparison Functions
+const triggerFileInput = () => {
+  imageInput.value?.click();
+};
+
+const openCamera = () => {
+  cameraInput.value?.click();
+};
+
+const handleImageDrop = (event) => {
+  const files = event.dataTransfer.files;
+  if (files && files.length > 0) {
+    handleImageSelect({ target: { files } });
+  }
+};
+
+const handleImageSelect = async (event) => {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const file = files[0];
+  
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    alert('Please select a valid image file');
+    return;
+  }
+
+  // Validate file size (10MB max)
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Image size must be less than 10MB');
+    return;
+  }
+
+  comparisonInProgress.value = true;
+  
+  try {
+    const response = await compareImages(file);
+    
+    if (response.data && response.data.status === 'success' && response.data.matches) {
+      // Transform matches to product objects
+      const matchedProducts = response.data.matches.map((match, idx) => ({
+        name: match.product_name || `Match ${idx + 1}`,
+        price: match.price ? `₹${match.price.toLocaleString()}` : 'Price on request',
+        description: `${match.article_type || ''} - ${match.color || ''}`,
+        rating: 4.5,
+        seller: match.gender || 'Store',
+        imageUrls: [`http://localhost:5001/${match.file}`],
+        similarity_score: match.similarity_score,
+        isComparisonResult: true,
+        matchIndex: idx
+      }));
+
+      // Replace products with matched results
+      products.value = matchedProducts;
+      searchActive.value = true;
+      searchQuery.value = '';
+      
+      // Close the modal
+      showComparisonModal.value = false;
+      
+      // Scroll to results
+      setTimeout(() => {
+        window.scrollTo({ top: 300, behavior: 'smooth' });
+      }, 100);
+
+      alert(`Found ${matchedProducts.length} similar products!`);
+      console.log('Matched products:', matchedProducts);
+    } else {
+      alert('No similar products found. Try another image.');
+    }
+  } catch (err) {
+    console.error('Image comparison error:', err);
+    alert(err.response?.data?.error || 'Failed to compare images. Please try again.');
+  } finally {
+    comparisonInProgress.value = false;
+    resetComparison();
+  }
+};
+
+const handleImageError = (event) => {
+  console.error('Failed to load image:', event.target.src);
+  event.target.src = 'https://via.placeholder.com/200?text=Image+Not+Found';
+};
+
+const resetComparison = () => {
+  comparisonResults.value = [];
+  if (imageInput.value) imageInput.value.value = '';
+  if (cameraInput.value) cameraInput.value.value = '';
+};
+
+const closeComparisonModal = () => {
+  showComparisonModal.value = false;
+  resetComparison();
+};
+
+const clearComparison = async () => {
+  searchActive.value = false;
+  searchQuery.value = '';
+  comparisonResults.value = [];
+  // Reload all products
+  await fetchProducts();
+};
+
+const openComparisonModal = () => {
+  showComparisonModal.value = true;
 };
 
 // Watch for search query changes
@@ -504,6 +694,31 @@ h5 {
   font-weight: 600;
 }
 
+.similarity-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  padding: 0.35rem 0.85rem;
+  border-radius: 50px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.35);
+  animation: slideInRight 0.4s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* Product Details */
 .product-main h6 {
   font-size: 1.35rem;
@@ -548,6 +763,176 @@ h5 {
 
 .text-muted {
   color: var(--color-text-muted) !important;
+}
+
+/* Image Comparison Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 1rem;
+}
+
+.comparison-modal {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 24px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  position: relative;
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.btn-close-modal {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: #f7fafc;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close-modal:hover {
+  background: #e53e3e;
+  color: white;
+  transform: rotate(90deg);
+}
+
+.comparison-upload-section h5 {
+  font-weight: 700;
+  color: var(--color-text-dark);
+  font-size: 1.5rem;
+}
+
+/* Upload Area */
+.upload-area {
+  border: 3px dashed var(--color-primary);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(74, 144, 226, 0.05);
+  transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+  background: rgba(74, 144, 226, 0.1);
+  border-color: var(--color-accent);
+}
+
+.upload-icon {
+  font-size: 3rem;
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+}
+
+.upload-area p {
+  margin: 0.5rem 0;
+}
+
+/* Results Grid */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.result-card {
+  background: var(--color-bg-light);
+  border: 2px solid var(--color-bg-alt);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.result-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.2);
+  transform: translateY(-4px);
+}
+
+.result-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  background: var(--color-bg-alt);
+}
+
+.result-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.result-card:hover .result-image {
+  transform: scale(1.1);
+}
+
+.similarity-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: #4A4A4A;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.result-info {
+  padding: 1rem;
+}
+
+.result-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  margin-bottom: 0.75rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.progress {
+  background: var(--color-bg-alt);
+  border-radius: 3px;
+}
+
+.progress-bar {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  border-radius: 3px;
 }
 
 /* Load More Button */
@@ -598,6 +983,21 @@ h5 {
 
   .filters-section {
     padding: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .comparison-modal {
+    padding: 1.5rem;
+    max-height: 90vh;
+  }
+
+  .results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1rem;
+  }
+
+  .result-image-wrapper {
+    height: 120px;
   }
 }
 </style>
