@@ -301,7 +301,7 @@
 
 <script setup>
 /* eslint-disable no-console */
-import L from 'leaflet';
+//import L from 'leaflet';
 import { ref, onMounted, nextTick } from 'vue';
 import { getProfile, updateProfile } from '@/api/apiProfile';
 import apiShop, { getMyShops, createShop, updateShop, deleteShop } from '@/api/apiShop';
