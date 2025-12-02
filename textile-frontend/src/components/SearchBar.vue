@@ -40,8 +40,8 @@
             v-if="showImageSearch"
             class="btn btn-camera" 
             type="button" 
-            title="Image Search"
-            @click="handleImageSearch"
+            title="Find Similar Products"
+            @click="$emit('find-similar')"
             :disabled="isImageSearching"
           >
             <i class="bi bi-camera-fill" :class="{ 'text-danger': isImageSearching }"></i>
@@ -114,7 +114,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'voice-search', 'image-search', 'nearby-search', 'search-results', 'search-error'])
+const emit = defineEmits(['update:modelValue', 'voice-search', 'image-search', 'find-similar', 'nearby-search', 'search-results', 'search-error'])
 
 // Local state
 const isVoiceSearching = ref(false)

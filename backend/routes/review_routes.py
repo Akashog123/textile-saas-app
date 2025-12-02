@@ -99,3 +99,75 @@ def post_shop_review(shop_id):
         current_app.logger.exception("Failed to submit review")
         db.session.rollback()
         return jsonify({"message": "Failed to submit review"}), 500
+
+
+@reviews_bp.route("/customer/shops/<int:shop_id>/reviews/<int:review_id>", methods=["PUT"])
+def update_shop_review(shop_id, review_id):
+    try:
+        review = Review.query.filter_by(id=review_id, shop_id=shop_id).first()
+        if not review:
+            return jsonify({"message": "Review not found"}), 404
+
+        data = request.get_json(force=True)
+        
+        # Update fields
+        if "rating" in data:
+            rating = data.get("rating")
+            if not (1 <= int(rating) <= 5):
+                return jsonify({"message": "rating must be integer between 1 and 5"}), 400
+            review.rating = int(rating)
+        
+        if "title" in data:
+            review.title = data.get("title")
+        
+        if "body" in data or "comment" in data:
+            comment = data.get("body") or data.get("comment") or ""
+            if len(comment.strip()) < 1:
+                return jsonify({"message": "comment/body is required"}), 400
+            review.body = comment
+        
+        if "user_name" in data:
+            review.user_name = data.get("user_name")
+
+        # Update the updated_at timestamp
+        review.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+
+        # Prepare response
+        saved = {
+            "id": review.id,
+            "user_name": review.user_name or "Anonymous",
+            "rating": review.rating,
+            "title": review.title,
+            "body": review.body,
+            "is_verified": bool(getattr(review, "is_verified_purchase", False)),
+            "created_at": review.created_at.isoformat() if review.created_at else None,
+            "updated_at": review.updated_at.isoformat() if review.updated_at else None
+        }
+
+        return jsonify({"status": "success", "review": saved}), 200
+
+    except Exception as e:
+        current_app.logger.exception("Failed to update review")
+        db.session.rollback()
+        return jsonify({"message": "Failed to update review"}), 500
+
+
+@reviews_bp.route("/customer/shops/<int:shop_id>/reviews/<int:review_id>", methods=["DELETE"])
+def delete_shop_review(shop_id, review_id):
+    try:
+        review = Review.query.filter_by(id=review_id, shop_id=shop_id).first()
+        if not review:
+            return jsonify({"message": "Review not found"}), 404
+
+        db.session.delete(review)
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Review deleted successfully"}), 200
+
+    except Exception as e:
+        current_app.logger.exception("Failed to delete review")
+        db.session.rollback()
+        return jsonify({"message": "Failed to delete review"}), 500
+
