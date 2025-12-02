@@ -772,10 +772,12 @@ h5 {
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1050;
   padding: 1rem;
+  overflow-y: auto;
+  padding-top: 5vh;
 }
 
 .comparison-modal {
@@ -784,16 +786,19 @@ h5 {
   border-radius: 24px;
   max-width: 900px;
   width: 100%;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   position: relative;
-  animation: modalSlideIn 0.3s ease;
+  animation: modalSlideInTop 0.3s ease;
+  margin: 0;
+  margin-top: 0;
+  margin-bottom: 2rem;
 }
 
-@keyframes modalSlideIn {
+@keyframes modalSlideInTop {
   from {
-    transform: translateY(-50px);
+    transform: translateY(-100px);
     opacity: 0;
   }
   to {
