@@ -1,10 +1,49 @@
 // src/api/apiReviews.js
-// Review system API endpoints (Story 8)
+// Customer Review API for Shops
 
 import api from './axios';
 
 /**
- * Submit a review for a shop or product
+ * Get all reviews for a specific shop
+ * @param {number} shopId - Shop ID
+ * @returns {Promise} Response with shop reviews, avgRating, reviewCount
+ */
+export const getShopReviews = (shopId) => {
+    return api.get(`/customer/shops/${shopId}/reviews`);
+};
+
+/**
+ * Submit a review for a shop (requires authentication)
+ * @param {number} shopId - Shop ID
+ * @param {Object} reviewData - Review data
+ * @param {number} reviewData.rating - Rating (1-5)
+ * @param {string} [reviewData.title] - Review title (optional)
+ * @param {string} reviewData.comment - Review body text
+ * @returns {Promise} Response with created review
+ */
+export const submitShopReview = (shopId, reviewData) => {
+    return api.post(`/customer/shops/${shopId}/reviews`, {
+        rating: reviewData.rating,
+        title: reviewData.title || '',
+        comment: reviewData.comment || reviewData.body
+    });
+};
+
+/**
+ * Create a review for a shop (alias for submitShopReview for API compatibility)
+ * @param {Object} data - Review data with shop_id
+ * @returns {Promise} Response with created review
+ */
+export const createReview = (data) => {
+    return api.post(`/customer/shops/${data.shop_id}/reviews`, {
+        rating: data.rating,
+        title: data.title || '',
+        comment: data.body || data.comment
+    });
+};
+
+/**
+ * Submit a review for a shop or product (backwards compatibility)
  * @param {Object} reviewData - Review data
  * @param {number} [reviewData.shop_id] - Shop ID (for shop reviews)
  * @param {number} [reviewData.product_id] - Product ID (for product reviews)
@@ -14,79 +53,89 @@ import api from './axios';
  * @returns {Promise} Response with created review
  */
 export const submitReview = (reviewData) => {
+    if (reviewData.shop_id) {
+        return api.post(`/customer/shops/${reviewData.shop_id}/reviews`, {
+            rating: reviewData.rating,
+            title: reviewData.title || '',
+            comment: reviewData.body || reviewData.comment
+        });
+    }
     return api.post('/reviews/submit', reviewData);
 };
 
 /**
- * Create a shop review (alias for submitReview for backwards compatibility)
- * @param {object} data
- * @returns {Promise}
- */
-export const createReview = (data) => {
-    return api.post('/reviews/submit', data);
-};
-
-/**
- * Get all reviews for a specific shop
- * @param {number} shopId - Shop ID
- * @returns {Promise} Response with shop reviews and stats
- */
-export const getShopReviews = (shopId) => {
-    return api.get(`/reviews/shop/${shopId}`);
-};
-
-/**
- * Get all reviews for a specific product
- * @param {number} productId - Product ID
- * @returns {Promise} Response with product reviews and stats
- */
-export const getProductReviews = (productId) => {
-    return api.get(`/reviews/product/${productId}`);
-};
-
-/**
- * Get all reviews submitted by the current user
+ * Get all reviews submitted by the current authenticated user
  * @returns {Promise} Response with user's reviews
  */
 export const getMyReviews = () => {
-    return api.get('/reviews/my-reviews');
+    return api.get('/customer/reviews/my-reviews');
 };
 
 /**
- * Update a shop review
- * @param {number} shopId
- * @param {number} reviewId
- * @param {object} data
- * @returns {Promise}
+ * Update an existing review by review ID only
+ * @param {number} reviewId - Review ID
+ * @param {Object} reviewData - Updated review data
+ * @returns {Promise} Response with updated review
  */
-export const updateReview = (shopId, reviewId, data) => {
-    return api.put(`/reviews/${reviewId}`, data);
+export const updateReviewById = (reviewId, reviewData) => {
+    return api.put(`/customer/reviews/${reviewId}`, {
+        rating: reviewData.rating,
+        title: reviewData.title,
+        body: reviewData.body || reviewData.comment
+    });
 };
 
 /**
- * Delete a review (only the reviewer can delete their own review)
+ * Update an existing review with shop_id in URL (for frontend compatibility)
+ * @param {number} shopId - Shop ID
+ * @param {number} reviewId - Review ID
+ * @param {Object} reviewData - Updated review data
+ * @returns {Promise} Response with updated review
+ */
+export const updateReview = (shopId, reviewId, reviewData) => {
+    return api.put(`/customer/shops/${shopId}/reviews/${reviewId}`, {
+        rating: reviewData.rating,
+        title: reviewData.title,
+        body: reviewData.body || reviewData.comment
+    });
+};
+
+/**
+ * Delete a review by review ID only (legacy route)
  * @param {number} reviewId - Review ID
  * @returns {Promise} Response with deletion status
  */
-export const deleteReview = (reviewId) => {
-    return api.delete(`/reviews/${reviewId}`);
+export const deleteReviewById = (reviewId) => {
+    return api.delete(`/customer/reviews/${reviewId}`);
 };
 
 /**
- * Get trending patterns based on reviews (aggregate insights)
- * @returns {Promise} Response with trending patterns
+ * Delete a review with shop_id in URL (for frontend compatibility)
+ * @param {number} shopId - Shop ID
+ * @param {number} reviewId - Review ID
+ * @returns {Promise} Response with deletion status
  */
-export const getTrendingPatterns = () => {
+export const deleteReview = (shopId, reviewId) => {
+    return api.delete(`/customer/shops/${shopId}/reviews/${reviewId}`);
+};
+
+/**
+ * Get trending/popular shops based on reviews (aggregate insights)
+ * @returns {Promise} Response with popular shops data
+ */
+export const getPopularShops = () => {
     return api.get('/customer/popular-shops');
 };
 
 export default {
+    getShopReviews,
+    submitShopReview,
     submitReview,
     createReview,
-    getShopReviews,
-    getProductReviews,
     getMyReviews,
     updateReview,
+    updateReviewById,
     deleteReview,
-    getTrendingPatterns
+    deleteReviewById,
+    getPopularShops
 };

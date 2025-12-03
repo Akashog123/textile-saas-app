@@ -27,7 +27,7 @@ def _serialize_shop_for_profile(shop):
         "lon": shop.lon,
         "latitude": shop.lat,
         "longitude": shop.lon,
-        "rating": round(shop.rating or 4.0, 1),
+        "rating": round(shop.rating or 0.0, 1),
         "is_popular": shop.is_popular or False,
         "image_url": shop.image_url or "",
         "product_count": shop.products.count(),

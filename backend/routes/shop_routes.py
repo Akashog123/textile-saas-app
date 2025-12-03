@@ -1,6 +1,7 @@
 import os
 import hashlib
 import time
+import json
 import logging
 import pandas as pd
 from datetime import datetime, timedelta
@@ -9,7 +10,8 @@ from io import StringIO, BytesIO
 from utils.auth_utils import token_required, roles_required, check_shop_ownership
 from utils.validation import validate_file_upload
 from utils.performance_utils import performance_monitor
-from models.model import db, Product, Inventory, SalesData, Shop, User, SalesUploadLog
+from utils.csv_templates import validate_columns, SALES_COLUMNS
+from models.model import db, Product, Inventory, SalesData, Shop, User, SalesUploadLog, ShopImage, CachedAIInsight
 from config import Config
 from services.ai_service import (
     forecast_trends,
@@ -22,13 +24,15 @@ from services.sales_analytics_service import get_sales_analytics_service, invali
 shop_bp = Blueprint("shop", __name__)
 INSTANCE_FOLDER = Config.DATA_DIR
 
+# AI Insight Cache TTL (24 hours)
+AI_INSIGHT_TTL_HOURS = 24
 
 def _default_dashboard_data():
     return {
         "weekly_sales": "₹0",
         "pending_reorders": 0,
         "total_orders": 0,
-        "customer_rating": 4.0,
+        "customer_rating": 0.0,
         "trend_chart": [],
         "ai_insights": [],
         "forecast": [],
@@ -36,9 +40,24 @@ def _default_dashboard_data():
         "production_priorities": [],
         "top_selling": [],
         "underperforming": [],
-        "demand_summary": "No recent sales data available. Please upload weekly sales to unlock insights.",
-        "recommendation": "Upload the latest sales sheet to refresh AI recommendations."
+        "demand_summary": "No sales data recorded yet. Sales analytics will appear once you start recording sales.",
+        "recommendation": "Add products to your inventory and upload sales data to unlock AI-powered insights and recommendations."
     }
+
+
+def _invalidate_db_cache(shop_id):
+    """
+    Invalidate all cached insights and forecasts for a shop in the database.
+    This should be called whenever new sales data is uploaded.
+    """
+    try:
+        # Delete all cached insights for this shop
+        CachedAIInsight.query.filter_by(shop_id=shop_id).delete()
+        db.session.commit()
+        print(f"[Cache Invalidate] Cleared DB cache for shop_id={shop_id}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Cache Invalidate Error] Failed to clear DB cache for shop_id={shop_id}: {e}")
 
 
 def _load_sales_dataframe(path):
@@ -87,10 +106,22 @@ def shop_dashboard(current_user):
 
     df = _load_sales_dataframe(sales_path)
     if df is None:
+        # Check if shop has any products in inventory
+        # Note: Product is already imported at the top of the file
+        product_count = Product.query.filter_by(shop_id=shop_id, is_active=True).count()
+        
+        default_data = _default_dashboard_data()
+        default_data["customer_rating"] = actual_rating
+        
+        if product_count == 0:
+            info_message = "Welcome! Start by adding products to your inventory. Once you have products and sales, your dashboard analytics will appear here."
+        else:
+            info_message = f"You have {product_count} products in inventory. Upload sales data to see analytics, forecasts, and AI-powered recommendations."
+        
         return jsonify({
             "status": "success",
-            "data": _default_dashboard_data(),
-            "warning": "Sales data file missing or malformed. Please upload a valid weekly sales sheet."
+            "data": default_data,
+            "info": info_message
         }), 200
 
     try:
@@ -164,7 +195,7 @@ def shop_dashboard(current_user):
         
         for product, inventory in low_stock_products:
             # Get product's primary image URL from database
-            product_image_url = product.get_primary_image_url() if hasattr(product, 'get_primary_image_url') else None
+            product_image_url = product.get_primary_image_url(resolve=True) if hasattr(product, 'get_primary_image_url') else None
             
             product_info = {
                 "product_id": product.id,
@@ -215,7 +246,7 @@ def shop_dashboard(current_user):
         )
 
         # Generate Insights using helper
-        insights_data = _generate_insights(df)
+        insights_data = _generate_insights(df, shop_id=shop_id)
         
         return jsonify({
             "status": "success",
@@ -237,21 +268,66 @@ def shop_dashboard(current_user):
             }
         }), 200
 
-    except Exception as e:
-        print(f"[Dashboard Error] {e}")
+    except pd.errors.EmptyDataError:
+        # Empty CSV file - not an error, just no data
+        print(f"[Dashboard] Empty sales data for shop {shop_id}")
+        default_data = _default_dashboard_data()
+        default_data["customer_rating"] = actual_rating
         return jsonify({
             "status": "success",
-            "data": _default_dashboard_data(),
-            "warning": "Sales data could not be processed. Please verify the uploaded sheet."
+            "data": default_data,
+            "info": "No sales records found. Upload sales data to see analytics."
+        }), 200
+    except (KeyError, ValueError) as e:
+        # Data format issues
+        print(f"[Dashboard Data Error] {e}")
+        default_data = _default_dashboard_data()
+        default_data["customer_rating"] = actual_rating
+        return jsonify({
+            "status": "success",
+            "data": default_data,
+            "warning": "Sales data format issue detected. Please verify the uploaded sheet has required columns (date, revenue, quantity_sold)."
+        }), 200
+    except Exception as e:
+        # Unexpected errors - log but don't alarm user
+        print(f"[Dashboard Error] {e}")
+        import traceback
+        traceback.print_exc()
+        default_data = _default_dashboard_data()
+        default_data["customer_rating"] = actual_rating
+        return jsonify({
+            "status": "success",
+            "data": default_data
+            # No warning - don't show error to user for unexpected issues
         }), 200
 
-def _generate_insights(df):
-    """Helper to generate AI insights from sales dataframe
+def _generate_insights(df, shop_id=None, force_refresh=False):
+    """Helper to generate AI insights from sales dataframe.
     
-    IMPORTANT: This function checks for data sufficiency before calling
-    NVIDIA AI models to avoid unnecessary API calls.
+    Caches insights in DB to avoid redundant AI API calls.
+    Invalidated when new sales data is uploaded (force_refresh=True).
     """
     try:
+        # Check for cached insights first (unless force refresh requested)
+        if shop_id and not force_refresh:
+            try:
+                cached = CachedAIInsight.query.filter_by(
+                    shop_id=shop_id,
+                    insight_type='dashboard',
+                    is_stale=False
+                ).first()
+                
+                if cached and cached.expires_at and cached.expires_at > datetime.now():
+                    logging.info(f"[Insights] Using cached insights for shop {shop_id}")
+                    return {
+                        "ai_insights": json.loads(cached.insights_json) if cached.insights_json else [],
+                        "demand_summary": cached.demand_summary or "",
+                        "recommendation": cached.recommendation or "",
+                        "cached": True
+                    }
+            except Exception as cache_read_err:
+                logging.warning(f"[Insights] Cache read failed: {cache_read_err}")
+        
         # Early return if DataFrame is empty or too small
         if df is None or df.empty or len(df) < 3:
             logging.info("[Insights] Skipping AI generation - insufficient data rows")
@@ -332,11 +408,48 @@ def _generate_insights(df):
             }
         ]
         
-        return {
+        result = {
             "ai_insights": ai_insights,
             "demand_summary": demand_summary,
             "recommendation": recommendation
         }
+        
+        # Save to DB cache if shop_id provided (for future requests)
+        if shop_id:
+            try:
+                cached = CachedAIInsight.query.filter_by(
+                    shop_id=shop_id,
+                    insight_type='dashboard'
+                ).first()
+                
+                expires_at = datetime.now() + timedelta(hours=AI_INSIGHT_TTL_HOURS)
+                
+                if cached:
+                    cached.insights_json = json.dumps(ai_insights)
+                    cached.demand_summary = demand_summary
+                    cached.recommendation = recommendation
+                    cached.is_stale = False
+                    cached.expires_at = expires_at
+                    cached.updated_at = datetime.now()
+                else:
+                    cached = CachedAIInsight(
+                        shop_id=shop_id,
+                        insight_type='dashboard',
+                        insights_json=json.dumps(ai_insights),
+                        demand_summary=demand_summary,
+                        recommendation=recommendation,
+                        is_stale=False,
+                        expires_at=expires_at
+                    )
+                    db.session.add(cached)
+                
+                db.session.commit()
+                logging.info(f"[Insights] Cached insights for shop {shop_id}")
+            except Exception as cache_err:
+                db.session.rollback()
+                logging.warning(f"[Insights] Failed to cache (non-blocking): {cache_err}")
+        
+        return result
         
     except Exception as e:
         print(f"[Insight Generation Error] {e}")
@@ -417,12 +530,16 @@ def upload_sales_data(current_user):
             df = pd.read_excel(buffer)
 
         # Normalize columns to lowercase
-        df.columns = [c.lower() for c in df.columns]
+        df.columns = [c.lower().strip() for c in df.columns]
         
-        # Required columns for sales data
-        required_cols = {"date", "sku", "product_name", "category", "quantity_sold", "selling_price"}
-        if not required_cols.issubset(set(df.columns)):
-            return jsonify({"status": "error", "message": f"File must contain columns: {', '.join(required_cols)}"}), 400
+        # Validate columns using centralized template
+        is_valid, missing, message = validate_columns(df.columns.tolist(), "sales")
+        if not is_valid:
+            return jsonify({
+                "status": "error", 
+                "message": message,
+                "hint": "Download the template from GET /api/v1/inventory/template/sales"
+            }), 400
 
         # Calculate revenue for insights
         df["quantity_sold"] = pd.to_numeric(df["quantity_sold"], errors="coerce").fillna(0)
@@ -471,7 +588,7 @@ def upload_sales_data(current_user):
                         shop_id=shop_id,
                         quantity_sold=quantity_sold,
                         revenue=float(row.get("revenue", 0)),
-                        fabric_type=row.get("fabric_type"),
+                        fabric_type=row.get("category") or row.get("fabric_type"),
                         region=row.get("region")
                     )
                     db.session.add(sales_entry)
@@ -503,8 +620,12 @@ def upload_sales_data(current_user):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         df.to_csv(save_path, index=False)
         
-        # Generate AI Insights immediately
-        insights_data = _generate_insights(df)
+        # Invalidate ALL caches for this shop (insights, forecasts, analytics)
+        invalidate_shop_cache(shop_id)
+        _invalidate_db_cache(shop_id)
+        
+        # Generate fresh AI Insights (force_refresh=True to bypass cache)
+        insights_data = _generate_insights(df, shop_id=shop_id, force_refresh=True)
 
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         log_entry.rows_processed = len(df)
@@ -515,9 +636,6 @@ def upload_sales_data(current_user):
         log_entry.sla_breached = duration_ms > SalesUploadLog.SLA_LIMIT_MS
         
         db.session.commit()
-        
-        # Invalidate cache after new data upload so next requests get fresh data
-        invalidate_shop_cache(shop_id)
         
         print(f"[Sales Upload] Processed {len(stock_updates)} stock updates for shop {shop_id}")
         
@@ -875,7 +993,7 @@ def _serialize_shop(s: Shop):
         "longitude": float(s.lon) if s.lon is not None else None,
         "image": getattr(s, "image_url", None) or None,
         "created_at": s.created_at.isoformat() if getattr(s, "created_at", None) else None,
-        "rating": round(s.rating or 4.0, 1),
+        "rating": round(s.rating or 0.0, 1),
     }
 
 # GET: Owner's Shops
@@ -1062,3 +1180,304 @@ def delete_my_shop(current_user, shop_id):
         logging.exception("Error deleting shop")
         db.session.rollback()
         return jsonify({"status": "error", "message": "Failed to delete shop"}), 500
+
+
+# ============================================================================
+# SHOP IMAGE MANAGEMENT ENDPOINTS
+# ============================================================================
+
+MAX_SHOP_IMAGES = 4
+SHOP_IMAGES_FOLDER = os.path.join(Config.UPLOAD_FOLDER, "shop_images")
+os.makedirs(SHOP_IMAGES_FOLDER, exist_ok=True)
+
+
+def _get_shop_images(shop_id):
+    """Get all images for a shop ordered by ordering field."""
+    from models.model import ShopImage
+    images = ShopImage.query.filter_by(shop_id=shop_id).order_by(ShopImage.ordering).all()
+    return [img.to_dict() for img in images]
+
+
+# GET: List all images for a shop
+@shop_bp.route("/<int:shop_id>/images", methods=["GET"])
+def get_shop_images(shop_id):
+    """Get all images for a specific shop (public endpoint)."""
+    try:
+        shop = Shop.query.get(shop_id)
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+        
+        images = _get_shop_images(shop_id)
+        return jsonify({
+            "status": "success",
+            "shop_id": shop_id,
+            "images": images,
+            "max_images": MAX_SHOP_IMAGES,
+            "can_upload_more": len(images) < MAX_SHOP_IMAGES
+        }), 200
+    except Exception as e:
+        logging.exception("Error fetching shop images")
+        return jsonify({"status": "error", "message": "Failed to fetch images"}), 500
+
+
+# POST: Upload images for a shop (up to 4)
+@shop_bp.route("/<int:shop_id>/images", methods=["POST"])
+@token_required
+@roles_required('shop_owner', 'shop_manager', 'admin')
+def upload_shop_images(current_user, shop_id):
+    """
+    Upload images for a shop. Maximum 4 images allowed per shop.
+    Accepts multipart form data with 'images' field (multiple files).
+    """
+    from models.model import ShopImage
+    from werkzeug.utils import secure_filename
+    import uuid
+    
+    try:
+        # Validate shop exists and user owns it
+        shop = Shop.query.get(shop_id)
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+        
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Not authorized to manage this shop"}), 403
+        
+        # Check existing image count
+        existing_count = ShopImage.query.filter_by(shop_id=shop_id).count()
+        
+        # Get uploaded files
+        files = request.files.getlist("images")
+        if not files or all(f.filename == '' for f in files):
+            return jsonify({"status": "error", "message": "No images provided"}), 400
+        
+        # Filter out empty files
+        files = [f for f in files if f.filename != '']
+        
+        # Check if adding these would exceed limit
+        if existing_count + len(files) > MAX_SHOP_IMAGES:
+            remaining = MAX_SHOP_IMAGES - existing_count
+            return jsonify({
+                "status": "error",
+                "message": f"Cannot upload {len(files)} images. Only {remaining} slot(s) remaining (max {MAX_SHOP_IMAGES}).",
+                "existing_count": existing_count,
+                "max_images": MAX_SHOP_IMAGES,
+                "remaining_slots": remaining
+            }), 400
+        
+        # Allowed image extensions
+        allowed_exts = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+        uploaded_images = []
+        
+        # Get next ordering value
+        max_order = db.session.query(db.func.max(ShopImage.ordering)).filter_by(shop_id=shop_id).scalar() or -1
+        
+        for idx, file in enumerate(files):
+            # Validate file extension
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext not in allowed_exts:
+                continue  # Skip invalid files
+            
+            # Validate file (check size, type)
+            is_valid, message = validate_file_upload(file, allowed_exts, max_size_mb=5)
+            if not is_valid:
+                continue  # Skip invalid files
+            
+            # Generate unique filename
+            unique_id = uuid.uuid4().hex[:8]
+            safe_name = secure_filename(file.filename)
+            filename = f"shop_{shop_id}_{unique_id}_{safe_name}"
+            filepath = os.path.join(SHOP_IMAGES_FOLDER, filename)
+            
+            # Save file
+            file.seek(0)  # Reset file pointer after validation
+            file.save(filepath)
+            
+            # Create database record
+            shop_image = ShopImage(
+                shop_id=shop_id,
+                url=f"/uploads/shop_images/{filename}",
+                alt=f"{shop.name} image {max_order + idx + 2}",
+                ordering=max_order + idx + 1
+            )
+            db.session.add(shop_image)
+            uploaded_images.append(shop_image)
+        
+        if not uploaded_images:
+            return jsonify({"status": "error", "message": "No valid images uploaded"}), 400
+        
+        db.session.commit()
+        
+        # Return updated image list
+        all_images = _get_shop_images(shop_id)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Successfully uploaded {len(uploaded_images)} image(s)",
+            "uploaded_count": len(uploaded_images),
+            "images": all_images,
+            "remaining_slots": MAX_SHOP_IMAGES - len(all_images)
+        }), 201
+        
+    except Exception as e:
+        logging.exception("Error uploading shop images")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to upload images"}), 500
+
+
+# DELETE: Delete a specific shop image
+@shop_bp.route("/<int:shop_id>/images/<int:image_id>", methods=["DELETE"])
+@token_required
+@roles_required('shop_owner', 'shop_manager', 'admin')
+def delete_shop_image(current_user, shop_id, image_id):
+    """Delete a specific image from a shop."""
+    from models.model import ShopImage
+    
+    try:
+        # Validate shop and ownership
+        shop = Shop.query.get(shop_id)
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+        
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Not authorized to manage this shop"}), 403
+        
+        # Find the image
+        image = ShopImage.query.filter_by(id=image_id, shop_id=shop_id).first()
+        if not image:
+            return jsonify({"status": "error", "message": "Image not found"}), 404
+        
+        # Delete physical file if it exists
+        if image.url.startswith("/uploads/"):
+            filepath = os.path.join(Config.BASE_DIR, image.url.lstrip("/"))
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception as e:
+                    logging.warning(f"Could not delete image file: {e}")
+        
+        # Delete database record
+        db.session.delete(image)
+        db.session.commit()
+        
+        # Re-order remaining images
+        remaining = ShopImage.query.filter_by(shop_id=shop_id).order_by(ShopImage.ordering).all()
+        for idx, img in enumerate(remaining):
+            img.ordering = idx
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Image deleted successfully",
+            "images": _get_shop_images(shop_id),
+            "remaining_slots": MAX_SHOP_IMAGES - len(remaining)
+        }), 200
+        
+    except Exception as e:
+        logging.exception("Error deleting shop image")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to delete image"}), 500
+
+
+# PUT: Reorder shop images
+@shop_bp.route("/<int:shop_id>/images/reorder", methods=["PUT"])
+@token_required
+@roles_required('shop_owner', 'shop_manager', 'admin')
+def reorder_shop_images(current_user, shop_id):
+    """
+    Reorder shop images. 
+    Expects JSON body: { "image_ids": [3, 1, 2, 4] } where order in array = display order
+    """
+    from models.model import ShopImage
+    
+    try:
+        # Validate shop and ownership
+        shop = Shop.query.get(shop_id)
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+        
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Not authorized to manage this shop"}), 403
+        
+        data = request.get_json()
+        if not data or "image_ids" not in data:
+            return jsonify({"status": "error", "message": "image_ids array required"}), 400
+        
+        image_ids = data["image_ids"]
+        if not isinstance(image_ids, list):
+            return jsonify({"status": "error", "message": "image_ids must be an array"}), 400
+        
+        # Verify all image IDs belong to this shop
+        shop_images = ShopImage.query.filter_by(shop_id=shop_id).all()
+        shop_image_ids = {img.id for img in shop_images}
+        
+        if set(image_ids) != shop_image_ids:
+            return jsonify({"status": "error", "message": "Invalid image IDs provided"}), 400
+        
+        # Update ordering
+        for idx, img_id in enumerate(image_ids):
+            img = ShopImage.query.get(img_id)
+            if img:
+                img.ordering = idx
+        
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Images reordered successfully",
+            "images": _get_shop_images(shop_id)
+        }), 200
+        
+    except Exception as e:
+        logging.exception("Error reordering shop images")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to reorder images"}), 500
+
+
+# PUT: Set primary/cover image
+@shop_bp.route("/<int:shop_id>/images/<int:image_id>/set-primary", methods=["PUT"])
+@token_required
+@roles_required('shop_owner', 'shop_manager', 'admin')
+def set_primary_shop_image(current_user, shop_id, image_id):
+    """Set a shop image as the primary/cover image (moves it to position 0)."""
+    from models.model import ShopImage
+    
+    try:
+        # Validate shop and ownership
+        shop = Shop.query.get(shop_id)
+        if not shop:
+            return jsonify({"status": "error", "message": "Shop not found"}), 404
+        
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "Not authorized to manage this shop"}), 403
+        
+        # Find the image
+        image = ShopImage.query.filter_by(id=image_id, shop_id=shop_id).first()
+        if not image:
+            return jsonify({"status": "error", "message": "Image not found"}), 404
+        
+        # Get all images and reorder
+        all_images = ShopImage.query.filter_by(shop_id=shop_id).order_by(ShopImage.ordering).all()
+        
+        # Set the selected image to order 0, shift others
+        for img in all_images:
+            if img.id == image_id:
+                img.ordering = 0
+            elif img.ordering < image.ordering:
+                img.ordering += 1
+        
+        # Also update the shop's main image_url to this image
+        shop.image_url = image.url
+        
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Primary image updated",
+            "images": _get_shop_images(shop_id),
+            "primary_image_url": image.url
+        }), 200
+        
+    except Exception as e:
+        logging.exception("Error setting primary shop image")
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to set primary image"}), 500

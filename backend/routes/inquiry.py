@@ -3,10 +3,9 @@ import json
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from models.model import db, Shop, User, Notification, Inquiry, InquiryRecipient
+from models.model import db, Shop, User, Notification, Inquiry, InquiryRecipient, InquiryMessage
 from utils.auth_utils import token_required
 from utils.validation import validate_file_upload
-from services.ai_service import generate_ai_caption, analyze_fabric_inquiry
 
 inquiry_bp = Blueprint("inquiry", __name__, url_prefix="/api/v1/inquiry")
 
@@ -197,5 +196,410 @@ def inquiry_history(current_user):
         return jsonify({
             "status": "error",
             "message": "Failed to fetch inquiry history",
+            "error": str(e)
+        }), 500
+
+
+# ============================================================================
+# CHAT / CONVERSATION ENDPOINTS
+# ============================================================================
+
+@inquiry_bp.route("/conversations", methods=["GET"])
+@token_required
+def get_conversations(current_user):
+    """
+    Get all conversation threads for the current user.
+    For shop owners: conversations they started with distributors.
+    For distributors: conversations from shop owners.
+    """
+    try:
+        user_id = current_user.get("id")
+        role = current_user.get("role", "").lower()
+        conversations = []
+
+        if role in ["shop_owner", "shop_manager"]:
+            # Get all inquiries sent by this user, grouped by recipient
+            inquiries = Inquiry.query.filter_by(sender_id=user_id).order_by(Inquiry.created_at.desc()).all()
+            
+            for inquiry in inquiries:
+                for recipient in inquiry.recipients:
+                    # Count unread messages (messages from distributor that shop owner hasn't read)
+                    unread_count = InquiryMessage.query.filter(
+                        InquiryMessage.inquiry_recipient_id == recipient.id,
+                        InquiryMessage.sender_id != user_id,
+                        InquiryMessage.is_read == False
+                    ).count()
+                    
+                    # Get last message
+                    last_message = InquiryMessage.query.filter_by(
+                        inquiry_recipient_id=recipient.id
+                    ).order_by(InquiryMessage.created_at.desc()).first()
+                    
+                    conversations.append({
+                        "id": recipient.id,
+                        "inquiry_id": inquiry.id,
+                        "contact_id": recipient.recipient_id,
+                        "contact_name": recipient.recipient.full_name if recipient.recipient else "Unknown",
+                        "contact_role": "distributor",
+                        "initial_message": inquiry.message,
+                        "initial_image": inquiry.image_url,
+                        "unread_count": unread_count,
+                        "last_message": last_message.message if last_message else inquiry.message,
+                        "last_message_time": (last_message.created_at.isoformat() if last_message 
+                                              else inquiry.created_at.isoformat()),
+                        "status": recipient.status,
+                        "created_at": inquiry.created_at.isoformat()
+                    })
+
+        elif role == "distributor":
+            # Get all inquiry recipients for this distributor
+            recipients = InquiryRecipient.query.filter_by(recipient_id=user_id)\
+                .order_by(InquiryRecipient.created_at.desc()).all()
+            
+            for recipient in recipients:
+                inquiry = recipient.inquiry
+                sender = inquiry.sender
+                shop = sender.shops.first() if sender else None
+                
+                # Count unread messages (messages from shop owner that distributor hasn't read)
+                unread_count = InquiryMessage.query.filter(
+                    InquiryMessage.inquiry_recipient_id == recipient.id,
+                    InquiryMessage.sender_id != user_id,
+                    InquiryMessage.is_read == False
+                ).count()
+                
+                # Also count initial inquiry as unread if not yet viewed
+                if recipient.status == "pending":
+                    unread_count += 1
+                
+                # Get last message
+                last_message = InquiryMessage.query.filter_by(
+                    inquiry_recipient_id=recipient.id
+                ).order_by(InquiryMessage.created_at.desc()).first()
+                
+                conversations.append({
+                    "id": recipient.id,
+                    "inquiry_id": inquiry.id,
+                    "contact_id": sender.id if sender else None,
+                    "contact_name": sender.full_name if sender else "Unknown",
+                    "shop_name": shop.name if shop else "Unknown Shop",
+                    "contact_role": "shop_owner",
+                    "initial_message": inquiry.message,
+                    "initial_image": inquiry.image_url,
+                    "unread_count": unread_count,
+                    "last_message": last_message.message if last_message else inquiry.message,
+                    "last_message_time": (last_message.created_at.isoformat() if last_message 
+                                          else inquiry.created_at.isoformat()),
+                    "status": recipient.status,
+                    "created_at": inquiry.created_at.isoformat()
+                })
+
+        # Sort by last message time
+        conversations.sort(key=lambda x: x["last_message_time"], reverse=True)
+
+        return jsonify({
+            "status": "success",
+            "count": len(conversations),
+            "conversations": conversations
+        }), 200
+
+    except Exception as e:
+        print("Get conversations error:", e)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to fetch conversations",
+            "error": str(e)
+        }), 500
+
+
+@inquiry_bp.route("/conversation/<int:conversation_id>/messages", methods=["GET"])
+@token_required
+def get_conversation_messages(current_user, conversation_id):
+    """
+    Get all messages for a specific conversation thread.
+    Includes the initial inquiry message as the first message.
+    """
+    try:
+        user_id = current_user.get("id")
+        role = current_user.get("role", "").lower()
+        
+        # Get the inquiry recipient (conversation thread)
+        recipient = InquiryRecipient.query.get(conversation_id)
+        if not recipient:
+            return jsonify({"status": "error", "message": "Conversation not found"}), 404
+        
+        inquiry = recipient.inquiry
+        
+        # Verify user has access to this conversation
+        is_shop_owner = inquiry.sender_id == user_id
+        is_distributor = recipient.recipient_id == user_id
+        
+        if not (is_shop_owner or is_distributor):
+            return jsonify({"status": "error", "message": "Access denied"}), 403
+        
+        # Mark conversation as read for distributor (first view)
+        if is_distributor and recipient.status == "pending":
+            recipient.status = "read"
+            recipient.read_at = datetime.utcnow()
+            db.session.commit()
+        
+        # Mark all messages from the other party as read
+        InquiryMessage.query.filter(
+            InquiryMessage.inquiry_recipient_id == conversation_id,
+            InquiryMessage.sender_id != user_id,
+            InquiryMessage.is_read == False
+        ).update({
+            "is_read": True,
+            "read_at": datetime.utcnow()
+        })
+        db.session.commit()
+        
+        # Build messages list starting with initial inquiry
+        messages = [{
+            "id": f"inquiry_{inquiry.id}",
+            "sender_id": inquiry.sender_id,
+            "sender_name": inquiry.sender.full_name if inquiry.sender else "Unknown",
+            "sender_role": inquiry.sender.role if inquiry.sender else "unknown",
+            "message": inquiry.message,
+            "image_url": inquiry.image_url,
+            "is_read": True,  # Initial message is always considered read
+            "read_at": recipient.read_at.isoformat() if recipient.read_at else None,
+            "created_at": inquiry.created_at.isoformat(),
+            "is_initial": True
+        }]
+        
+        # Get all chat messages
+        chat_messages = InquiryMessage.query.filter_by(
+            inquiry_recipient_id=conversation_id
+        ).order_by(InquiryMessage.created_at.asc()).all()
+        
+        for msg in chat_messages:
+            messages.append(msg.to_chat_dict())
+        
+        # Get contact info
+        if is_shop_owner:
+            contact = recipient.recipient
+            contact_info = {
+                "id": contact.id,
+                "name": contact.full_name,
+                "email": contact.email,
+                "role": "distributor"
+            }
+        else:
+            contact = inquiry.sender
+            shop = contact.shops.first() if contact else None
+            contact_info = {
+                "id": contact.id if contact else None,
+                "name": contact.full_name if contact else "Unknown",
+                "email": contact.email if contact else None,
+                "role": "shop_owner",
+                "shop_name": shop.name if shop else "Unknown Shop"
+            }
+        
+        return jsonify({
+            "status": "success",
+            "conversation_id": conversation_id,
+            "inquiry_id": inquiry.id,
+            "contact": contact_info,
+            "messages": messages,
+            "conversation_status": recipient.status
+        }), 200
+
+    except Exception as e:
+        print("Get conversation messages error:", e)
+        db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "message": "Failed to fetch messages",
+            "error": str(e)
+        }), 500
+
+
+@inquiry_bp.route("/conversation/<int:conversation_id>/send", methods=["POST"])
+@token_required
+def send_message(current_user, conversation_id):
+    """
+    Send a new message in a conversation thread.
+    Supports text message and optional image attachment.
+    """
+    try:
+        user_id = current_user.get("id")
+        
+        # Get the inquiry recipient (conversation thread)
+        recipient = InquiryRecipient.query.get(conversation_id)
+        if not recipient:
+            return jsonify({"status": "error", "message": "Conversation not found"}), 404
+        
+        inquiry = recipient.inquiry
+        
+        # Verify user has access to this conversation
+        is_shop_owner = inquiry.sender_id == user_id
+        is_distributor = recipient.recipient_id == user_id
+        
+        if not (is_shop_owner or is_distributor):
+            return jsonify({"status": "error", "message": "Access denied"}), 403
+        
+        # Get message data
+        data = request.form or request.get_json(silent=True) or {}
+        message_text = data.get("message", "").strip()
+        
+        if not message_text:
+            return jsonify({"status": "error", "message": "Message cannot be empty"}), 400
+        
+        # Handle image upload
+        file_path = None
+        file = request.files.get("image")
+        if file:
+            is_valid, file_message = validate_file_upload(file, ['.png', '.jpg', '.jpeg', '.gif'], max_size_mb=10)
+            if not is_valid:
+                return jsonify({"status": "error", "message": file_message}), 400
+            file_path = save_inquiry_file(file)
+        
+        # Create the message
+        new_message = InquiryMessage(
+            inquiry_recipient_id=conversation_id,
+            sender_id=user_id,
+            message=message_text,
+            image_url=file_path.replace("\\", "/") if file_path else None
+        )
+        db.session.add(new_message)
+        
+        # Update recipient status to 'replied' if this is a distributor responding
+        if is_distributor and recipient.status != "replied":
+            recipient.status = "replied"
+        
+        # Create notification for the other party
+        if is_shop_owner:
+            # Notify distributor
+            notification_user_id = recipient.recipient_id
+            notification_message = f"New message from {current_user.get('username')}"
+        else:
+            # Notify shop owner
+            notification_user_id = inquiry.sender_id
+            notification_message = f"Reply from distributor {current_user.get('username')}"
+        
+        notification = Notification(
+            user_id=notification_user_id,
+            message=notification_message,
+            link=f"/inquiries/chat/{conversation_id}",
+            is_read=False
+        )
+        db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Message sent successfully",
+            "data": new_message.to_chat_dict()
+        }), 201
+
+    except Exception as e:
+        print("Send message error:", e)
+        db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "message": "Failed to send message",
+            "error": str(e)
+        }), 500
+
+
+@inquiry_bp.route("/conversation/<int:conversation_id>/mark-read", methods=["PUT"])
+@token_required
+def mark_conversation_read(current_user, conversation_id):
+    """Mark all messages in a conversation as read for the current user."""
+    try:
+        user_id = current_user.get("id")
+        
+        # Get the inquiry recipient (conversation thread)
+        recipient = InquiryRecipient.query.get(conversation_id)
+        if not recipient:
+            return jsonify({"status": "error", "message": "Conversation not found"}), 404
+        
+        inquiry = recipient.inquiry
+        
+        # Verify user has access
+        is_shop_owner = inquiry.sender_id == user_id
+        is_distributor = recipient.recipient_id == user_id
+        
+        if not (is_shop_owner or is_distributor):
+            return jsonify({"status": "error", "message": "Access denied"}), 403
+        
+        # Mark all messages from the other party as read
+        updated = InquiryMessage.query.filter(
+            InquiryMessage.inquiry_recipient_id == conversation_id,
+            InquiryMessage.sender_id != user_id,
+            InquiryMessage.is_read == False
+        ).update({
+            "is_read": True,
+            "read_at": datetime.utcnow()
+        })
+        
+        # Update recipient status if distributor first viewing
+        if is_distributor and recipient.status == "pending":
+            recipient.status = "read"
+            recipient.read_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Marked {updated} messages as read"
+        }), 200
+
+    except Exception as e:
+        print("Mark read error:", e)
+        db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "message": "Failed to mark messages as read",
+            "error": str(e)
+        }), 500
+
+
+@inquiry_bp.route("/unread-count", methods=["GET"])
+@token_required
+def get_unread_count(current_user):
+    """Get total unread message count for the current user."""
+    try:
+        user_id = current_user.get("id")
+        role = current_user.get("role", "").lower()
+        total_unread = 0
+
+        if role in ["shop_owner", "shop_manager"]:
+            # Count unread messages in conversations where user is the shop owner
+            inquiries = Inquiry.query.filter_by(sender_id=user_id).all()
+            for inquiry in inquiries:
+                for recipient in inquiry.recipients:
+                    total_unread += InquiryMessage.query.filter(
+                        InquiryMessage.inquiry_recipient_id == recipient.id,
+                        InquiryMessage.sender_id != user_id,
+                        InquiryMessage.is_read == False
+                    ).count()
+
+        elif role == "distributor":
+            # Count unread messages and pending inquiries
+            recipients = InquiryRecipient.query.filter_by(recipient_id=user_id).all()
+            for recipient in recipients:
+                # Count unread chat messages
+                total_unread += InquiryMessage.query.filter(
+                    InquiryMessage.inquiry_recipient_id == recipient.id,
+                    InquiryMessage.sender_id != user_id,
+                    InquiryMessage.is_read == False
+                ).count()
+                # Count pending initial inquiries
+                if recipient.status == "pending":
+                    total_unread += 1
+
+        return jsonify({
+            "status": "success",
+            "unread_count": total_unread
+        }), 200
+
+    except Exception as e:
+        print("Unread count error:", e)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to get unread count",
             "error": str(e)
         }), 500
