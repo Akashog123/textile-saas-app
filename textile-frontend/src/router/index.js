@@ -104,6 +104,20 @@ const routes = [
         meta: { title: "Shops - Customer Portal" }
       },
       {
+        path: "shops/:shopId",
+        name: "CustomerShopDetail",
+        component: () => import("@/views/customer/CustomerShopDetail.vue"),
+        meta: { title: "Shop Details - Customer Portal" },
+        props: true
+      },
+      {
+        path: "products/:productId",
+        name: "CustomerProductDetail",
+        component: () => import("@/views/customer/CustomerProductDetail.vue"),
+        meta: { title: "Product Details - Customer Portal" },
+        props: true
+      },
+      {
         path: "profile",
         name: "CustomerProfile",
         component: () => import("@/views/customer/CustomerProfile.vue"),
@@ -137,6 +151,12 @@ const routes = [
         name: "RegionalDemandDistributor",
         component: () => import("@/views/distributor/RegionalDemand.vue"),
         meta: { title: "Regional Demand - Distributor" }
+      },
+      {
+        path: "inquiries",
+        name: "DistributorInquiries",
+        component: () => import("@/views/distributor/DistributorInquiries.vue"),
+        meta: { title: "Shop Inquiries - Distributor" }
       },
     ],
   },

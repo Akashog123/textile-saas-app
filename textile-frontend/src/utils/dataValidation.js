@@ -42,19 +42,33 @@ export const validateShopData = (shop) => {
     return createFallbackShop();
   }
 
+  // Get the best available image
+  const imageUrl = shop.image_url || 
+    shop.image || 
+    `https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop&q=80`;
+
+  // Build location string
+  const location = shop.location || 
+    (shop.address ? `${shop.address}${shop.city ? ', ' + shop.city : ''}` : shop.city || 'Location not available');
+
   return {
     id: validateId(shop.id),
     name: validateString(shop.name, 'Unknown Shop'),
-    description: validateString(shop.description, 'Quality textile shop'),
+    description: validateString(shop.description, 'Quality textile shop with a wide selection of fabrics'),
     address: validateString(shop.address, 'Address not available'),
     contact: validateString(shop.contact, 'Contact not available'),
     hours: validateString(shop.hours, 'Open during business hours'),
     rating: validateRating(shop.rating),
-    location: validateString(shop.location, shop.address || 'Location not available'),
+    location: location,
     city: validateString(shop.city, 'Unknown'),
-    image: validateString(shop.image_url || shop.image, `https://placehold.co/800x600?text=${encodeURIComponent(shop.name || 'Shop')}`),
+    state: validateString(shop.state, ''),
+    image: imageUrl,
     lat: validateCoordinate(shop.lat || shop.latitude),
-    lng: validateCoordinate(shop.lng || shop.longitude),
+    lng: validateCoordinate(shop.lon || shop.lng || shop.longitude),
+    is_popular: Boolean(shop.is_popular),
+    product_count: shop.product_count || 0,
+    review_count: shop.review_count || 0,
+    categories: Array.isArray(shop.categories) ? shop.categories : [],
     products: Array.isArray(shop.products) ? shop.products.map(validateProductData) : []
   };
 };
@@ -69,17 +83,40 @@ export const validateFabricData = (fabric) => {
     return createFallbackFabric();
   }
 
+  // Determine badge based on fabric properties
+  let badge = 'Trending';
+  if (fabric.is_trending) badge = 'Trending';
+  else if (fabric.badge) badge = fabric.badge;
+  else if (fabric.category) badge = fabric.category;
+
+  // Get the best available image
+  const imageUrl = fabric.image || 
+    fabric.image_url || 
+    (fabric.images && fabric.images.length > 0 ? fabric.images[0].url : null) ||
+    `https://images.unsplash.com/photo-1558171813-4c088753af8f?w=800&h=600&fit=crop&q=80`;
+
+  // Format price - use price_formatted if available, otherwise format the price
+  let priceDisplay = 'Price on request';
+  if (fabric.price_formatted) {
+    priceDisplay = fabric.price_formatted;
+  } else if (fabric.price && !isNaN(fabric.price)) {
+    priceDisplay = `₹${Number(fabric.price).toLocaleString('en-IN')}`;
+  }
+
   return {
     id: validateId(fabric.id),
     name: validateString(fabric.name, 'Unknown Fabric'),
-    price: validatePrice(fabric.price),
-    description: validateString(fabric.description, fabric.ai_caption || 'No description available'),
+    price: priceDisplay,
+    description: validateString(fabric.description || fabric.ai_caption, 'Premium quality fabric with excellent finish and durability.'),
     category: validateString(fabric.category, 'General'),
     rating: validateRating(fabric.rating),
-    badge: validateString(fabric.badge, 'Trending'),
-    seller: validateString(fabric.seller, 'Independent Seller'),
-    image: validateString(fabric.image, `https://placehold.co/800x600?text=${encodeURIComponent(fabric.name || 'Fabric')}`),
-    ai_caption: validateString(fabric.ai_caption, fabric.description || 'No description available')
+    badge: badge,
+    seller: validateString(fabric.shop_name || fabric.seller, 'Local Shop'),
+    image: imageUrl,
+    ai_caption: validateString(fabric.ai_caption, fabric.description || 'Quality fabric'),
+    shop_id: validateId(fabric.shop_id),
+    shop_name: validateString(fabric.shop_name, 'Local Shop'),
+    is_trending: Boolean(fabric.is_trending)
   };
 };
 

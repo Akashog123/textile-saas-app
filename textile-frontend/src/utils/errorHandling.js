@@ -230,7 +230,7 @@ export const clearErrorLogs = () => {
  * @param {string} type - Type of notification ('error', 'warning', 'info')
  * @param {number} duration - Duration in ms to show notification
  */
-export const showErrorNotification = (message, type = 'error', duration = 5000) => {
+export const showNotification = (message, type = 'info', duration = 5000) => {
   // Create notification element if it doesn't exist
   let notification = document.getElementById('error-notification');
   if (!notification) {
@@ -274,6 +274,54 @@ export const showErrorNotification = (message, type = 'error', duration = 5000) 
   }, duration);
 };
 
+/**
+ * Show error notification (wrapper around showNotification)
+ */
+export const showErrorNotification = (message, duration = 5000) => {
+  showNotification(message, 'error', duration);
+};
+
+/**
+ * Show success notification (wrapper around showNotification)
+ */
+export const showSuccessNotification = (message, duration = 5000) => {
+  const colors = {
+    success: 'linear-gradient(135deg, #48bb78, #38a169)'
+  };
+  
+  let notification = document.getElementById('success-notification');
+  if (!notification) {
+    notification = document.createElement('div');
+    notification.id = 'success-notification';
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      max-width: 400px;
+      padding: 15px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    `;
+    document.body.appendChild(notification);
+  }
+  
+  notification.style.background = colors.success;
+  notification.textContent = message;
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(0)';
+  }, 100);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+  }, duration);
+};
+
 export default {
   handleApiError,
   handleDataError,
@@ -282,5 +330,7 @@ export default {
   logError,
   getErrorLogs,
   clearErrorLogs,
-  showErrorNotification
+  showNotification,
+  showErrorNotification,
+  showSuccessNotification
 };

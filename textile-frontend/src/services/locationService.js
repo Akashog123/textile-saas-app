@@ -1,6 +1,6 @@
 /**
- * MapmyIndia Service
- * Handles geolocation and nearby shop search using MapmyIndia API
+ * Location Service
+ * Handles geolocation and nearby shop search functionality
  */
 
 import axios from 'axios';
@@ -55,7 +55,7 @@ export const getUserLocation = () => {
 };
 
 /**
- * Search for nearby shops using MapmyIndia API via our backend proxy
+ * Search for nearby shops using backend API
  * @param {number} latitude - User's latitude
  * @param {number} longitude - User's longitude
  * @param {number} radius - Search radius in meters (default: 5000)

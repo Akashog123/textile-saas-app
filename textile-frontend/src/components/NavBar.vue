@@ -37,7 +37,7 @@
               <!-- Customer Navigation -->
               <template v-if="user.role === 'customer'">
                 <li class="nav-item">
-                  <router-link to="/customer" class="nav-link">
+                  <router-link to="/customer" class="nav-link" exact-active-class="router-link-exact-active">
                     <span class="nav-icon"><i class="bi bi-house-door"></i></span>
                     <span class="nav-text">Home</span>
                   </router-link>
@@ -98,9 +98,15 @@
               <!-- Distributor Navigation -->
               <template v-if="user.role === 'distributor' || user.role === 'manufacturer'">
                 <li class="nav-item">
-                  <router-link to="/distributor" class="nav-link">
+                  <router-link to="/distributor" class="nav-link" exact-active-class="router-link-exact-active">
                     <span class="nav-icon"><i class="bi bi-house-door"></i></span>
                     <span class="nav-text">Home</span>
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/distributor/inquiries" class="nav-link">
+                    <span class="nav-icon"><i class="bi bi-chat-dots"></i></span>
+                    <span class="nav-text">Inquiries</span>
                   </router-link>
                 </li>
                 <li class="nav-item">
@@ -273,7 +279,7 @@ const userRole = computed(() => props.user?.role || '')
 }
 
 .nav-link:hover .nav-icon,
-.nav-link.router-link-active .nav-icon {
+.nav-link.router-link-exact-active .nav-icon {
   transform: translateY(-2px);
 }
 
@@ -296,7 +302,7 @@ const userRole = computed(() => props.user?.role || '')
   opacity: 0;
 }
 
-.nav-link.router-link-active::after {
+.nav-link.router-link-exact-active::after {
   width: 40%;
   opacity: 1;
   bottom: 6px;
