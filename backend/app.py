@@ -1,3 +1,4 @@
+#app.py
 import os
 import sys
 from flask import Flask, jsonify, send_from_directory
@@ -5,6 +6,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from models.model import db
 from config import Config
+from flask_migrate import Migrate
 
 # Environment Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,6 +41,7 @@ from routes.pdf_service import pdf_bp
 from routes.catalog_routes import catalog_bp
 from routes.nearby_search import nearby_bp
 from routes.performance_routes import performance_bp 
+from routes.review_routes import reviews_bp
 
 # Flask Application Setup
 app = Flask(
@@ -58,7 +61,7 @@ CORS(
 
 # Initialize Extensions
 db.init_app(app)
-
+migrate = Migrate(app, db)
 # Security Headers Middleware
 @app.after_request
 def add_security_headers(response):
@@ -103,6 +106,7 @@ app.register_blueprint(pdf_bp, url_prefix="/api/v1/pdf")
 app.register_blueprint(catalog_bp, url_prefix="/api/v1/catalog")
 app.register_blueprint(nearby_bp)
 app.register_blueprint(performance_bp, url_prefix="/api/v1/performance")
+app.register_blueprint(reviews_bp, url_prefix="/api/v1") 
 
 # Utility Routes
 @app.route("/uploads/<path:filename>")
