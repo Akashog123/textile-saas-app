@@ -351,6 +351,53 @@ class MarketingHistory(db.Model):
         return f"<MarketingHistory {self.file_name} ({self.content_type})>"
 
 
+class DistributorSupply(db.Model):
+    """Track which distributor supplies which products to which shops"""
+    __tablename__ = "distributor_supplies"
+
+    id = db.Column(db.Integer, primary_key=True)
+    distributor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
+    quantity_supplied = db.Column(db.Integer, default=0)
+    unit_price = db.Column(db.Numeric(10, 2))  # Price at which distributor supplied
+    total_value = db.Column(db.Numeric(12, 2))  # Total value of supply
+    supply_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    status = db.Column(db.String(50), default="completed")  # pending, completed, cancelled
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    distributor = db.relationship("User", backref=db.backref("supplies_made", lazy="dynamic"))
+    product = db.relationship("Product", backref=db.backref("supply_records", lazy="dynamic"))
+    shop = db.relationship("Shop", backref=db.backref("supplies_received", lazy="dynamic"))
+
+    # Composite index for common queries
+    __table_args__ = (
+        Index('idx_distributor_shop', 'distributor_id', 'shop_id'),
+        Index('idx_distributor_product', 'distributor_id', 'product_id'),
+    )
+
+    def __repr__(self):
+        return f"<DistributorSupply distributor={self.distributor_id} product={self.product_id} shop={self.shop_id}>"
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "distributor_id": self.distributor_id,
+            "product_id": self.product_id,
+            "shop_id": self.shop_id,
+            "quantity_supplied": self.quantity_supplied,
+            "unit_price": float(self.unit_price) if self.unit_price else None,
+            "total_value": float(self.total_value) if self.total_value else None,
+            "supply_date": self.supply_date.isoformat() if self.supply_date else None,
+            "status": self.status,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 # DB Setup
 def init_db(app):
     db.init_app(app)

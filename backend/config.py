@@ -50,7 +50,8 @@ class Config:
     AI_PROVIDER = os.getenv("AI_PROVIDER", "nvidia").lower()  # Default: NVIDIA
     
     # AI Model Configuration - NVIDIA Defaults
-    AI_TEXT_MODEL = os.getenv("AI_TEXT_MODEL", "deepseek-ai/deepseek-r1")
+    # Using Llama 3.1 70B for faster responses (5-15s vs 60-130s with DeepSeek R1)
+    AI_TEXT_MODEL = os.getenv("AI_TEXT_MODEL", "meta/llama-3.1-8b-instruct")
     AI_IMAGE_MODEL = os.getenv("AI_IMAGE_MODEL", "black-forest-labs/flux.1-kontext-dev")
     AI_VISION_MODEL = os.getenv("AI_VISION_MODEL", "meta/llama-3.2-90b-vision-instruct")
 
