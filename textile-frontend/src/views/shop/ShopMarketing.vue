@@ -3,9 +3,9 @@
     <header class="hero">
       <div>
         <h2 class="fw-bold mb-1">AI Marketing Captions</h2>
-        <p class="text-muted mb-0">Select inventory products, generate premium captions, and social media instantly.</p>
+        <p class="text-muted mb-0">Select inventory products, generate premium captions, and share to social media instantly.</p>
       </div>
-      <button class="btn btn-outline-primary" @click="toggleHistory">
+      <button class="btn btn-gradient" @click="toggleHistory">
         <i class="bi bi-clock-history me-2"></i>{{ showHistory ? 'Hide History' : 'View History' }}
       </button>
     </header>
@@ -26,12 +26,12 @@
             </div>
           </div>
           <div class="d-flex gap-2 align-self-end">
-            <button class="btn btn-outline-secondary" @click="refreshProducts" :disabled="inventoryLoading">
+            <button class="btn btn-outline-gradient" @click="refreshProducts" :disabled="inventoryLoading">
               <i class="bi bi-arrow-clockwise me-1"></i>Refresh
             </button>
             <button class="btn btn-primary" @click="generateCaptions" :disabled="!canGenerate || generating">
               <span v-if="generating"><span class="spinner-border spinner-border-sm me-2"></span>Generating</span>
-              <span v-else><i class="bi bi-magic me-1"></i>Generate Captions</span>
+              <span v-else><i class="bi bi-magic me-1"></i>Generate</span>
             </button>
           </div>
         </div>
@@ -98,8 +98,7 @@
         <div class="chip" v-for="product in selectedProducts" :key="product.id" @click="removeProduct(product.id)">
           <img :src="getProductImage(product)" :alt="product.name" @error="handleImageFallback" />
           <div>
-            <strong>{{ product.name }}</strong>
-            <small class="text-muted">₹{{ formatAmount(product.price) }}</small>
+              <strong>{{ product.name }}</strong>  <small class="text-muted">₹{{ formatAmount(product.price) }}</small>
           </div>
           <i class="bi bi-x-lg"></i>
         </div>
@@ -169,6 +168,25 @@
     <div v-if="showToast" class="toast-banner">
       <i :class="toastIcon" class="me-2"></i>{{ toastMessage }}
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
+      <div class="modal-dialog" @click.stop>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Confirm Delete</h5>
+            <button class="btn-close" @click="closeDeleteModal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to delete this history entry?</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="closeDeleteModal">Cancel</button>
+            <button class="btn btn-danger" @click="confirmDeleteHistory">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -200,24 +218,68 @@ const showToast = ref(false);
 const toastMessage = ref('');
 const toastIcon = ref('bi bi-check-circle-fill');
 
+// Delete Modal State
+const showDeleteModal = ref(false);
+const historyToDelete = ref(null);
+
 const shopId = computed(() => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  return user.shop_id || user.id;
+  // Priority: primary_shop_id > shop_id > first shop from shops array (consistent with multishop mechanism)
+  return user.primary_shop_id || user.shop_id || (user.shops && user.shops[0]?.id) || null;
 });
 
 const canGenerate = computed(() => selectedProducts.value.length > 0 && selectedProducts.value.length <= 10);
 
 const formatAmount = (val) => Number(val || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5001';
+
+/**
+ * Check if URL is from our local API (might have wrong port)
+ */
+const isLocalApiUrl = (url) => {
+  if (!url) return false;
+  return url.includes('127.0.0.1') || url.includes('localhost');
+};
+
+/**
+ * Extract path from URL - only for local API URLs
+ */
+const extractImagePath = (url) => {
+  if (!url) return null;
+  // Only extract path from local API URLs
+  if (isLocalApiUrl(url)) {
+    try {
+      return new URL(url).pathname;
+    } catch {
+      return url;
+    }
+  }
+  return url;
+};
+
 const getProductImage = (product) => {
-  if (product.image_url) {
-    return product.image_url.startsWith('http') ? product.image_url : `http://127.0.0.1:5001${product.image_url}`;
+  const rawUrl = product.image_url || product.image;
+  if (rawUrl) {
+    // External URLs (like placehold.co) - use directly
+    if (rawUrl.startsWith('http') && !isLocalApiUrl(rawUrl)) {
+      return rawUrl;
+    }
+    // Local API URL - extract path and rebuild
+    const path = extractImagePath(rawUrl);
+    if (path && path.startsWith('/')) {
+      return `${API_BASE}${path}`;
+    }
+    return rawUrl;
   }
   return `https://placehold.co/140x140?text=${encodeURIComponent(product.name || 'Product')}`;
 };
 
 const handleImageFallback = (event) => {
-  event.target.src = 'https://placehold.co/140x140?text=Preview';
+  // Prevent infinite loop - only set fallback if not already a placeholder
+  if (!event.target.src.includes('placehold.co')) {
+    event.target.src = 'https://placehold.co/140x140?text=Preview';
+  }
 };
 
 const stockHealth = (qty) => {
@@ -328,10 +390,7 @@ const fetchMarketingHistory = async () => {
   try {
     const { data } = await getMarketingHistory({ per_page: 10 });
     if (data?.status === 'success') {
-      marketingHistory.value = (data.data || []).map((item) => ({
-        ...item,
-        generated_content: item.generated_content ? JSON.parse(item.generated_content) : null
-      }));
+      marketingHistory.value = data.data || [];
     } else {
       historyError.value = data?.message || 'Unable to load history.';
     }
@@ -349,12 +408,23 @@ const loadHistoryResult = (item) => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-const deleteHistoryItem = async (id) => {
-  if (!confirm('Delete this history entry?')) return;
+const deleteHistoryItem = (id) => {
+  historyToDelete.value = id;
+  showDeleteModal.value = true;
+};
+
+const closeDeleteModal = () => {
+  showDeleteModal.value = false;
+  historyToDelete.value = null;
+};
+
+const confirmDeleteHistory = async () => {
+  if (!historyToDelete.value) return;
   try {
-    await deleteMarketingHistoryItem(id);
+    await deleteMarketingHistoryItem(historyToDelete.value);
     showToastMessage('History entry deleted.', 'bi bi-trash');
     fetchMarketingHistory();
+    closeDeleteModal();
   } catch (err) {
     console.error('[History Delete Error]', err);
     showToastMessage('Unable to delete history entry.', 'bi bi-exclamation-circle');
@@ -396,7 +466,7 @@ onMounted(() => {
 <style scoped>
 .marketing-wrapper {
   padding: 2rem;
-  background: linear-gradient(135deg, var(--color-bg-light) 0%, var(--color-bg-alt) 100%);
+  background: var(--gradient-bg);
   min-height: calc(100vh - 60px);
 }
 
@@ -443,6 +513,42 @@ onMounted(() => {
   background: #fff;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+/* ===== Buttons ===== */
+.btn-gradient {
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.6rem 1.2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-gradient:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+.btn-outline-gradient {
+  border: 2px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+              var(--gradient-primary) border-box;
+  color: var(--color-primary);
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-gradient:hover {
+  background: var(--gradient-primary) padding-box,
+              var(--gradient-primary) border-box;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
 }
 
 .product-card:hover {
@@ -569,6 +675,55 @@ onMounted(() => {
   border-radius: 0.75rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   z-index: 1050;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+}
+
+.modal-dialog {
+  min-width: 400px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 @media (max-width: 768px) {

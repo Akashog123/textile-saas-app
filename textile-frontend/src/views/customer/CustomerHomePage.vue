@@ -1,14 +1,74 @@
 <template>
   <div class="customer-home-page fade-in-entry">
-    <!-- Search Bar -->
-    <SearchBar 
+    <!-- Search Bar with Suggestions -->
+    <CustomerSearchBar 
       v-model="searchQuery"
-      placeholder="Search for Shops and Fabrics..."
+      placeholder="Search for Shops, Fabrics, and Products..."
+      :show-nearby-button="true"
+      :show-voice-search="true"
+      :show-image-search="true"
+      nearby-button-text="Find Nearby"
+      @search="handleSearch"
       @nearby-search="searchNearbyShops"
+      @image-search="handleImageSearch"
+      @suggestion-select="handleSuggestionSelect"
     />
 
+    <!-- Loading State for Fabrics -->
+    <div class="section trending-section mb-4" v-if="loadingFabrics">
+      <div class="section-header mb-4">
+        <h5 class="section-title">
+          <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
+          Trending Fabric Patterns
+        </h5>
+        <p class="section-subtitle">Loading trending fabrics...</p>
+      </div>
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State for Fabrics -->
+    <div class="section trending-section mb-4" v-else-if="trendingFabrics.length === 0 && !errorFabrics">
+      <div class="section-header mb-4">
+        <h5 class="section-title">
+          <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
+          Trending Fabric Patterns
+        </h5>
+      </div>
+      <EmptyState
+        icon="bi-layers"
+        title="No Trending Fabrics"
+        message="There are no trending fabrics available at the moment. Check back later for the latest patterns."
+        action-text="Browse All Products"
+        action-icon="bi-search"
+        @action="router.push({ name: 'CustomerProducts' })"
+      />
+    </div>
+
+    <!-- Error State for Fabrics -->
+    <div class="section trending-section mb-4" v-else-if="errorFabrics">
+      <div class="section-header mb-4">
+        <h5 class="section-title">
+          <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
+          Trending Fabric Patterns
+        </h5>
+      </div>
+      <EmptyState
+        icon="bi-exclamation-triangle"
+        title="Unable to Load Fabrics"
+        :message="errorFabrics"
+        variant="warning"
+        action-text="Try Again"
+        action-icon="bi-arrow-clockwise"
+        @action="fetchTrendingFabrics"
+      />
+    </div>
+
     <!-- Trending Fabric Patterns Section -->
-    <div class="section trending-section mb-4" v-if="trendingFabrics.length > 0">
+    <div class="section trending-section mb-4" v-else-if="trendingFabrics.length > 0">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -37,6 +97,7 @@
                     :src="trendingFabrics[fabricIndex].image"
                     :alt="trendingFabrics[fabricIndex].name"
                     class="fabric-image"
+                    @error="handleFabricImageError($event, fabricIndex)"
                   />
                   <div class="fabric-badge">
                     <span class="badge-icon"><i class="bi bi-fire"></i></span>
@@ -75,10 +136,10 @@
                       >
                     </div>
                     <span class="rating-text"
-                      >({{ trendingFabrics[fabricIndex].rating }}.0)</span
+                      >({{ Math.round(trendingFabrics[fabricIndex].rating) }}.0)</span
                     >
                   </div>
-                  <button class="btn btn-view-details">
+                  <button class="btn btn-view-details" @click="viewFabricDetails(trendingFabrics[fabricIndex])">
                     View Details
                     <span class="ms-2">→</span>
                   </button>
@@ -108,8 +169,61 @@
       </div>
     </div>
 
+    <!-- Loading State for Shops -->
+    <div class="section shops-section mb-4" v-if="loadingShops">
+      <div class="section-header mb-4">
+        <h5 class="section-title">
+          <span class="title-icon"><i class="bi bi-house-fill"></i></span>
+          Popular Local Shops
+        </h5>
+        <p class="section-subtitle">Loading shops...</p>
+      </div>
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State for Shops -->
+    <div class="section shops-section mb-4" v-else-if="popularShops.length === 0 && !errorShops">
+      <div class="section-header mb-4">
+        <h5 class="section-title">
+          <span class="title-icon"><i class="bi bi-house-fill"></i></span>
+          Popular Local Shops
+        </h5>
+      </div>
+      <EmptyState
+        icon="bi-shop"
+        title="No Shops Available"
+        message="There are no shops registered in your area yet. Be the first to discover new textile stores!"
+        action-text="Browse All Shops"
+        action-icon="bi-search"
+        @action="router.push({ name: 'CustomerShops' })"
+      />
+    </div>
+
+    <!-- Error State for Shops -->
+    <div class="section shops-section mb-4" v-else-if="errorShops">
+      <div class="section-header mb-4">
+        <h5 class="section-title">
+          <span class="title-icon"><i class="bi bi-house-fill"></i></span>
+          Popular Local Shops
+        </h5>
+      </div>
+      <EmptyState
+        icon="bi-exclamation-triangle"
+        title="Unable to Load Shops"
+        :message="errorShops"
+        variant="warning"
+        action-text="Try Again"
+        action-icon="bi-arrow-clockwise"
+        @action="fetchPopularShops"
+      />
+    </div>
+
     <!-- Popular Local Shops Section -->
-    <div class="section shops-section mb-4" v-if="popularShops.length > 0">
+    <div class="section shops-section mb-4" v-else-if="popularShops.length > 0">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-house-fill"></i></span>
@@ -136,7 +250,11 @@
                     :src="popularShops[shopIndex].image"
                     :alt="popularShops[shopIndex].name"
                     class="shop-image"
+                    @error="handleShopImageError($event, shopIndex)"
                   />
+                  <div class="shop-badge" v-if="popularShops[shopIndex].is_popular">
+                    <i class="bi bi-star-fill"></i> Popular
+                  </div>
                 </div>
               </div>
               <div class="col-md-8">
@@ -152,7 +270,7 @@
                         :key="i"
                         :class="[
                           'star',
-                          i <= popularShops[shopIndex].rating
+                          i <= Math.round(popularShops[shopIndex].rating)
                             ? 'filled'
                             : 'empty',
                         ]"
@@ -160,7 +278,7 @@
                       >
                     </div>
                     <span class="rating-text"
-                      >({{ popularShops[shopIndex].rating }}.0)</span
+                      >({{ popularShops[shopIndex].rating.toFixed(1) }})</span
                     >
                   </div>
                   <div class="shop-location mb-3">
@@ -171,8 +289,14 @@
                       popularShops[shopIndex].location
                     }}</span>
                   </div>
+                  <div class="shop-meta mb-3" v-if="popularShops[shopIndex].product_count > 0">
+                    <span class="meta-item">
+                      <i class="bi bi-box-seam me-1"></i>
+                      {{ popularShops[shopIndex].product_count }} Products
+                    </span>
+                  </div>
                   <div class="d-flex gap-2">
-                    <button class="btn btn-outline-location">
+                    <button class="btn btn-outline-location" @click="viewShopOnMap(popularShops[shopIndex])">
                       <span class="me-2"
                         ><i class="bi bi-geo-alt-fill"></i
                       ></span>
@@ -212,25 +336,6 @@
       </div>
     </div>
 
-    <!-- Map View Section -->
-    <div class="section map-section">
-      <div class="section-header mb-3">
-        <h5 class="section-title">
-          <span class="title-icon"><i class="bi bi-map-fill"></i></span>
-          Shop Locations Near You
-        </h5>
-      </div>
-      <MapmyIndiaMap
-        :shops="popularShopsWithCoordinates"
-        :center="mapCenter"
-        :zoom="13"
-        height="400px"
-        @marker-click="selectShop"
-        @location-found="handleUserLocationFound"
-        @map-ready="handleMapReady"
-      />
-    </div>
-
     <!-- Shop Profile Modal -->
     <transition name="modal-fade">
       <div v-if="selectedShop" class="modal-overlay" @click="closeShopProfile">
@@ -254,21 +359,46 @@
         </div>
       </div>
     </transition>
+
+    <!-- Toast Notification -->
+    <Teleport to="body">
+      <Transition name="toast">
+        <div v-if="toast.show" class="toast-notification" :class="toast.type">
+          <i :class="toast.icon"></i>
+          <span>{{ toast.message }}</span>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { getTrendingFabrics, getPopularShops } from '@/api/apiCustomer';
+import { useRouter } from 'vue-router';
+import { getTrendingFabrics, getPopularShops, searchByImage } from '@/api/apiCustomer';
 import { formatPricePerMeter } from '@/utils/priceUtils';
 import { validateFabricData, validateShopData } from '@/utils/dataValidation';
-import SearchBar from '@/components/SearchBar.vue';
-import MapmyIndiaMap from '@/components/MapmyIndiaMap.vue';
+import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
+const router = useRouter();
 const searchQuery = ref('');
 const fabricIndex = ref(0);
 const shopIndex = ref(0);
 const selectedShop = ref(null);
+
+// Toast state
+const toast = ref({ show: false, message: '', type: 'success', icon: 'bi bi-check-circle-fill' });
+
+const showToast = (message, type = 'success') => {
+  toast.value = {
+    show: true,
+    message,
+    type,
+    icon: type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-circle-fill'
+  };
+  setTimeout(() => toast.value.show = false, 3000);
+};
 
 // Loading states
 const loadingFabrics = ref(false);
@@ -290,10 +420,52 @@ const userLocation = ref(null);
 const popularShopsWithCoordinates = computed(() => {
   return popularShops.value.map(shop => ({
     ...shop,
-    lat: shop.lat || parseFloat(shop.latitude) || 28.6139 + (Math.random() - 0.5) * 0.1,
-    lng: shop.lng || parseFloat(shop.longitude) || 77.2090 + (Math.random() - 0.5) * 0.1
-  }));
+    lat: shop.lat || parseFloat(shop.latitude) || null,
+    lng: shop.lng || parseFloat(shop.longitude) || null
+  })).filter(shop => shop.lat && shop.lng);
 });
+
+/**
+ * Handle search from CustomerSearchBar
+ */
+const handleSearch = (query) => {
+  const searchQuery = typeof query === 'string' ? query : (query?.target?.value || String(query || ''));
+  if (searchQuery.trim()) {
+    router.push({ name: 'CustomerProducts', query: { search: searchQuery } });
+  }
+};
+
+/**
+ * Handle suggestion selection
+ */
+const handleSuggestionSelect = (suggestion) => {
+  if (suggestion.type === 'product') {
+    router.push({ name: 'CustomerProductDetail', params: { productId: suggestion.id } });
+  } else if (suggestion.type === 'shop') {
+    router.push({ name: 'CustomerShopDetail', params: { shopId: suggestion.id } });
+  } else if (suggestion.type === 'category') {
+    router.push({ name: 'CustomerProducts', query: { category: suggestion.name } });
+  }
+};
+
+/**
+ * Handle image search - redirect to products page with image search mode
+ */
+const handleImageSearch = async (imageData) => {
+  // Store the file in sessionStorage temporarily for the products page to access
+  // Since we can't pass File objects through router state reliably
+  sessionStorage.setItem('pendingImageSearch', 'true');
+  
+  // Create object URL for preview (will be used by products page)
+  const imageUrl = URL.createObjectURL(imageData.file);
+  sessionStorage.setItem('pendingImageUrl', imageUrl);
+  
+  // Navigate to products page with image search flag
+  router.push({ 
+    name: 'CustomerProducts', 
+    query: { imageSearch: 'pending' }
+  });
+};
 
 /**
  * Fetch trending fabrics from backend
@@ -312,8 +484,7 @@ const fetchTrendingFabrics = async () => {
   } catch (err) {
     console.error('[Trending Fabrics Error]', err);
     errorFabrics.value = err.response?.data?.message || 'Failed to load trending fabrics';
-    // Fallback to demo data if API fails
-    trendingFabrics.value = getFallbackFabrics();
+    trendingFabrics.value = [];
   } finally {
     loadingFabrics.value = false;
   }
@@ -333,84 +504,12 @@ const fetchPopularShops = async () => {
   } catch (err) {
     console.error('[Popular Shops Error]', err);
     errorShops.value = err.response?.data?.message || 'Failed to load popular shops';
-    // Fallback to demo data if API fails
-    popularShops.value = getFallbackShops();
+    popularShops.value = [];
   } finally {
     loadingShops.value = false;
   }
 };
 
-/**
- * Fallback data for trending fabrics (demo)
- */
-const getFallbackFabrics = () => [
-  {
-    name: 'Handwoven Silk Brocade',
-    price: formatPricePerMeter(1850),
-    description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear and special occasions.',
-    rating: 5,
-    badge: 'Trending',
-    image: 'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    name: 'Premium Cotton Batik',
-    price: formatPricePerMeter(650),
-    description: 'Soft and breathable premium cotton with traditional batik patterns. Ideal for summer wear with excellent comfort.',
-    rating: 4,
-    badge: 'Best Seller',
-    image: 'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    name: 'Luxury Georgette Silk',
-    price: formatPricePerMeter(1450),
-    description: 'Elegant georgette silk with beautiful floral prints and luxurious drape.',
-    rating: 5,
-    badge: 'New Arrival',
-    image: 'https://images.unsplash.com/photo-1729772164459-6dbe32e20510?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    name: 'Artisan Woven Cotton',
-    price: formatPricePerMeter(890),
-    description: 'Handcrafted artisan cotton with unique weave patterns. Showcases traditional craftsmanship.',
-    rating: 4,
-    badge: 'Handcrafted',
-    image: 'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-];
-
-/**
- * Fallback data for popular shops (demo)
- */
-const getFallbackShops = () => [
-  {
-    name: 'The Silk Emporium',
-    description: 'Premier destination for authentic silk fabrics featuring traditional handloom textiles and modern designer collections.',
-    rating: 5,
-    location: 'MG Road, Bangalore',
-    image: 'https://images.unsplash.com/photo-1636545787095-8aa7e737f74e?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    name: 'Heritage Textile House',
-    description: 'Specializing in premium cotton and handwoven fabrics with rich cultural heritage.',
-    rating: 4,
-    location: 'Commercial Street, Bangalore',
-    image: 'https://images.unsplash.com/photo-1636545776450-32062836e1cd?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    name: 'Artisan Fabric Gallery',
-    description: 'Curated collection of artisan fabrics showcasing traditional craftsmanship.',
-    rating: 5,
-    location: 'Indiranagar, Bangalore',
-    image: 'https://images.unsplash.com/photo-1636545732552-a94515d1b4c0?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    name: 'Modern Textile Studio',
-    description: 'Contemporary fabric store offering latest trends in textiles.',
-    rating: 4,
-    location: 'Koramangala, Bangalore',
-    image: 'https://images.unsplash.com/photo-1613132955165-3db1e7526e08?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-  },
-];
 
 // Carousel navigation
 const prevFabric = () => {
@@ -429,54 +528,115 @@ const nextShop = () => {
   if (shopIndex.value < popularShops.value.length - 1) shopIndex.value++;
 };
 
-const searchNearbyShops = async () => {
+const searchNearbyShops = async (location) => {
   try {
-    // Import the MapmyIndia service
-    const { getNearbyShopsAuto, formatDistance } = await import('@/services/mapmyindiaService');
-    
     loadingShops.value = true;
     errorShops.value = '';
     
-    // Get nearby shops (automatically gets user location)
-    const result = await getNearbyShopsAuto(5000); // 5km radius
+    let lat, lon;
     
-    if (result.shops && result.shops.length > 0) {
-      // Transform nearby shops to our format
-      popularShops.value = result.shops.map((shop) => ({
+    // Use location from CustomerSearchBar if provided
+    if (location && location.lat && location.lon) {
+      lat = location.lat;
+      lon = location.lon;
+      userLocation.value = { lat, lon };
+      mapCenter.value = { lat, lng: lon };
+    } else {
+      // Import the location service for geolocation
+      const { getNearbyShopsAuto, formatDistance } = await import('@/services/locationService');
+      const result = await getNearbyShopsAuto(5000); // 5km radius
+      
+      if (result.shops && result.shops.length > 0) {
+        // Transform nearby shops to our format
+        popularShops.value = result.shops.map((shop) => ({
+          id: shop.id,
+          name: shop.name,
+          description: `Located ${formatDistance(shop.distance)} away • ${shop.address}`,
+          rating: 4,
+          location: shop.address,
+          lat: shop.latitude,
+          lon: shop.longitude,
+          image: `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`,
+          distance: shop.distance
+        }));
+        
+        // Sort by distance (nearest first)
+        popularShops.value.sort((a, b) => a.distance - b.distance);
+        shopIndex.value = 0;
+        console.log(`Found ${result.shops.length} nearby shops`);
+      } else {
+        showToast('No nearby shops found within 5km', 'error');
+      }
+      loadingShops.value = false;
+      return;
+    }
+    
+    // Use the API with provided location
+    const { getNearbyShops } = await import('@/api/apiCustomer');
+    const response = await getNearbyShops({
+      lat,
+      lon,
+      radius: 5,
+      limit: 20
+    });
+    
+    if (response.data && response.data.shops && response.data.shops.length > 0) {
+      popularShops.value = response.data.shops.map((shop) => ({
         id: shop.id,
-        name: shop.name,
-        description: `Located ${formatDistance(shop.distance)} away • ${shop.address}`,
-        rating: 4,
-        location: shop.address,
-        lat: shop.latitude,
-        lon: shop.longitude,
-        image: `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`,
+        name: shop.name || shop.shop_name,
+        description: shop.description || shop.address,
+        rating: shop.rating || 4,
+        location: shop.address || shop.city,
+        lat: parseFloat(shop.latitude) || shop.lat,
+        lng: parseFloat(shop.longitude) || shop.lng,
+        image: shop.image || shop.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`,
         distance: shop.distance
       }));
       
-      // Sort by distance (nearest first)
-      popularShops.value.sort((a, b) => a.distance - b.distance);
-      
-      // Reset carousel to first shop
+      popularShops.value.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       shopIndex.value = 0;
-      
-      console.log(`Found ${result.shops.length} nearby shops`);
-      
+      console.log(`Found ${popularShops.value.length} nearby shops`);
     } else {
-      alert('No nearby shops found within 5km');
+      showToast('No nearby shops found within 5km', 'error');
     }
     
   } catch (err) {
     console.error('Nearby search error:', err);
-    alert(err.message || 'Failed to search nearby shops');
+    showToast(err.message || 'Failed to search nearby shops', 'error');
     errorShops.value = err.message;
   } finally {
     loadingShops.value = false;
   }
 };
 
+const viewFabricDetails = (fabric) => {
+  if (fabric.id) {
+    router.push({ name: 'CustomerProductDetail', params: { productId: fabric.id } });
+  } else {
+    // Navigate to products page with search query
+    router.push({ name: 'CustomerProducts', query: { search: fabric.name } });
+  }
+};
+
 const viewShopProfile = (shop) => {
-  selectedShop.value = shop;
+  if (shop.id) {
+    router.push({ name: 'CustomerShopDetail', params: { shopId: shop.id } });
+  } else {
+    selectedShop.value = shop;
+  }
+};
+
+const viewShopOnMap = (shop) => {
+  // Navigate to shops page with map view focused on this shop
+  router.push({ 
+    name: 'CustomerShops', 
+    query: { 
+      viewMode: 'map',
+      shopId: shop.id,
+      lat: shop.lat,
+      lng: shop.lng
+    } 
+  });
 };
 
 const selectShop = (shop) => {
@@ -485,6 +645,25 @@ const selectShop = (shop) => {
 
 const closeShopProfile = () => {
   selectedShop.value = null;
+};
+
+// Image error handlers
+const handleFabricImageError = (event, index) => {
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?w=800&h=600&fit=crop&q=80'
+  ];
+  event.target.src = fallbackImages[index % fallbackImages.length];
+};
+
+const handleShopImageError = (event, index) => {
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=800&h=600&fit=crop&q=80'
+  ];
+  event.target.src = fallbackImages[index % fallbackImages.length];
 };
 
 // Map event handlers
@@ -784,6 +963,22 @@ onMounted(() => {
   backdrop-filter: blur(4px);
 }
 
+.shop-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: linear-gradient(135deg, #ffc107, #ff9800);
+  padding: 0.4rem 0.8rem;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
 .badge-icon {
   font-size: 1.2rem;
 }
@@ -802,6 +997,22 @@ onMounted(() => {
   font-weight: 700;
   color: var(--color-text-dark);
   margin-bottom: 0.5rem;
+}
+
+.shop-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.shop-meta .meta-item {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  background: rgba(59, 130, 246, 0.08);
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
 }
 
 .price-tag {
@@ -1074,5 +1285,41 @@ onMounted(() => {
   .modern-card {
     padding: 1.5rem;
   }
+}
+
+/* ============================================================================
+   TOAST
+   ============================================================================ */
+.toast-notification {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 8px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.toast-notification.success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.toast-notification.error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
 }
 </style>

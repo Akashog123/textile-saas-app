@@ -1,465 +1,564 @@
 <template>
   <div class="customer-products-page fade-in-entry">
-    <!-- Search Bar -->
-    <SearchBar 
+    <!-- Search Bar with Suggestions -->
+    <CustomerSearchBar 
       v-model="searchQuery"
-      placeholder="Search fabrics and products..."
+      placeholder="Search fabrics, products, or shops..."
+      :show-nearby-button="true"
+      :show-voice-search="true"
+      :show-image-search="true"
+      @search="handleSearch"
       @nearby-search="handleNearbySearch"
-      @find-similar="openComparisonModal"
+      @image-search="handleImageSearch"
+      @suggestion-select="handleSuggestionSelect"
     />
 
-    <!-- Filters -->
-    <div class="filters-section mb-4 d-flex gap-3 align-items-center">
-      <span class="fw-semibold">Filters▼</span>
-      <button class="filter-btn">
-        <i class="bi bi-palette-fill"></i> Category
-      </button>
-      <button class="filter-btn">
-        <i class="bi bi-palette-fill"></i> Color
-      </button>
-      <button class="filter-btn">
-        <i class="bi bi-rulers"></i> Price Range
-      </button>
-      <button class="filter-btn">
-        <i class="bi bi-tag-fill"></i> Availability
-      </button>
-      <button v-if="searchActive" class="filter-btn ms-auto" @click="clearComparison" title="Clear search results">
-        <i class="bi bi-x-circle"></i> Clear Search
-      </button>
-    </div>
-
-    <!-- Search Status -->
-    <div v-if="searchActive" class="alert alert-info mb-4" role="alert">
-      <i class="bi bi-search me-2"></i>
-      Showing {{ products.length }} similar products. 
-      <button class="btn btn-sm btn-outline-secondary ms-2" @click="clearComparison">
-        Clear Search
-      </button>
-    </div>
-
-    <!-- Products Grid with Carousel -->
-    <div class="products-grid">
-      <div
-        v-for="(product, idx) in products"
-        :key="idx"
-        class="product-carousel-item mb-4"
-      >
-        <div class="card">
-          <div class="card-body">
-            <div class="carousel-container">
-              <button
-                class="carousel-btn prev"
-                @click="prevImage(idx)"
-                :disabled="currentImageIndex[idx] === 0"
-              >
-                ‹
-              </button>
-
-              <div class="product-main">
-                <div class="product-image-wrapper mb-3">
-                  <img
-                    :src="product.imageUrls[currentImageIndex[idx]]"
-                    :alt="product.name"
-                    class="product-image"
-                  />
-                  <div class="image-indicator">
-                    {{ currentImageIndex[idx] + 1 }} /
-                    {{ product.imageUrls.length }}
-                  </div>
-                  <div v-if="product.similarity_score" class="similarity-badge">
-                    {{ Math.round(product.similarity_score * 100) }}% match
-                  </div>
-                </div>
-
-                <div class="row">
-                  <div class="col-md-8">
-                    <h6 class="mb-2">{{ product.name }}</h6>
-                    <div class="price mb-2">
-                      <strong class="text-primary">{{ product.price }}</strong
-                      >/m
-                    </div>
-                    <p class="text-muted small mb-2">
-                      {{ product.description }}
-                    </p>
-                    <div class="rating mb-2">
-                      <span
-                        v-for="i in 5"
-                        :key="i"
-                        :class="
-                          i <= product.rating ? 'text-warning' : 'text-muted'
-                        "
-                        >★</span
-                      >
-                    </div>
-                  </div>
-                  <div class="col-md-4 text-end">
-                    <p class="small text-muted mb-1">Sold by</p>
-                    <p class="small fw-semibold">{{ product.seller }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                class="carousel-btn next"
-                @click="nextImage(idx)"
-                :disabled="
-                  currentImageIndex[idx] === product.imageUrls.length - 1
-                "
-              >
-                ›
-              </button>
-            </div>
-          </div>
-        </div>
+    <!-- Filters Section -->
+    <div class="filters-section">
+      <div class="filters-header">
+        <span class="filters-label">
+          <i class="bi bi-sliders"></i> Filters
+        </span>
+        <button 
+          v-if="hasActiveFilters" 
+          class="btn-clear-filters"
+          @click="clearFilters"
+        >
+          <i class="bi bi-x-lg"></i> Clear All
+        </button>
       </div>
-    </div>
-
-    <!-- Load More -->
-    <div class="text-center mt-4">
-      <button class="btn btn-outline-primary">Load More Products</button>
-    </div>
-
-    <!-- Image Comparison Modal -->
-    <div v-if="showComparisonModal" class="modal-overlay" @click="closeComparisonModal">
-      <div class="comparison-modal" @click.stop>
-        <button class="btn-close-modal" @click="closeComparisonModal">✕</button>
+      
+      <div class="filters-row">
+        <!-- Category Filter -->
+        <div class="filter-dropdown">
+          <select v-model="filters.category" class="filter-select" @change="fetchProducts">
+            <option value="">All Categories</option>
+            <option v-for="cat in categories" :key="cat.name" :value="cat.name">
+              {{ cat.name }} ({{ cat.count }})
+            </option>
+          </select>
+        </div>
         
-        <!-- Upload/Camera Section -->
-        <div class="comparison-upload-section" v-if="!comparisonInProgress">
-          <h5 class="mb-3">Find Similar Products</h5>
-          <p class="text-muted mb-4">Upload or take a photo of a fabric to find similar products in our catalog</p>
-          
-          <div class="upload-area" @click="triggerFileInput" @dragover.prevent="() => {}" @drop.prevent="handleImageDrop">
-            <input 
-              ref="imageInput" 
-              type="file" 
-              accept="image/*" 
-              @change="handleImageSelect"
-              style="display: none"
-            />
-            <div class="upload-content text-center">
-              <i class="bi bi-cloud-arrow-up upload-icon"></i>
-              <p class="mb-2"><strong>Click to upload</strong> or drag and drop</p>
-              <p class="text-muted small">SVG, PNG, JPG, GIF up to 10MB</p>
-            </div>
-          </div>
-
-          <div class="mt-3 d-flex gap-2 justify-content-center">
-            <button class="btn btn-outline-primary" @click="triggerFileInput">
-              <i class="bi bi-folder-open me-2"></i>Choose Image
-            </button>
-            <button class="btn btn-outline-secondary" @click="openCamera">
-              <i class="bi bi-camera-fill me-2"></i>Take Photo
-            </button>
-          </div>
-
-          <!-- Camera Input (hidden) -->
-          <input 
-            ref="cameraInput" 
-            type="file" 
-            accept="image/*" 
-            capture="environment"
-            @change="handleImageSelect"
-            style="display: none"
-          />
+        <!-- Price Range Filter -->
+        <div class="filter-dropdown">
+          <select v-model="filters.priceRange" class="filter-select" @change="applyPriceFilter">
+            <option value="">Any Price</option>
+            <option value="0-500">Under ₹500</option>
+            <option value="500-1000">₹500 - ₹1,000</option>
+            <option value="1000-2000">₹1,000 - ₹2,000</option>
+            <option value="2000+">₹2,000+</option>
+          </select>
         </div>
-
-        <!-- Loading Section -->
-        <div v-if="comparisonInProgress" class="text-center py-5">
-          <div class="spinner-border mb-3" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <p class="text-muted">Analyzing image and finding matches...</p>
+        
+        <!-- Sort Filter -->
+        <div class="filter-dropdown">
+          <select v-model="filters.sort" class="filter-select" @change="fetchProducts">
+            <option value="rating">Top Rated</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="newest">Newest First</option>
+          </select>
+        </div>
+        
+        <!-- Stock Filter -->
+        <div class="filter-toggle">
+          <label class="toggle-label">
+            <input type="checkbox" v-model="filters.inStockOnly" @change="fetchProducts" />
+            <span class="toggle-switch"></span>
+            <span class="toggle-text">In Stock Only</span>
+          </label>
         </div>
       </div>
+    </div>
+
+    <!-- Results Summary -->
+    <div class="results-summary" v-if="!loading">
+      <span class="results-count">{{ totalProducts }} products found</span>
+      <span v-if="searchQuery" class="results-query">
+        for "{{ searchQuery }}"
+      </span>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Finding products...</p>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error" class="error-container">
+      <i class="bi bi-exclamation-triangle"></i>
+      <p>{{ error }}</p>
+      <button class="btn btn-primary" @click="fetchProducts">Try Again</button>
+    </div>
+
+    <!-- Empty State -->
+    <div v-else-if="products.length === 0" class="empty-state">
+      <i class="bi bi-search"></i>
+      <h4>No products found</h4>
+      <p>Try adjusting your filters or search terms</p>
+      <button class="btn btn-primary" @click="clearFilters">Clear Filters</button>
+    </div>
+
+    <!-- Products Grid -->
+    <div v-else class="products-grid">
+      <ProductCard
+        v-for="product in products"
+        :key="product.id"
+        :product="product"
+        :show-shop="true"
+        @view-details="viewProductDetails"
+        @view-shop="viewShopDetails"
+        @add-to-wishlist="addToWishlist"
+      />
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="products.length > 0 && pagination.totalPages > 1" class="pagination-container">
+      <button 
+        class="btn btn-outline-primary"
+        :disabled="pagination.page <= 1"
+        @click="goToPage(pagination.page - 1)"
+      >
+        <i class="bi bi-chevron-left"></i> Previous
+      </button>
+      
+      <div class="page-numbers">
+        <button 
+          v-for="pageNum in visiblePages" 
+          :key="pageNum"
+          class="page-btn"
+          :class="{ active: pageNum === pagination.page }"
+          @click="goToPage(pageNum)"
+        >
+          {{ pageNum }}
+        </button>
+      </div>
+      
+      <button 
+        class="btn btn-outline-primary"
+        :disabled="pagination.page >= pagination.totalPages"
+        @click="goToPage(pagination.page + 1)"
+      >
+        Next <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+
+    <!-- Load More Button (Alternative) -->
+    <div v-if="products.length > 0 && hasMoreProducts && !pagination.totalPages" class="text-center mt-4">
+      <button 
+        class="btn btn-outline-primary btn-load-more" 
+        @click="loadMore"
+        :disabled="loadingMore"
+      >
+        <span v-if="loadingMore">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          Loading...
+        </span>
+        <span v-else>Load More Products</span>
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
-import { getProducts } from '@/api/apiProducts';
-import { compareImages } from '@/api/apiImages';
-import { formatPricePerMeter } from '@/utils/priceUtils';
-import { validateProductData } from '@/utils/dataValidation';
-import { handleApiError, executeWithRetry, createRetryConfig, showErrorNotification } from '@/utils/errorHandling';
-import SearchBar from '@/components/SearchBar.vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { browseProducts, getCategories, searchShopsAndProducts, searchByImage, getNearbyShops } from '@/api/apiCustomer';
+import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
+import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
+import ProductCard from '@/components/cards/ProductCard.vue';
 
+const router = useRouter();
+
+// State
 const searchQuery = ref('');
-const currentImageIndex = reactive({});
-
-// Loading and error states
 const loading = ref(false);
+const loadingMore = ref(false);
 const error = ref('');
+const products = ref([]);
+const categories = ref([]);
+const totalProducts = ref(0);
+const hasMoreProducts = ref(true);
 
-// Search state
-const searchActive = ref(false);
-
-// Image comparison states
-const showComparisonModal = ref(false);
-const comparisonInProgress = ref(false);
-const comparisonResults = ref([]);
-const imageInput = ref(null);
-const cameraInput = ref(null);
-
-// Filter states
+// Filters
 const filters = reactive({
   category: '',
-  price_min: null,
-  price_max: null,
-  search: ''
+  priceRange: '',
+  sort: 'rating',
+  inStockOnly: false,
+  min_price: null,
+  max_price: null
 });
 
-// Products data from backend
-const products = ref([]);
+// Pagination
+const pagination = reactive({
+  page: 1,
+  perPage: 20,
+  totalPages: 0
+});
+
+// Computed
+const hasActiveFilters = computed(() => {
+  return filters.category || filters.priceRange || filters.inStockOnly || searchQuery.value;
+});
+
+const visiblePages = computed(() => {
+  const pages = [];
+  const maxVisible = 5;
+  const half = Math.floor(maxVisible / 2);
+  
+  let start = Math.max(1, pagination.page - half);
+  let end = Math.min(pagination.totalPages, start + maxVisible - 1);
+  
+  if (end - start < maxVisible - 1) {
+    start = Math.max(1, end - maxVisible + 1);
+  }
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
+  return pages;
+});
 
 /**
- * Fetch products from backend with filters
+ * Apply price range filter
+ */
+const applyPriceFilter = () => {
+  switch (filters.priceRange) {
+    case '0-500':
+      filters.min_price = 0;
+      filters.max_price = 500;
+      break;
+    case '500-1000':
+      filters.min_price = 500;
+      filters.max_price = 1000;
+      break;
+    case '1000-2000':
+      filters.min_price = 1000;
+      filters.max_price = 2000;
+      break;
+    case '2000+':
+      filters.min_price = 2000;
+      filters.max_price = null;
+      break;
+    default:
+      filters.min_price = null;
+      filters.max_price = null;
+  }
+  fetchProducts();
+};
+
+/**
+ * Clear all filters
+ */
+const clearFilters = () => {
+  filters.category = '';
+  filters.priceRange = '';
+  filters.sort = 'rating';
+  filters.inStockOnly = false;
+  filters.min_price = null;
+  filters.max_price = null;
+  searchQuery.value = '';
+  pagination.page = 1;
+  fetchProducts();
+};
+
+/**
+ * Fetch products from backend
  */
 const fetchProducts = async () => {
   loading.value = true;
   error.value = '';
+  
   try {
     const params = {
-      ...filters,
-      search: searchQuery.value || filters.search
+      page: pagination.page,
+      per_page: pagination.perPage,
+      sort: filters.sort
     };
     
-    const response = await executeWithRetry(
-      () => getProducts(params),
-      createRetryConfig(3, 1000)
-    );
+    if (filters.category) params.category = filters.category;
+    if (filters.min_price !== null) params.min_price = filters.min_price;
+    if (filters.max_price !== null) params.max_price = filters.max_price;
+    if (filters.inStockOnly) params.in_stock = true;
+    if (searchQuery.value) params.search = searchQuery.value;
     
-    console.log('[Products Response]', response.data);
+    const response = await browseProducts(params);
     
     if (response.data && response.data.products) {
-      products.value = response.data.products.map(p => validateProductData(p));
-      console.log('[Processed Products]', products.value);
-      
-      // Initialize image indices
-      for (const [idx] of products.value.entries()) {
-        currentImageIndex[idx] = 0;
-      }
+      products.value = normalizeProducts(response.data.products);
+      totalProducts.value = response.data.total || products.value.length;
+      pagination.totalPages = response.data.pages || 0;
+      hasMoreProducts.value = response.data.has_more || false;
     }
   } catch (err) {
     const errorMessage = handleApiError(err, 'Products');
     error.value = errorMessage;
-    showErrorNotification(errorMessage, 'error');
-    
-    // Fallback to demo data
-    products.value = getFallbackProducts();
-    for (const [idx] of products.value.entries()) {
-      currentImageIndex[idx] = 0;
-    }
+    showErrorNotification(errorMessage);
+    products.value = [];
   } finally {
     loading.value = false;
   }
 };
 
 /**
- * Fallback demo data
+ * Load more products (infinite scroll style)
  */
-const getFallbackProducts = () => [
-  {
-    name: 'Handwoven Silk Brocade',
-    price: formatPricePerMeter(1850),
-    description: 'Exquisite handwoven silk brocade with intricate golden thread work. Perfect for traditional wear.',
-    rating: 5,
-    seller: 'Royal Silk Emporium',
-    imageUrls: [
-      'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1636545662955-5225152e33bf?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-    ],
-  },
-  {
-    name: 'Premium Cotton Batik Print',
-    price: formatPricePerMeter(650),
-    description: 'Soft and breathable premium cotton with authentic batik patterns. Ideal for summer wear.',
-    rating: 4,
-    seller: 'Fashion Hub Textiles',
-    imageUrls: [
-      'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?ixlib=rb-4.1.0&auto=format&fit=crop&q=80&w=800',
-    ],
-  },
-];
-
-const prevImage = (idx) => {
-  if (currentImageIndex[idx] > 0) {
-    currentImageIndex[idx]--;
-  }
-};
-
-const nextImage = (idx) => {
-  if (currentImageIndex[idx] < products.value[idx].imageUrls.length - 1) {
-    currentImageIndex[idx]++;
-  }
-};
-
-// Handle nearby search from SearchBar
-const handleNearbySearch = async () => {
+const loadMore = async () => {
+  if (loadingMore.value || !hasMoreProducts.value) return;
+  
+  loadingMore.value = true;
+  
   try {
-    loading.value = true;
-    error.value = '';
+    pagination.page++;
+    const params = {
+      page: pagination.page,
+      per_page: pagination.perPage,
+      sort: filters.sort
+    };
     
-    // Import the MapmyIndia service
-    const { getNearbyShopsAuto, formatDistance } = await import('@/services/mapmyindiaService');
+    if (filters.category) params.category = filters.category;
+    if (searchQuery.value) params.search = searchQuery.value;
     
-    // Get nearby shops (automatically gets user location)
-    const result = await getNearbyShopsAuto(5000); // 5km radius
+    const response = await browseProducts(params);
     
-    if (result.shops && result.shops.length > 0) {
-      // Transform nearby shops to product format
-      products.value = result.shops.map((shop, index) => ({
-        id: shop.id || `nearby-${index}`,
-        name: shop.name,
-        price: 'Visit Shop',
-        description: `${shop.address} • ${formatDistance(shop.distance)} away`,
-        rating: 4,
-        seller: shop.name,
-        imageUrls: [`https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`],
-        distance: shop.distance,
-        location: {
-          latitude: shop.latitude,
-          longitude: shop.longitude
-        }
-      }));
-      
-      // Initialize image indices
-      for (const [idx] of products.value.entries()) {
-        currentImageIndex[idx] = 0;
-      }
-      
-      console.log(`Found ${result.shops.length} nearby shops`);
-    } else {
-      error.value = 'No nearby shops found. Try increasing the search radius.';
+    if (response.data && response.data.products) {
+      const newProducts = normalizeProducts(response.data.products);
+      products.value = [...products.value, ...newProducts];
+      hasMoreProducts.value = response.data.has_more || false;
     }
-    
   } catch (err) {
-    console.error('Nearby search error:', err);
-    error.value = err.message || 'Failed to search nearby shops';
+    pagination.page--;
+    showErrorNotification('Failed to load more products');
+  } finally {
+    loadingMore.value = false;
+  }
+};
+
+/**
+ * Go to specific page
+ */
+const goToPage = (page) => {
+  if (page < 1 || page > pagination.totalPages) return;
+  pagination.page = page;
+  fetchProducts();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+/**
+ * Handle search from search bar
+ */
+const handleSearch = async (query) => {
+  searchQuery.value = query;
+  pagination.page = 1;
+  
+  if (!query.trim()) {
+    fetchProducts();
+    return;
+  }
+  
+  loading.value = true;
+  error.value = '';
+  
+  try {
+    const response = await searchShopsAndProducts({
+      q: query,
+      type: 'products',
+      category: filters.category || undefined,
+      min_price: filters.min_price,
+      max_price: filters.max_price,
+      limit: pagination.perPage
+    });
+    
+    if (response.data && response.data.products) {
+      products.value = normalizeProducts(response.data.products);
+      totalProducts.value = response.data.total_products || products.value.length;
+    }
+  } catch (err) {
+    const errorMessage = handleApiError(err, 'Search');
+    error.value = errorMessage;
   } finally {
     loading.value = false;
   }
 };
 
-// Image Comparison Functions
-const triggerFileInput = () => {
-  imageInput.value?.click();
-};
-
-const openCamera = () => {
-  cameraInput.value?.click();
-};
-
-const handleImageDrop = (event) => {
-  const files = event.dataTransfer.files;
-  if (files && files.length > 0) {
-    handleImageSelect({ target: { files } });
+/**
+ * Handle suggestion selection from search bar
+ */
+const handleSuggestionSelect = (suggestion) => {
+  if (suggestion.type === 'product') {
+    router.push({ name: 'CustomerProductDetail', params: { productId: suggestion.id } });
+  } else if (suggestion.type === 'shop') {
+    router.push({ name: 'CustomerShopDetail', params: { shopId: suggestion.id } });
+  } else if (suggestion.type === 'category') {
+    filters.category = suggestion.name;
+    fetchProducts();
   }
 };
 
-const handleImageSelect = async (event) => {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
-
-  const file = files[0];
-  
-  // Validate file type
-  if (!file.type.startsWith('image/')) {
-    alert('Please select a valid image file');
-    return;
-  }
-
-  // Validate file size (10MB max)
-  if (file.size > 10 * 1024 * 1024) {
-    alert('Image size must be less than 10MB');
-    return;
-  }
-
-  comparisonInProgress.value = true;
+/**
+ * Handle nearby search
+ */
+const handleNearbySearch = async (location) => {
+  loading.value = true;
+  error.value = '';
   
   try {
-    const response = await compareImages(file);
+    const response = await getNearbyShops({
+      lat: location.lat,
+      lon: location.lon,
+      radius: 10,
+      limit: 50
+    });
     
-    if (response.data && response.data.status === 'success' && response.data.matches) {
-      // Transform matches to product objects
-      const matchedProducts = response.data.matches.map((match, idx) => ({
-        name: match.product_name || `Match ${idx + 1}`,
-        price: match.price ? `₹${match.price.toLocaleString()}` : 'Price on request',
-        description: `${match.article_type || ''} - ${match.color || ''}`,
-        rating: 4.5,
-        seller: match.gender || 'Store',
-        imageUrls: [`http://localhost:5001/${match.file}`],
-        similarity_score: match.similarity_score,
-        isComparisonResult: true,
-        matchIndex: idx
-      }));
-
-      // Replace products with matched results
-      products.value = matchedProducts;
-      searchActive.value = true;
-      searchQuery.value = '';
+    if (response.data && response.data.shops) {
+      // Extract products from nearby shops
+      const nearbyProducts = [];
+      response.data.shops.forEach(shop => {
+        if (shop.products) {
+          shop.products.forEach(product => {
+            nearbyProducts.push({
+              ...product,
+              shop: { id: shop.id, name: shop.name },
+              distance: shop.distance
+            });
+          });
+        }
+      });
       
-      // Close the modal
-      showComparisonModal.value = false;
-      
-      // Scroll to results
-      setTimeout(() => {
-        window.scrollTo({ top: 300, behavior: 'smooth' });
-      }, 100);
-
-      alert(`Found ${matchedProducts.length} similar products!`);
-      console.log('Matched products:', matchedProducts);
-    } else {
-      alert('No similar products found. Try another image.');
+      if (nearbyProducts.length > 0) {
+        products.value = normalizeProducts(nearbyProducts);
+        totalProducts.value = nearbyProducts.length;
+        showSuccessNotification(`Found ${nearbyProducts.length} products from nearby shops`);
+      } else {
+        error.value = 'No products found from nearby shops. Try expanding your search radius.';
+      }
     }
   } catch (err) {
-    console.error('Image comparison error:', err);
-    alert(err.response?.data?.error || 'Failed to compare images. Please try again.');
+    const errorMessage = handleApiError(err, 'Nearby Search');
+    error.value = errorMessage;
   } finally {
-    comparisonInProgress.value = false;
-    resetComparison();
+    loading.value = false;
   }
 };
 
-const handleImageError = (event) => {
-  console.error('Failed to load image:', event.target.src);
-  event.target.src = 'https://via.placeholder.com/200?text=Image+Not+Found';
+/**
+ * Handle image search
+ */
+const handleImageSearch = async (imageData) => {
+  loading.value = true;
+  error.value = '';
+  
+  try {
+    const response = await searchByImage(imageData.file, 20);
+    
+    if (response.data?.data?.similar_products) {
+      products.value = normalizeProducts(response.data.data.similar_products);
+      totalProducts.value = products.value.length;
+      searchQuery.value = 'Visual Search Results';
+      showSuccessNotification(`Found ${products.value.length} similar products`);
+    } else if (response.data?.similar_products) {
+      // Alternative response format
+      products.value = normalizeProducts(response.data.similar_products);
+      totalProducts.value = products.value.length;
+      searchQuery.value = 'Visual Search Results';
+      showSuccessNotification(`Found ${products.value.length} similar products`);
+    } else {
+      products.value = [];
+      showSuccessNotification('No similar products found');
+    }
+  } catch (err) {
+    const errorMessage = handleApiError(err, 'Image Search');
+    error.value = errorMessage;
+  } finally {
+    loading.value = false;
+  }
 };
 
-const resetComparison = () => {
-  comparisonResults.value = [];
-  if (imageInput.value) imageInput.value.value = '';
-  if (cameraInput.value) cameraInput.value.value = '';
+/**
+ * View product details
+ */
+const viewProductDetails = (product) => {
+  router.push({ name: 'CustomerProductDetail', params: { productId: product.id } });
 };
 
-const closeComparisonModal = () => {
-  showComparisonModal.value = false;
-  resetComparison();
+/**
+ * View shop details
+ */
+const viewShopDetails = (shop) => {
+  router.push({ name: 'CustomerShopDetail', params: { shopId: shop.id } });
 };
 
-const clearComparison = async () => {
-  searchActive.value = false;
-  searchQuery.value = '';
-  comparisonResults.value = [];
-  // Reload all products
-  await fetchProducts();
+/**
+ * Add to wishlist
+ */
+const addToWishlist = (product) => {
+  // TODO: Implement wishlist functionality
+  showSuccessNotification(`${product.name} added to wishlist`);
 };
 
-const openComparisonModal = () => {
-  showComparisonModal.value = true;
+/**
+ * Normalize product data for display
+ */
+const normalizeProducts = (rawProducts) => {
+  return rawProducts.map(p => ({
+    id: p.id || p.product_id,
+    name: p.name || p.productDisplayName || 'Unknown Product',
+    price: p.price || p.price_per_meter || 0,
+    unit: p.unit || '/meter',
+    description: p.description || p.product_description || '',
+    category: p.category || p.masterCategory || '',
+    rating: p.rating ?? p.average_rating ?? 4,
+    image: p.image_url || p.image || p.link || getPlaceholderImage(p.name),
+    shop: p.shop || { id: p.shop_id, name: p.shop_name || 'Unknown Shop' },
+    in_stock: p.in_stock ?? (p.stock_qty > 0),
+    stock_qty: p.stock_qty || p.quantity || 0,
+    is_trending: p.is_trending || false,
+    similarity_score: p.similarity_score || null,
+    distance: p.distance || null
+  }));
 };
 
-// Watch for search query changes
-watch(searchQuery, () => {
-  if (searchQuery.value) {
-    filters.search = searchQuery.value;
+/**
+ * Get placeholder image URL
+ */
+const getPlaceholderImage = (name) => {
+  const encodedName = encodeURIComponent(name || 'Product');
+  return `https://placehold.co/400x400/EEE/999?text=${encodedName}`;
+};
+
+/**
+ * Fetch categories
+ */
+const fetchCategories = async () => {
+  try {
+    const response = await getCategories();
+    if (response.data && response.data.categories) {
+      categories.value = response.data.categories;
+    }
+  } catch (err) {
+    console.error('Failed to fetch categories:', err);
+  }
+};
+
+// Watch for search query changes with debounce
+let searchTimeout;
+watch(searchQuery, (newVal) => {
+  clearTimeout(searchTimeout);
+  if (newVal.length >= 2) {
+    searchTimeout = setTimeout(() => handleSearch(newVal), 500);
+  } else if (newVal.length === 0) {
+    pagination.page = 1;
     fetchProducts();
   }
 });
 
-// Fetch products on mount
+// Initialize on mount
 onMounted(() => {
+  fetchCategories();
   fetchProducts();
 });
 </script>
@@ -487,62 +586,297 @@ onMounted(() => {
   }
 }
 
-/* Header */
-h5 {
-  font-weight: 700;
-  color: var(--color-text-dark);
-  font-size: 1.75rem;
+/* Filters Section */
+.filters-section {
+  padding: 1rem 1.5rem;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.8));
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.3));
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  margin: 1.5rem 0;
 }
 
-/* Search Input */
-.input-group {
+.filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filters-label {
+  font-weight: 600;
+  color: var(--color-text-dark, #333);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-clear-filters {
+  background: transparent;
+  border: none;
+  color: var(--color-primary, #4A90E2);
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-clear-filters:hover {
+  background: rgba(74, 144, 226, 0.1);
+}
+
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.filter-dropdown {
+  position: relative;
+}
+
+.filter-select {
+  padding: 0.6rem 2rem 0.6rem 1rem;
+  border: 2px solid var(--color-bg-alt, #e2e8f0);
   background: white;
   border-radius: 50px;
-  overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-  border: 2px solid transparent;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--color-text-muted, #666);
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  min-width: 140px;
+}
+
+.filter-select:hover {
+  border-color: var(--color-primary, #4A90E2);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--color-primary, #4A90E2);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input {
+  display: none;
+}
+
+.toggle-switch {
+  width: 44px;
+  height: 24px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  position: relative;
   transition: all 0.3s ease;
 }
 
-.input-group:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 4px 20px rgba(74, 144, 226, 0.2);
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.input-group .form-control {
-  border: none;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  color: var(--color-text-dark);
+.toggle-label input:checked + .toggle-switch {
+  background: var(--color-primary, #4A90E2);
 }
 
-.input-group .form-control:focus {
-  box-shadow: none;
+.toggle-label input:checked + .toggle-switch::after {
+  left: 22px;
 }
 
-.input-group .btn {
-  border: none;
-  background: transparent;
-  font-size: 1.2rem;
-  padding: 0.5rem 1rem;
-  transition: transform 0.2s ease;
-  color: var(--color-text-muted);
+.toggle-text {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #666);
+  font-weight: 500;
 }
 
-.input-group .btn:hover {
-  transform: scale(1.1);
-  color: var(--color-primary);
+/* Results Summary */
+.results-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #666);
+}
+
+.results-count {
+  font-weight: 600;
+  color: var(--color-text-dark, #333);
+}
+
+.results-query {
+  color: var(--color-primary, #4A90E2);
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.loading-spinner {
+  text-align: center;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top-color: var(--color-primary, #4A90E2);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner p {
+  color: var(--color-text-muted, #666);
+}
+
+/* Error State */
+.error-container {
+  text-align: center;
+  padding: 3rem;
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.error-container i {
+  font-size: 3rem;
+  color: #ef4444;
+  margin-bottom: 1rem;
+}
+
+.error-container p {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.8));
+  border-radius: 16px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.3));
+}
+
+.empty-state i {
+  font-size: 4rem;
+  color: #cbd5e0;
+  margin-bottom: 1rem;
+}
+
+.empty-state h4 {
+  color: var(--color-text-dark, #333);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: var(--color-text-muted, #666);
+  margin-bottom: 1.5rem;
+}
+
+/* Products Grid */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+/* Pagination */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem 0;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.page-btn {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--color-bg-alt, #e2e8f0);
+  background: white;
+  border-radius: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-btn:hover {
+  border-color: var(--color-primary, #4A90E2);
+  color: var(--color-primary, #4A90E2);
+}
+
+.page-btn.active {
+  background: var(--color-primary, #4A90E2);
+  border-color: var(--color-primary, #4A90E2);
+  color: white;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.6rem 1.25rem;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: linear-gradient(135deg, var(--color-primary, #4A90E2) 0%, var(--color-accent, #63B3ED) 100%);
   border: none;
-  border-radius: 50px;
-  padding: 0.75rem 2rem;
-  font-weight: 600;
-  color: #4A4A4A;
-  transition: all 0.3s ease;
-  white-space: nowrap;
+  color: white;
 }
 
 .btn-primary:hover {
@@ -550,413 +884,25 @@ h5 {
   box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
 }
 
-/* Filters Section */
-.filters-section {
-  padding: 1rem 1.5rem;
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  border-radius: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  margin-bottom: 2rem;
-}
-
-.fw-semibold {
-  color: var(--color-text-dark) !important;
-  font-size: 1rem;
-  font-weight: 600 !important;
-}
-
-.filter-btn {
-  padding: 0.6rem 1.25rem;
-  border: 2px solid var(--color-bg-alt);
-  background: white;
-  border-radius: 50px;
-  cursor: pointer;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.filter-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
-}
-
-/* Products Grid */
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
-}
-
-.product-carousel-item .card {
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.product-carousel-item .card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 15px 50px rgba(74, 144, 226, 0.15);
-}
-
-.product-carousel-item .card-body {
-  padding: 1.5rem;
-}
-
-/* Carousel Container */
-.carousel-container {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.carousel-btn {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  border: none;
-  border-radius: 50%;
-  width: 45px;
-  height: 45px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #4A4A4A;
-  flex-shrink: 0;
-  font-size: 1.5rem;
-  font-weight: bold;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.25);
-}
-
-.carousel-btn:hover:not(:disabled) {
-  transform: scale(1.15);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
-}
-
-.carousel-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  background: #cbd5e0;
-  box-shadow: none;
-}
-
-.product-main {
-  flex: 1;
-}
-
-/* Product Image */
-.product-image-wrapper {
-  position: relative;
-  width: 100%;
-  height: 280px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--color-bg-light);
-}
-
-.product-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.3s ease;
-}
-
-.product-image:hover {
-  transform: scale(1.05);
-}
-
-.image-indicator {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 50px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.similarity-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-  color: white;
-  padding: 0.35rem 0.85rem;
-  border-radius: 50px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.35);
-  animation: slideInRight 0.4s ease-out;
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Product Details */
-.product-main h6 {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--color-text-dark);
-  margin-bottom: 0.75rem;
-}
-
-.price {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-primary);
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 1rem;
-}
-
-.product-main p {
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  font-size: 0.95rem;
-}
-
-.rating {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
-}
-
-.rating .text-warning {
-  color: #fbbf24 !important;
-}
-
-.rating .text-muted {
-  color: #e2e8f0 !important;
-}
-
-.small {
-  font-size: 0.9rem;
-}
-
-.text-muted {
-  color: var(--color-text-muted) !important;
-}
-
-/* Image Comparison Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  z-index: 1050;
-  padding: 1rem;
-  overflow-y: auto;
-  padding-top: 5vh;
-}
-
-.comparison-modal {
-  background: white;
-  padding: 2.5rem;
-  border-radius: 24px;
-  max-width: 900px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  position: relative;
-  animation: modalSlideInTop 0.3s ease;
-  margin: 0;
-  margin-top: 0;
-  margin-bottom: 2rem;
-}
-
-@keyframes modalSlideInTop {
-  from {
-    transform: translateY(-100px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.btn-close-modal {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  background: #f7fafc;
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-close-modal:hover {
-  background: #e53e3e;
-  color: white;
-  transform: rotate(90deg);
-}
-
-.comparison-upload-section h5 {
-  font-weight: 700;
-  color: var(--color-text-dark);
-  font-size: 1.5rem;
-}
-
-/* Upload Area */
-.upload-area {
-  border: 3px dashed var(--color-primary);
-  border-radius: 16px;
-  padding: 3rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  background: rgba(74, 144, 226, 0.05);
-  transition: all 0.3s ease;
-}
-
-.upload-area:hover {
-  background: rgba(74, 144, 226, 0.1);
-  border-color: var(--color-accent);
-}
-
-.upload-icon {
-  font-size: 3rem;
-  color: var(--color-primary);
-  margin-bottom: 1rem;
-}
-
-.upload-area p {
-  margin: 0.5rem 0;
-}
-
-/* Results Grid */
-.results-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1.5rem;
-  margin-top: 2rem;
-}
-
-.result-card {
-  background: var(--color-bg-light);
-  border: 2px solid var(--color-bg-alt);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.result-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.2);
-  transform: translateY(-4px);
-}
-
-.result-image-wrapper {
-  position: relative;
-  width: 100%;
-  height: 150px;
-  overflow: hidden;
-  background: var(--color-bg-alt);
-}
-
-.result-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.3s ease;
-}
-
-.result-card:hover .result-image {
-  transform: scale(1.1);
-}
-
-.similarity-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: #4A4A4A;
-  padding: 0.35rem 0.75rem;
-  border-radius: 50px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
-}
-
-.result-info {
-  padding: 1rem;
-}
-
-.result-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--color-text-dark);
-  margin-bottom: 0.75rem;
-  margin: 0 0 0.75rem 0;
-}
-
-.progress {
-  background: var(--color-bg-alt);
-  border-radius: 3px;
-}
-
-.progress-bar {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  border-radius: 3px;
-}
-
-/* Load More Button */
 .btn-outline-primary {
-  border: 2px solid var(--color-primary);
-  color: var(--color-primary);
+  border: 2px solid var(--color-primary, #4A90E2);
+  color: var(--color-primary, #4A90E2);
   background: white;
-  padding: 0.75rem 2.5rem;
-  border-radius: 50px;
-  font-weight: 600;
-  transition: all 0.3s ease;
 }
 
-.btn-outline-primary:hover {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: #4A4A4A;
+.btn-outline-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--color-primary, #4A90E2) 0%, var(--color-accent, #63B3ED) 100%);
+  color: white;
   border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
+}
+
+.btn-outline-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-load-more {
+  padding: 0.75rem 2.5rem;
 }
 
 /* Responsive Design */
@@ -965,44 +911,35 @@ h5 {
     padding: 1rem;
   }
 
-  .products-grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-
-  .d-flex.justify-content-between {
+  .filters-row {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+
+  .products-grid {
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    align-items: stretch !important;
   }
 
-  .input-group {
-    max-width: 100% !important;
-  }
-
-  .carousel-btn {
-    width: 35px;
-    height: 35px;
-    font-size: 1.2rem;
-  }
-
-  .filters-section {
-    padding: 1rem;
+  .pagination-container {
     flex-wrap: wrap;
   }
 
-  .comparison-modal {
-    padding: 1.5rem;
-    max-height: 90vh;
+  .page-numbers {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 0.5rem;
   }
+}
 
-  .results-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 1rem;
-  }
-
-  .result-image-wrapper {
-    height: 120px;
+@media (max-width: 480px) {
+  .products-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

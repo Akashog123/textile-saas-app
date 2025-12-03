@@ -4,6 +4,15 @@
 import api from './axios';
 
 /**
+ * Download CSV template for sales data upload
+ * Template columns: date, sku, product_name, category, quantity_sold, selling_price, region
+ * @returns {Promise} Response with CSV file blob
+ */
+export const downloadSalesTemplate = () => {
+    return api.get('/inventory/template/sales', { responseType: 'blob' });
+};
+
+/**
  * Get shop dashboard analytics and insights
  * @param {number} shopId - Shop ID
  * @returns {Promise} Response with dashboard data including sales, revenue, AI insights, and forecast
@@ -28,7 +37,7 @@ export const uploadSalesData = (shopId, file) => {
 
     return api.post('/shop/upload_sales_data', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 60000 // 60 seconds for file upload
+        timeout: 120000 // 120 seconds for file upload + AI analysis
     });
 };
 
@@ -178,6 +187,67 @@ export const deleteShop = (shopId) => {
   return api.delete(`/shop/my-shops/${shopId}`, { timeout: 15000 });
 };
 
+/* -------------------------
+   Shop Images Management
+   Upload up to 4 images per shop
+   ------------------------- */
+
+/**
+ * Get all images for a shop
+ * @param {number} shopId - Shop ID
+ * @returns {Promise} Response with images array, max_images, can_upload_more
+ */
+export const getShopImages = (shopId) => {
+  return api.get(`/shop/${shopId}/images`, { timeout: 15000 });
+};
+
+/**
+ * Upload images for a shop (max 4 total)
+ * @param {number} shopId - Shop ID
+ * @param {FileList|Array} files - Array of image files
+ * @returns {Promise} Response with uploaded images and remaining slots
+ */
+export const uploadShopImages = (shopId, files) => {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('images', file);
+  }
+  return api.post(`/shop/${shopId}/images`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000
+  });
+};
+
+/**
+ * Delete a shop image
+ * @param {number} shopId - Shop ID
+ * @param {number} imageId - Image ID to delete
+ * @returns {Promise} Response with remaining images
+ */
+export const deleteShopImage = (shopId, imageId) => {
+  return api.delete(`/shop/${shopId}/images/${imageId}`, { timeout: 15000 });
+};
+
+/**
+ * Reorder shop images
+ * @param {number} shopId - Shop ID
+ * @param {Array<number>} imageIds - Array of image IDs in desired order
+ * @returns {Promise} Response with reordered images
+ */
+export const reorderShopImages = (shopId, imageIds) => {
+  return api.put(`/shop/${shopId}/images/reorder`, { image_ids: imageIds }, { timeout: 15000 });
+};
+
+/**
+ * Set a shop image as the primary/cover image
+ * @param {number} shopId - Shop ID
+ * @param {number} imageId - Image ID to set as primary
+ * @returns {Promise} Response with updated images
+ */
+export const setShopPrimaryImage = (shopId, imageId) => {
+  return api.put(`/shop/${shopId}/images/${imageId}/set-primary`, {}, { timeout: 15000 });
+};
+
 export default {
     getShopDashboard,
     uploadSalesData,
@@ -193,4 +263,10 @@ export default {
     createShop,
     updateShop,
     deleteShop,
+    downloadSalesTemplate,
+    getShopImages,
+    uploadShopImages,
+    deleteShopImage,
+    reorderShopImages,
+    setShopPrimaryImage
 };
