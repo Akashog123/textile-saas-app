@@ -1,11 +1,11 @@
-name,category,price,stock,sku,minimum_stock
-Cotton T-Shirt,Apparel,299.99,50,CT-001,10
-Denim Jeans,Apparel,899.99,30,DJ-002,5
-Silk Blouse,Apparel,1299.99,15,SB-003,3
-Wool Sweater,Apparel,799.99,25,WS-004,8
-Linen Shirt,Apparel,599.99,40,LS-005,10
-Polyester Dress,Apparel,449.99,35,PD-006,7
-Rayon Skirt,Apparel,399.99,45,RS-007,9
-Nylon Jacket,Apparel,999.99,20,NJ-008,4
-Spandex Leggings,Apparel,349.99,60,SL-009,12
-Viscose Top,Apparel,279.99,55,VT-010,11
+﻿name,sku,category,price,purchase_qty,minimum_stock,description
+Cotton T-Shirt,CT-001,Apparel,299.99,50,10,Premium cotton t-shirt
+Denim Jeans,DJ-002,Apparel,899.99,30,5,Classic denim jeans
+Silk Blouse,SB-003,Apparel,1299.99,15,3,Elegant silk blouse
+Wool Sweater,WS-004,Apparel,799.99,25,8,Warm wool sweater
+Linen Shirt,LS-005,Apparel,599.99,40,10,Breathable linen shirt
+Polyester Dress,PD-006,Apparel,449.99,35,7,Lightweight polyester dress
+Rayon Skirt,RS-007,Apparel,399.99,45,9,Soft rayon skirt
+Nylon Jacket,NJ-008,Apparel,999.99,20,4,Durable nylon jacket
+Spandex Leggings,SL-009,Apparel,349.99,60,12,Stretchy spandex leggings
+Viscose Top,VT-010,Apparel,279.99,55,11,Comfortable viscose top
