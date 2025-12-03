@@ -28,7 +28,7 @@
               <!-- Customer Navigation -->
               <template v-if="user.role === 'customer'">
                 <li class="nav-item">
-                  <router-link to="/customer" class="nav-link">
+                  <router-link to="/customer" class="nav-link" exact>
                     <i class="bi bi-house-door me-2"></i>Home
                   </router-link>
                 </li>
@@ -81,7 +81,7 @@
               <!-- Distributor Navigation -->
               <template v-if="user.role === 'distributor' || user.role === 'manufacturer'">
                 <li class="nav-item">
-                  <router-link to="/distributor" class="nav-link">
+                  <router-link to="/distributor" class="nav-link" exact>
                     <i class="bi bi-house-door me-2"></i>Home
                   </router-link>
                 </li>
@@ -242,7 +242,7 @@ const handleLogout = () => {
 }
 
 .nav-link:hover,
-.nav-link.router-link-active {
+.nav-link.router-link-exact-active {
   color: var(--color-primary);
   background: rgba(59, 130, 246, 0.08);
   transform: translateY(-1px);

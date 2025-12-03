@@ -53,9 +53,11 @@ const handleLogout = async () => {
   } catch (error) {
     console.error('Logout error:', error)
   } finally {
+    // Clear all cached data
     localStorage.removeItem('token')
     localStorage.removeItem('role')
     localStorage.removeItem('user')
+    sessionStorage.clear() // Clear all session cached data (planning, heatmap, etc.)
     user.value = null
     authKey.value += 1
     router.push('/login')
