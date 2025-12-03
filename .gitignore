@@ -59,3 +59,4 @@ ENV/
 run_app.py
 
 
+/backend/services/manager_kbs
