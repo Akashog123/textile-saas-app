@@ -47,16 +47,26 @@ class GeminiProvider(AIProvider):
         self.GenerativeModel = GenerativeModel
         print("Gemini AI Provider initialized")
     
-    def generate_text(self, prompt: str, model: str = None, **kwargs) -> str:
-        """Generate text using Gemini"""
-        try:
+    def generate_text(self, prompt: str, model: str = None, timeout: int = 30, **kwargs) -> str:
+        """Generate text using Gemini with timeout"""
+        import concurrent.futures
+        
+        def _call_api():
             model_name = model or Config.AI_TEXT_MODEL
             gen_model = self.GenerativeModel(model_name)
             response = gen_model.generate_content(prompt, **kwargs)
-            
             if response and hasattr(response, "text") and response.text:
                 return response.text.strip()
             return ""
+        
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(_call_api)
+                result = future.result(timeout=timeout)
+                return result
+        except concurrent.futures.TimeoutError:
+            print(f"Gemini API timeout after {timeout}s")
+            raise TimeoutError(f"Gemini API call timed out after {timeout} seconds")
         except Exception as e:
             print(f"Gemini text generation error: {e}")
             raise
@@ -313,7 +323,7 @@ class NVIDIAProvider(AIProvider):
             # Extract temperature and other params
             temperature = kwargs.get("temperature", 0.6)
             top_p = kwargs.get("top_p", 0.7)
-            max_tokens = kwargs.get("max_tokens", 4096)
+            max_tokens = kwargs.get("max_tokens", 1024)
             
             completion = self.client.chat.completions.create(
                 model=model_name,

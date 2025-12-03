@@ -278,7 +278,7 @@ const userRole = computed(() => props.user?.role || '')
 }
 
 .nav-link:hover,
-.nav-link.router-link-active {
+.nav-link.router-link-exact-active {
   color: var(--color-primary);
   background: rgba(59, 130, 246, 0.06);
 }
