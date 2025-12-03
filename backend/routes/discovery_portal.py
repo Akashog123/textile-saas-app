@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 from models.model import db, Product, Shop, SalesData
 from sqlalchemy import or_, func
 from utils.image_utils import resolve_product_image, resolve_shop_image
-from utils.performance_utils import cached_ai_caption, batch_ai_captions, performance_monitor
+from utils.performance_utils import batch_ai_captions, performance_monitor
 from config import Config
 import requests
 from decimal import Decimal
