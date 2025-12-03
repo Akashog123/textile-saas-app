@@ -54,3 +54,8 @@ ENV/
 
 # Vitest
 **/__screenshots__/
+
+# App runner script
+run_app.py
+
+

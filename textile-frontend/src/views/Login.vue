@@ -403,6 +403,9 @@ const handleLogin = async () => {
   loginError.value = "";
   loadingLogin.value = true;
 
+  // Clear any cached data from previous user session
+  sessionStorage.clear();
+
   try {
     const resp = await api.post("/auth/login", {
       username: loginForm.value.username,
