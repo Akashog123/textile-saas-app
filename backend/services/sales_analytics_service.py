@@ -3,58 +3,54 @@
 Robust Sales Analytics Service for Shop Dashboard
 Provides comprehensive sales summaries, trend analysis, and demand forecasting.
 Uses ONLY database records from shop owner's periodic sales data uploads.
-Includes TTL-based caching for performance optimization.
+Includes DB-backed caching for AI insights and forecasts to prevent redundant API calls.
 """
 
 import pandas as pd
 import numpy as np
 import hashlib
+import json
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import logging
 
-from models.model import db, SalesData, Product, Shop
+from models.model import db, SalesData, Product, Shop, CachedAIInsight, CachedForecast
 from services.prophet_service import prophet_manager
 
 logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Cache TTL Configuration
+# ============================================================================
+FORECAST_TTL_HOURS = 24  # Forecasts valid for 24 hours unless new data uploaded
+INSIGHTS_TTL_HOURS = 24  # AI insights valid for 24 hours unless new data uploaded
+
+
+# ============================================================================
 # Query Cache for Sales Analytics
 # ============================================================================
 class SalesQueryCache:
-    """TTL-based cache for sales analytics queries."""
+    """Query cache DISABLED - always fetches fresh data from DB."""
     
-    def __init__(self, ttl_seconds: int = 300):  # 5 minute TTL default
-        self._cache: Dict[str, Tuple[Any, float]] = {}
-        self.ttl = ttl_seconds
+    def __init__(self, ttl_seconds: int = 300):
+        pass
     
     def _make_key(self, shop_id: int, method: str, *args) -> str:
-        key_data = f"{shop_id}:{method}:{str(args)}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return ""
     
     def get(self, shop_id: int, method: str, *args) -> Optional[Any]:
-        key = self._make_key(shop_id, method, *args)
-        if key in self._cache:
-            value, timestamp = self._cache[key]
-            if time.time() - timestamp < self.ttl:
-                logger.debug(f"[QueryCache HIT] {method} for shop {shop_id}")
-                return value
-            del self._cache[key]
+        # Always return None - no caching, fetch fresh from DB
         return None
     
     def set(self, shop_id: int, method: str, value: Any, *args):
-        key = self._make_key(shop_id, method, *args)
-        self._cache[key] = (value, time.time())
-        logger.debug(f"[QueryCache SET] {method} for shop {shop_id}")
+        # No-op - caching disabled
+        pass
     
     def invalidate(self, shop_id: int):
-        """Invalidate all cache entries for a specific shop."""
-        keys_to_delete = [k for k in self._cache if k.startswith(f"{shop_id}:")]
-        for key in keys_to_delete:
-            del self._cache[key]
-        logger.info(f"[QueryCache] Invalidated cache for shop {shop_id}")
+        # No-op - caching disabled
+        pass
 
 
 # Global query cache instance
@@ -66,11 +62,106 @@ class SalesAnalyticsService:
     Comprehensive sales analytics service using ONLY database records.
     Data comes from SalesData table populated by shop owner's periodic uploads.
     Includes query caching for better performance with repeated requests.
+    Uses DB-backed caching for forecasts and AI insights to prevent redundant computations.
     """
     
     def __init__(self, shop_id: int):
         self.shop_id = shop_id
         self._cache = _query_cache
+    
+    # =========================================================================
+    # DB-BACKED FORECAST CACHING
+    # =========================================================================
+    
+    def _get_data_hash(self, days: int = 90) -> str:
+        """Generate a hash of sales data to detect changes."""
+        try:
+            # Get count and latest date for quick hash
+            from sqlalchemy import func
+            result = db.session.query(
+                func.count(SalesData.id),
+                func.max(SalesData.date),
+                func.sum(SalesData.revenue)
+            ).filter(
+                SalesData.shop_id == self.shop_id
+            ).first()
+            
+            count, max_date, total_revenue = result if result else (0, None, 0)
+            hash_input = f"{self.shop_id}:{count}:{max_date}:{total_revenue}"
+            return hashlib.md5(hash_input.encode()).hexdigest()
+        except Exception as e:
+            logger.error(f"Error generating data hash: {e}")
+            return ""
+    
+    def _get_cached_forecast(self, forecast_type: str) -> Optional[Dict]:
+        """
+        Get cached forecast from database if still valid.
+        Returns None if no valid cache exists or data has changed.
+        """
+        try:
+            data_hash = self._get_data_hash()
+            cached = CachedForecast.query.filter_by(
+                shop_id=self.shop_id,
+                forecast_type=forecast_type
+            ).first()
+            
+            if cached:
+                # Check if data hash matches (data hasn't changed)
+                if cached.data_hash != data_hash:
+                    logger.info(f"[Cache Miss] Data changed for shop {self.shop_id}")
+                    return None
+                
+                # Check if cache is expired
+                if cached.expires_at and datetime.utcnow() > cached.expires_at:
+                    logger.info(f"[Cache Miss] Expired for shop {self.shop_id}")
+                    return None
+                
+                logger.info(f"[Cache Hit] Using cached forecast for shop {self.shop_id}")
+                return json.loads(cached.forecast_data) if isinstance(cached.forecast_data, str) else cached.forecast_data
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error getting cached forecast: {e}")
+            return None
+    
+    def _save_cached_forecast(self, forecast_type: str, forecast_data: Dict):
+        """Save forecast to database cache."""
+        try:
+            data_hash = self._get_data_hash()
+            expires_at = datetime.utcnow() + timedelta(hours=FORECAST_TTL_HOURS)
+            
+            # Delete existing cache for this shop/type
+            CachedForecast.query.filter_by(
+                shop_id=self.shop_id,
+                forecast_type=forecast_type
+            ).delete()
+            
+            # Create new cache entry
+            cached = CachedForecast(
+                shop_id=self.shop_id,
+                forecast_type=forecast_type,
+                forecast_data=json.dumps(forecast_data) if not isinstance(forecast_data, str) else forecast_data,
+                data_hash=data_hash,
+                expires_at=expires_at,
+                created_at=datetime.utcnow()
+            )
+            db.session.add(cached)
+            db.session.commit()
+            logger.info(f"[Cache Save] Saved forecast for shop {self.shop_id}")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error saving cached forecast: {e}")
+    
+    def invalidate_forecasts(self):
+        """Invalidate all cached forecasts for this shop."""
+        try:
+            CachedForecast.query.filter_by(shop_id=self.shop_id).delete()
+            db.session.commit()
+            logger.info(f"[Cache Invalidate] Cleared forecast cache for shop {self.shop_id}")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error invalidating forecasts: {e}")
+    
     # =========================================================================
     # DATA LOADING - Database Only
     # =========================================================================
@@ -108,14 +199,15 @@ class SalesAnalyticsService:
                     product = Product.query.get(record.product_id)
                     if product:
                         product_name = product.name
-                        category = product.fabric_type or record.fabric_type
+                        # Product uses 'category'
+                        category = product.category or record.fabric_type
                 
                 data.append({
                     'date': record.date,
                     'product_id': record.product_id,
                     'product_name': product_name,
                     'region': record.region,
-                    'fabric_type': category,
+                    'category': category,
                     'quantity_sold': record.quantity_sold or 0,
                     'revenue': float(record.revenue or 0)
                 })
@@ -249,14 +341,13 @@ class SalesAnalyticsService:
                     "revenue": round(float(row['revenue']), 2),
                     "quantity": int(row['quantity_sold'])
                 })
-        
-        # Top categories/fabrics
+                # Top categories
         top_categories = []
-        category_col = None
-        for col in ['fabric_type', 'category', 'product_category']:
-            if col in current_week.columns:
-                category_col = col
-                break
+        category_col = 'category' if 'category' in current_week.columns else None
+        
+        # Fallback for legacy data with fabric_type
+        if not category_col and 'fabric_type' in current_week.columns:
+            category_col = 'fabric_type'
         
         if category_col:
             top_cats = current_week.groupby(category_col).agg({
@@ -272,10 +363,11 @@ class SalesAnalyticsService:
                         "percentage": round(float(row['revenue']) / current_revenue * 100, 1) if current_revenue > 0 else 0
                     })
         
-        # Generate insights
+        # Generate insights (pass daily_breakdown and df for richer analysis)
         insights = self._generate_weekly_insights(
             current_revenue, prev_revenue, revenue_change_pct,
-            current_quantity, prev_quantity, top_products, top_categories
+            current_quantity, prev_quantity, top_products, top_categories,
+            daily_breakdown=daily_breakdown, df=current_week
         )
         
         avg_order_value = current_revenue / current_orders if current_orders > 0 else 0
@@ -312,55 +404,166 @@ class SalesAnalyticsService:
     
     def _generate_weekly_insights(
         self, current_revenue: float, prev_revenue: float, revenue_change_pct: float,
-        current_qty: int, prev_qty: int, top_products: List, top_categories: List
+        current_qty: int, prev_qty: int, top_products: List, top_categories: List,
+        daily_breakdown: List = None, df: pd.DataFrame = None
     ) -> List[Dict]:
-        """Generate actionable insights from weekly data"""
+        """Generate actionable, unique insights from weekly data"""
         insights = []
         
-        # Revenue trend insight
-        if revenue_change_pct > 10:
+        # 1. Sales Velocity Insight - Calculate average daily sales rate
+        if current_qty > 0:
+            avg_daily_units = current_qty / 7
+            if avg_daily_units >= 30:
+                velocity_status = "high"
+                velocity_msg = f"You're selling {avg_daily_units:.0f} units/day on average. Strong velocity!"
+            elif avg_daily_units >= 10:
+                velocity_status = "good"
+                velocity_msg = f"Steady pace at {avg_daily_units:.0f} units/day. Room to push harder."
+            else:
+                velocity_status = "slow"
+                velocity_msg = f"Only {avg_daily_units:.1f} units/day. Consider flash sales or bundles."
+            
             insights.append({
-                "type": "success",
-                "icon": "bi-graph-up-arrow",
-                "title": "Strong Revenue Growth",
-                "message": f"Revenue increased by {revenue_change_pct:.1f}% compared to last week. Keep up the momentum!"
-            })
-        elif revenue_change_pct < -10:
-            insights.append({
-                "type": "warning",
-                "icon": "bi-graph-down-arrow",
-                "title": "Revenue Decline Alert",
-                "message": f"Revenue dropped by {abs(revenue_change_pct):.1f}%. Consider promotions or marketing campaigns."
-            })
-        elif current_revenue > 0:
-            insights.append({
-                "type": "info",
-                "icon": "bi-dash-lg",
-                "title": "Stable Performance",
-                "message": "Revenue is holding steady compared to last week."
+                "type": "success" if velocity_status == "high" else "info" if velocity_status == "good" else "warning",
+                "icon": "bi-speedometer2",
+                "title": "Sales Velocity",
+                "message": velocity_msg,
+                "category": "Performance"
             })
         
-        # Top performer insight
-        if top_products and len(top_products) > 0:
-            top_product = top_products[0]
-            insights.append({
-                "type": "success",
-                "icon": "bi-trophy",
-                "title": "Top Performer",
-                "message": f"'{top_product['name']}' is your best seller with ₹{top_product['revenue']:,.0f} in revenue."
-            })
+        # 2. Best Selling Day Analysis
+        if daily_breakdown and len(daily_breakdown) > 0:
+            best_day = max(daily_breakdown, key=lambda x: x.get('revenue', 0))
+            worst_day = min(daily_breakdown, key=lambda x: x.get('revenue', 0))
+            
+            if best_day.get('revenue', 0) > 0:
+                insights.append({
+                    "type": "success",
+                    "icon": "bi-calendar-check",
+                    "title": "Peak Sales Day",
+                    "message": f"{best_day.get('day_name', 'N/A')} was your best day with {best_day.get('revenue_formatted', '₹0')}. Plan promotions around this day!",
+                    "category": "Timing"
+                })
+            
+            # Only show worst day insight if there's meaningful difference
+            if best_day.get('revenue', 0) > 0 and worst_day.get('revenue', 0) >= 0:
+                diff_pct = ((best_day.get('revenue', 0) - worst_day.get('revenue', 1)) / best_day.get('revenue', 1)) * 100 if best_day.get('revenue', 0) > 0 else 0
+                if diff_pct > 50:
+                    insights.append({
+                        "type": "warning",
+                        "icon": "bi-calendar-x",
+                        "title": "Opportunity Day",
+                        "message": f"{worst_day.get('day_name', 'N/A')} had {diff_pct:.0f}% less sales. Run {worst_day.get('day_name', '')} specials!",
+                        "category": "Timing"
+                    })
         
-        # Category insight
+        # 3. Revenue per Unit (Pricing Power)
+        if current_qty > 0 and current_revenue > 0:
+            avg_price = current_revenue / current_qty
+            prev_avg_price = prev_revenue / prev_qty if prev_qty > 0 else 0
+            price_change = ((avg_price - prev_avg_price) / prev_avg_price * 100) if prev_avg_price > 0 else 0
+            
+            if price_change > 10:
+                insights.append({
+                    "type": "success",
+                    "icon": "bi-cash-stack",
+                    "title": "Pricing Power Up",
+                    "message": f"Avg. revenue per item is ₹{avg_price:,.0f} (+{price_change:.0f}% vs last week). Premium products are selling!",
+                    "category": "Pricing"
+                })
+            elif price_change < -10:
+                insights.append({
+                    "type": "warning",
+                    "icon": "bi-tag",
+                    "title": "Price Pressure",
+                    "message": f"Avg. revenue per item dropped to ₹{avg_price:,.0f}. Review discounting strategy.",
+                    "category": "Pricing"
+                })
+        
+        # 4. Category Concentration Risk
         if top_categories and len(top_categories) > 0:
             top_cat = top_categories[0]
-            insights.append({
-                "type": "info",
-                "icon": "bi-pie-chart",
-                "title": "Category Leader",
-                "message": f"{top_cat['name']} accounts for {top_cat['percentage']:.0f}% of your weekly sales."
-            })
+            if top_cat['percentage'] > 60:
+                insights.append({
+                    "type": "warning",
+                    "icon": "bi-exclamation-triangle",
+                    "title": "Category Concentration",
+                    "message": f"{top_cat['name']} dominates at {top_cat['percentage']:.0f}% of sales. Diversify to reduce risk.",
+                    "category": "Strategy"
+                })
+            elif len(top_categories) >= 3 and all(cat['percentage'] >= 15 for cat in top_categories[:3]):
+                insights.append({
+                    "type": "success",
+                    "icon": "bi-pie-chart",
+                    "title": "Healthy Category Mix",
+                    "message": "Revenue well-distributed across categories. Great portfolio balance!",
+                    "category": "Strategy"
+                })
         
-        return insights
+        # 5. Growth Momentum Analysis
+        if prev_revenue > 0:
+            if revenue_change_pct > 20:
+                insights.append({
+                    "type": "success",
+                    "icon": "bi-rocket-takeoff",
+                    "title": "Momentum Building",
+                    "message": f"+{revenue_change_pct:.1f}% growth! Capitalize with expanded inventory & marketing.",
+                    "category": "Trend"
+                })
+            elif revenue_change_pct < -20:
+                insights.append({
+                    "type": "warning",
+                    "icon": "bi-arrow-down-circle",
+                    "title": "Action Required",
+                    "message": f"Revenue down {abs(revenue_change_pct):.1f}%. Consider clearance sales or new product launches.",
+                    "category": "Trend"
+                })
+        
+        # 6. Top Product Growth Potential
+        if top_products and len(top_products) >= 2:
+            top_prod = top_products[0]
+            second_prod = top_products[1]
+            gap = top_prod['revenue'] - second_prod['revenue']
+            
+            if gap > top_prod['revenue'] * 0.5:
+                insights.append({
+                    "type": "info",
+                    "icon": "bi-star",
+                    "title": "Hero Product",
+                    "message": f"'{top_prod['name'][:25]}...' leads by ₹{gap:,.0f}. Stock up & feature prominently!",
+                    "category": "Product"
+                })
+            else:
+                insights.append({
+                    "type": "info",
+                    "icon": "bi-trophy",
+                    "title": "Competitive Top Products",
+                    "message": f"Top 2 products neck-to-neck. Cross-promote as bundle for higher AOV.",
+                    "category": "Product"
+                })
+        
+        # 7. Quantity vs Revenue Insight
+        qty_change_pct = ((current_qty - prev_qty) / prev_qty * 100) if prev_qty > 0 else 0
+        if current_qty > 0 and prev_qty > 0:
+            if qty_change_pct > 0 and revenue_change_pct < 0:
+                insights.append({
+                    "type": "warning",
+                    "icon": "bi-currency-exchange",
+                    "title": "Margin Alert",
+                    "message": f"Units up {qty_change_pct:.0f}% but revenue down. Check if discounts are too deep.",
+                    "category": "Pricing"
+                })
+            elif qty_change_pct < 0 and revenue_change_pct > 0:
+                insights.append({
+                    "type": "success",
+                    "icon": "bi-gem",
+                    "title": "Premium Shift",
+                    "message": f"Fewer units, higher revenue! Customers choosing premium products.",
+                    "category": "Product"
+                })
+        
+        # Limit to top 5 most actionable insights
+        return insights[:5]
     
     # =========================================================================
     # SALES GROWTH TREND (Weekly/Monthly/Yearly)
@@ -586,9 +789,15 @@ class SalesAnalyticsService:
     
     def get_quarterly_demand_forecast(self) -> Dict[str, Any]:
         """
-        Generate next quarter (90 days) demand forecast using Prophet
-        Returns weekly predictions with confidence intervals
+        Generate next quarter (90 days) demand forecast using Prophet.
+        Uses DB caching to avoid redundant Prophet computations.
+        Returns weekly predictions with confidence intervals.
         """
+        # Check DB cache first
+        cached_forecast = self._get_cached_forecast('quarterly')
+        if cached_forecast:
+            return cached_forecast
+        
         df = self.get_sales_data(days=365)  # Use up to 1 year of data from DB
         
         now = datetime.now()
@@ -619,18 +828,26 @@ class SalesAnalyticsService:
             default_response["insights"] = [{
                 "type": "info",
                 "title": "Insufficient Data",
-                "message": "Upload at least 30 days of sales data to generate accurate forecasts."
+                "message": "Upload at least 7 days of sales data to generate forecasts. For accurate predictions, 90+ days is recommended.",
+                "icon": "bi bi-info-circle"
             }]
             return default_response
         
-        # Check data sufficiency
+        # Check data sufficiency - now allows forecasting with 7+ days but with warnings
         date_range = (df['date'].max() - df['date'].min()).days
-        if date_range < 30:
+        has_limited_data = date_range < 90
+        has_very_limited_data = date_range < 30
+        has_minimal_data = date_range < 7
+        
+        # Only block if we have less than 7 days (absolute minimum)
+        if has_minimal_data:
             default_response["status"] = "insufficient_data"
+            default_response["summary"]["historical_days_used"] = date_range
             default_response["insights"] = [{
-                "type": "warning",
-                "title": "Limited Historical Data",
-                "message": f"Only {date_range} days of data available. Recommend at least 90 days for accurate forecasting."
+                "type": "error",
+                "title": "Insufficient Historical Data",
+                "message": f"Only {date_range} days of data available. Minimum 7 days required for any forecast.",
+                "icon": "bi bi-exclamation-triangle"
             }]
             return default_response
         
@@ -657,8 +874,16 @@ class SalesAnalyticsService:
             )
             
             # Extract future predictions only
-            future_revenue = revenue_forecast[revenue_forecast['ds'] > now]
-            future_quantity = quantity_forecast[quantity_forecast['ds'] > now]
+            future_revenue = revenue_forecast[revenue_forecast['ds'] > now].copy()
+            future_quantity = quantity_forecast[quantity_forecast['ds'] > now].copy()
+            
+            # SAFETY: Ensure all forecast values are non-negative (already done in prophet_service, but double-check)
+            future_revenue['yhat'] = future_revenue['yhat'].clip(lower=0)
+            future_revenue['yhat_lower'] = future_revenue['yhat_lower'].clip(lower=0)
+            future_revenue['yhat_upper'] = future_revenue['yhat_upper'].clip(lower=0)
+            future_quantity['yhat'] = future_quantity['yhat'].clip(lower=0)
+            future_quantity['yhat_lower'] = future_quantity['yhat_lower'].clip(lower=0)
+            future_quantity['yhat_upper'] = future_quantity['yhat_upper'].clip(lower=0)
             
             # Weekly aggregation
             weekly_forecast = []
@@ -676,15 +901,17 @@ class SalesAnalyticsService:
                 ]
                 
                 if not week_revenue_data.empty:
+                    predicted_revenue = max(0, float(week_revenue_data['yhat'].sum()))
+                    predicted_quantity = max(0, int(week_quantity_data['yhat'].sum())) if not week_quantity_data.empty else 0
                     weekly_forecast.append({
                         "week_number": week_num + 1,
                         "start_date": week_start.strftime("%Y-%m-%d"),
                         "end_date": week_end.strftime("%Y-%m-%d"),
-                        "predicted_revenue": round(float(week_revenue_data['yhat'].sum()), 2),
-                        "predicted_revenue_formatted": f"₹{week_revenue_data['yhat'].sum():,.0f}",
-                        "predicted_quantity": int(week_quantity_data['yhat'].sum()) if not week_quantity_data.empty else 0,
-                        "confidence_lower": round(float(week_revenue_data['yhat_lower'].sum()), 2),
-                        "confidence_upper": round(float(week_revenue_data['yhat_upper'].sum()), 2)
+                        "predicted_revenue": round(predicted_revenue, 2),
+                        "predicted_revenue_formatted": f"₹{predicted_revenue:,.0f}",
+                        "predicted_quantity": predicted_quantity,
+                        "confidence_lower": round(max(0, float(week_revenue_data['yhat_lower'].sum())), 2),
+                        "confidence_upper": round(max(0, float(week_revenue_data['yhat_upper'].sum())), 2)
                     })
             
             # Monthly aggregation
@@ -705,38 +932,76 @@ class SalesAnalyticsService:
                 month_name = month_start.strftime("%B %Y")
                 
                 if not month_revenue.empty:
+                    predicted_revenue = max(0, float(month_revenue['yhat'].sum()))
+                    predicted_quantity = max(0, int(month_quantity['yhat'].sum())) if not month_quantity.empty else 0
                     monthly_forecast.append({
                         "month": month_name,
-                        "predicted_revenue": round(float(month_revenue['yhat'].sum()), 2),
-                        "predicted_revenue_formatted": f"₹{month_revenue['yhat'].sum():,.0f}",
-                        "predicted_quantity": int(month_quantity['yhat'].sum()) if not month_quantity.empty else 0,
-                        "confidence_lower": round(float(month_revenue['yhat_lower'].sum()), 2),
-                        "confidence_upper": round(float(month_revenue['yhat_upper'].sum()), 2)
+                        "predicted_revenue": round(predicted_revenue, 2),
+                        "predicted_revenue_formatted": f"₹{predicted_revenue:,.0f}",
+                        "predicted_quantity": predicted_quantity,
+                        "confidence_lower": round(max(0, float(month_revenue['yhat_lower'].sum())), 2),
+                        "confidence_upper": round(max(0, float(month_revenue['yhat_upper'].sum())), 2)
                     })
             
             # Category-wise forecast (if category data available)
             category_forecast = self._generate_category_forecast(df, revenue_forecast)
             
-            # Calculate totals
-            total_predicted_revenue = future_revenue['yhat'].sum()
-            total_predicted_quantity = future_quantity['yhat'].sum()
+            # Calculate totals - ensure non-negative
+            total_predicted_revenue = max(0, float(future_revenue['yhat'].sum()))
+            total_predicted_quantity = max(0, int(future_quantity['yhat'].sum()))
             
-            # Determine confidence level based on data quality
+            # Get accuracy level and warnings from metrics
+            accuracy_level = revenue_metrics.get('accuracy_level', 'Medium')
+            has_low_accuracy_warning = revenue_metrics.get('has_low_accuracy_warning', False)
+            model_warnings = revenue_metrics.get('warnings', [])
+            
+            # Override confidence level based on data quality score
             data_quality_score = revenue_metrics.get('data_quality_score', 50)
             if data_quality_score >= 80:
                 confidence_level = "High"
-            elif data_quality_score >= 50:
+            elif data_quality_score >= 60:
                 confidence_level = "Medium"
-            else:
+            elif data_quality_score >= 40:
                 confidence_level = "Low"
+            else:
+                confidence_level = "Very Low"
             
-            # Generate forecast insights
+            # Generate forecast insights with accuracy warnings
             insights = self._generate_forecast_insights(
                 weekly_forecast, monthly_forecast, category_forecast,
                 total_predicted_revenue, confidence_level
             )
             
-            return {
+            # Add accuracy warning insights if data is limited
+            if has_very_limited_data:
+                insights.insert(0, {
+                    "type": "warning",
+                    "title": "Limited Data Warning",
+                    "message": f"This forecast is based on only {date_range} days of data. For accurate predictions, upload at least 90 days of sales history.",
+                    "icon": "bi bi-exclamation-triangle",
+                    "severity": "high"
+                })
+            elif has_limited_data:
+                insights.insert(0, {
+                    "type": "info",
+                    "title": "Data Recommendation",
+                    "message": f"Forecast based on {date_range} days. More historical data (90+ days) will improve accuracy and seasonal pattern detection.",
+                    "icon": "bi bi-info-circle",
+                    "severity": "medium"
+                })
+            
+            # Add model-level warnings to insights
+            for warning in model_warnings:
+                if warning.get('severity') in ['critical', 'high']:
+                    insights.append({
+                        "type": "warning",
+                        "title": "Accuracy Notice",
+                        "message": warning.get('message', ''),
+                        "icon": "bi bi-exclamation-circle",
+                        "severity": warning.get('severity', 'medium')
+                    })
+            
+            forecast_result = {
                 "status": "success",
                 "forecast_period": {
                     "start": now.strftime("%Y-%m-%d"),
@@ -748,8 +1013,13 @@ class SalesAnalyticsService:
                     "total_predicted_revenue_formatted": f"₹{total_predicted_revenue:,.0f}",
                     "total_predicted_quantity": int(total_predicted_quantity),
                     "confidence_level": confidence_level,
+                    "accuracy_level": accuracy_level,
                     "data_quality_score": data_quality_score,
-                    "historical_days_used": date_range
+                    "historical_days_used": date_range,
+                    "has_limited_data_warning": has_limited_data,
+                    "has_very_limited_data_warning": has_very_limited_data,
+                    "minimum_recommended_days": 90,
+                    "minimum_required_days": 7
                 },
                 "weekly_forecast": weekly_forecast,
                 "monthly_forecast": monthly_forecast,
@@ -759,8 +1029,14 @@ class SalesAnalyticsService:
                     "revenue_model": revenue_metrics,
                     "quantity_model": quantity_metrics
                 },
+                "accuracy_warnings": model_warnings,
                 "generated_at": datetime.now().isoformat()
             }
+            
+            # Cache the result in DB
+            self._save_cached_forecast('quarterly', forecast_result)
+            
+            return forecast_result
             
         except Exception as e:
             logger.error(f"Forecast generation error for shop {self.shop_id}: {e}")
@@ -780,19 +1056,15 @@ class SalesAnalyticsService:
         """
         category_forecast = []
         
-        # Find category column - check multiple possible names
-        category_col = None
-        for col in ['fabric_type', 'category', 'product_category', 'product_type', 'item_category', 'type']:
-            if col in historical_df.columns:
-                category_col = col
-                break
+        category_col = 'category' if 'category' in historical_df.columns else None
         
-        # Also try to get product names if no category column
-        if not category_col:
-            for col in ['product_name', 'product', 'item_name', 'name']:
-                if col in historical_df.columns:
-                    category_col = col
-                    break
+        # Fallback for legacy data
+        if not category_col and 'fabric_type' in historical_df.columns:
+            category_col = 'fabric_type'
+        
+        # Use product_name as fallback if no category
+        if not category_col and 'product_name' in historical_df.columns:
+            category_col = 'product_name'
         
         if not category_col:
             logger.warning(f"No category column found for shop {self.shop_id}")
@@ -812,7 +1084,8 @@ class SalesAnalyticsService:
         
         # Calculate future revenue total
         now = datetime.now()
-        future_total = revenue_forecast[revenue_forecast['ds'] > now]['yhat'].sum()
+        future_revenue_values = revenue_forecast[revenue_forecast['ds'] > now]['yhat'].clip(lower=0)
+        future_total = max(0, float(future_revenue_values.sum()))
         
         # Calculate recent data for trend analysis (last 30 days vs previous 30 days)
         recent_30 = historical_df[historical_df['date'] >= now - timedelta(days=30)]
@@ -870,13 +1143,16 @@ class SalesAnalyticsService:
             
             category_forecast.append({
                 "category": str(category).strip(),
-                "predicted_revenue": round(float(predicted_revenue), 2),
-                "predicted_revenue_formatted": f"₹{predicted_revenue:,.0f}",
-                "predicted_quantity": int(historical_qty * (future_total / total_historical_revenue)) if total_historical_revenue > 0 else 0,
+                "name": str(category).strip(),  # Alias for frontend compatibility
+                "predicted_revenue": round(max(0, float(predicted_revenue)), 2),
+                "predicted_revenue_formatted": f"₹{max(0, predicted_revenue):,.0f}",
+                "predicted": f"₹{max(0, predicted_revenue):,.0f}",  # Short format for display
+                "predicted_quantity": max(0, int(historical_qty * (future_total / total_historical_revenue))) if total_historical_revenue > 0 else 0,
                 "proportion_percent": round(proportion * 100, 1),
+                "proportion": round(proportion * 100, 1),  # Alias for frontend
                 "trend": trend,
                 "growth_rate": round(growth_rate, 1),
-                "historical_revenue": round(float(historical_revenue), 2),
+                "historical_revenue": round(max(0, float(historical_revenue)), 2),
                 "insight": insight,
                 "priority": priority,
                 "is_actionable": priority >= 70  # Flag items shop owner should focus on
@@ -963,6 +1239,7 @@ def get_sales_analytics_service(shop_id: int, invalidate_cache: bool = False) ->
     
     if invalidate_cache:
         _service_cache[shop_id].invalidate_cache()
+        _service_cache[shop_id].invalidate_forecasts()  # Also invalidate DB-stored forecasts
     
     return _service_cache[shop_id]
 
@@ -975,3 +1252,8 @@ def invalidate_shop_cache(shop_id: int):
     _query_cache.invalidate(shop_id)
     if shop_id in _service_cache:
         _service_cache[shop_id].invalidate_cache()
+        _service_cache[shop_id].invalidate_forecasts()  # Also invalidate DB-stored forecasts
+    else:
+        # Create service just to invalidate DB cache
+        service = SalesAnalyticsService(shop_id)
+        service.invalidate_forecasts()
