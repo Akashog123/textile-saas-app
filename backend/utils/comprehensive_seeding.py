@@ -11,7 +11,7 @@ from typing import Dict, Any, List
 
 from werkzeug.security import generate_password_hash
 
-from models.model import db, User, Shop
+from models.model import db, User, Shop, Product, DistributorSupply
 
 # Seeding limits
 MAX_CUSTOMERS = 3
@@ -164,7 +164,7 @@ def create_shops(shop_managers: List[User]) -> List[Shop]:
             location=f"{shop_data['city']}, {shop_data['state']}",
             lat=shop_data["lat"],
             lon=shop_data["lon"],
-            rating=4.5,
+            rating=0.0,
             is_popular=True,
             owner_id=manager.id
         )
@@ -175,9 +175,57 @@ def create_shops(shop_managers: List[User]) -> List[Shop]:
     return created_shops
 
 
+def create_distributor_partnerships(distributors: List[User], shops: List[Shop]) -> int:
+    """
+    Create DistributorSupply records linking distributors to shop products.
+    Each distributor supplies products to shops.
+    """
+    partnerships_created = 0
+    
+    if not distributors or not shops:
+        print("[Seed] No distributors or shops available for partnerships")
+        return 0
+    
+    # For each shop, get its products and assign them to distributors
+    for shop in shops:
+        # Get products for this shop
+        products = Product.query.filter_by(shop_id=shop.id, is_active=True).all()
+        
+        if not products:
+            print(f"[Seed] No products found for shop {shop.name}, skipping")
+            continue
+        
+        # Distribute products among distributors (round-robin)
+        for i, product in enumerate(products):
+            distributor = distributors[i % len(distributors)]
+            
+            # Check if supply record already exists
+            existing = DistributorSupply.query.filter_by(
+                distributor_id=distributor.id,
+                product_id=product.id,
+                shop_id=shop.id
+            ).first()
+            
+            if not existing:
+                supply = DistributorSupply(
+                    distributor_id=distributor.id,
+                    product_id=product.id,
+                    shop_id=shop.id,
+                    quantity_supplied=100,  # Initial supply quantity
+                    unit_price=float(product.price) * 0.7 if product.price else 0,  # 70% of retail price
+                    status='completed'
+                )
+                db.session.add(supply)
+                partnerships_created += 1
+        
+        print(f"[Seed] Created {len(products)} supply records for shop: {shop.name}")
+    
+    return partnerships_created
+
+
 def seed_comprehensive_data() -> Dict[str, Any]:
-    """Main seeding function for user accounts and shops."""
-    print("[Seed] Starting account and shop creation seeding...")
+    """Main seeding function for user accounts, shops, and distributor partnerships."""
+    print("[Seed] Starting comprehensive seeding...")
     
     summary = {
         "users_created": 0,
@@ -185,6 +233,7 @@ def seed_comprehensive_data() -> Dict[str, Any]:
         "shop_managers_created": 0,
         "distributors_created": 0,
         "shops_created": 0,
+        "partnerships_created": 0,
         "errors": []
     }
     
@@ -207,12 +256,17 @@ def seed_comprehensive_data() -> Dict[str, Any]:
         shops = create_shops(users["shop_managers"])
         summary["shops_created"] = len(shops)
         
+        # Create distributor partnerships
+        print("[Seed] Creating distributor-shop partnerships...")
+        partnerships = create_distributor_partnerships(users["distributors"], shops)
+        summary["partnerships_created"] = partnerships
+        
         # Commit all changes
         db.session.commit()
         
-        print("[Seed] Account and shop creation completed successfully!")
+        print("[Seed] Comprehensive seeding completed successfully!")
         print(f"[Seed] Created: {summary['customers_created']} customers, {summary['shop_managers_created']} shop managers, {summary['distributors_created']} distributors")
-        print(f"[Seed] Created: {summary['shops_created']} shops")
+        print(f"[Seed] Created: {summary['shops_created']} shops, {summary['partnerships_created']} partnerships")
         
         # Print login credentials
         print("\n[Seed] Login Credentials:")
@@ -231,6 +285,16 @@ def seed_comprehensive_data() -> Dict[str, Any]:
             manager = users["shop_managers"][i] if i < len(users["shop_managers"]) else None
             if manager:
                 print(f"  {manager.username} -> {shop.name} (ID: {shop.id})")
+        
+        # Print distributor partnerships
+        print("\n[Seed] Distributor Partnerships:")
+        print("=" * 50)
+        for dist in users["distributors"]:
+            partnerships_list = DistributorSupply.query.filter_by(distributor_id=dist.id, status='active').all()
+            for p in partnerships_list:
+                shop = Shop.query.get(p.shop_id)
+                if shop:
+                    print(f"  {dist.username} <-> {shop.name}")
         
     except Exception as e:
         db.session.rollback()
