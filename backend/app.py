@@ -1,12 +1,19 @@
 #app.py
 import os
 import sys
-from flask import Flask, jsonify, send_from_directory
+import google.generativeai as genai
+from flask import Flask, jsonify, send_from_directory , request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from models.model import db
 from config import Config
 from flask_migrate import Migrate
+# ... existing imports ...
+import numpy as np # Ensure numpy is installed
+from routes.chatbot_routes import chatbot_bp
+from services.rag_service import rag_service
+from services.rag_service import rag_service
+from utils.rag_pipeline import rag_pipeline
 
 # Environment Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,7 +49,7 @@ from routes.catalog_routes import catalog_bp
 from routes.nearby_search import nearby_bp
 from routes.performance_routes import performance_bp 
 from routes.review_routes import reviews_bp
-
+from utils.export_data import fetch_rag_data
 # Flask Application Setup
 app = Flask(
     __name__,
@@ -107,6 +114,10 @@ app.register_blueprint(catalog_bp, url_prefix="/api/v1/catalog")
 app.register_blueprint(nearby_bp)
 app.register_blueprint(performance_bp, url_prefix="/api/v1/performance")
 app.register_blueprint(reviews_bp, url_prefix="/api/v1") 
+app.register_blueprint(chatbot_bp, url_prefix="/api/v1/chatbot")
+
+
+genai.configure(api_key="AIzaSyCl90N_jDSwl6CYAv7BCg9lXjclC9eRIvo")
 
 # Utility Routes
 @app.route("/uploads/<path:filename>")
@@ -262,6 +273,16 @@ register_commands(app)
 if __name__ == "__main__":
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     with app.app_context():
+        rag_service.load_from_disk_startup(BASE_DIR)
+
+        if not rag_service.is_initialized:
+            from utils.export_data import fetch_rag_data
+            data = fetch_rag_data()
+            rag_service.load_from_memory(data, BASE_DIR)
+
+        rag_pipeline.init_app(app)
+    
+    with app.app_context():
         db.create_all()
         # Run comprehensive seeding on startup for development
         if os.getenv("AUTO_SEED", "true").lower() == "true":
@@ -279,4 +300,4 @@ if __name__ == "__main__":
         print(rule)
     print("\n───────────────────────────────\n")
 
-    app.run(host="127.0.0.1", port=5001, debug=True)
+    app.run(host="127.0.0.1", port=5001, debug=True , threaded=True)
