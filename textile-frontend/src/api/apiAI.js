@@ -25,6 +25,7 @@ export const findStoresWithAI = (params) => {
 };
 
 /**
+ * @deprecated Use searchByImage from apiCustomer.js instead
  * Compare uploaded image against product catalog
  * @param {File} imageFile - Image file to compare
  * @returns {Promise} Response with similar fabric recommendations
@@ -32,10 +33,11 @@ export const findStoresWithAI = (params) => {
 export const compareImageWithCatalog = (imageFile) => {
     const formData = new FormData();
     formData.append('image', imageFile);
+    formData.append('limit', 20);
     
-    return api.post('/compare-images/', formData, {
+    return api.post('/image-search/similar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000 // Allow 30 seconds for AI processing
+        timeout: 15000
     });
 };
 
