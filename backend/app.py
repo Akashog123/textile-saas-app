@@ -268,6 +268,11 @@ def index():
 from utils.db_commands import register_commands
 register_commands(app)
 
+# Serve Uploaded Files
+@app.route('/uploads/<path:filename>')
+def serve_uploads(filename):
+    """Serve uploaded files from the uploads directory"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # Entry Point
 if __name__ == "__main__":
@@ -319,4 +324,4 @@ if __name__ == "__main__":
         print(rule)
     print("\n───────────────────────────────\n")
 
-    app.run(host="127.0.0.1", port=5001, debug=True , threaded=True)
+    app.run(host="127.0.0.1", port=app.config['PORT'], debug=True , threaded=True)

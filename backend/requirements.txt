@@ -22,6 +22,10 @@ cmdstanpy==1.2.4
 google-generativeai==0.3.2
 openai==1.57.0
 
+# Embeddings / Vector Search
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4
+
 # HTTP / Networking
 requests==2.32.3
 urllib3==2.2.3

@@ -67,13 +67,21 @@ def register():
 
     # Auto-create Shop for Shop Owners
     if new_user.role.lower() == "shop_owner":
-        shop_name = f"{new_user.full_name or new_user.username}'s Shop"
-        location = new_user.city or "Unspecified"
+        shop_name = data.get("shop_name") or f"{new_user.full_name or new_user.username}'s Shop"
+        location = data.get("address") or new_user.city or "Unspecified"
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
 
         new_shop = Shop(
             name=shop_name,
             description="Newly registered shop",
             location=location,
+            address=data.get("address"),
+            city=new_user.city,
+            state=new_user.state,
+            contact=new_user.contact,
+            lat=latitude,
+            lon=longitude,
             owner_id=new_user.id
         )
         db.session.add(new_shop)

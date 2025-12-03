@@ -42,7 +42,6 @@ class Config:
 
     # AI & API INTEGRATIONS
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    MAPMYINDIA_KEY = os.getenv("MAPMYINDIA_KEY", "")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
     
@@ -86,7 +85,7 @@ class Config:
     TESTING = os.getenv("TESTING", "False").lower() in ["1", "true", "yes"]
 
     # SERVER SETTINGS
-    PORT = int(os.getenv("PORT", 8000))
+    PORT = int(os.getenv("PORT", 5001))
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
     
     # IMAGE SERVING CONFIGURATION

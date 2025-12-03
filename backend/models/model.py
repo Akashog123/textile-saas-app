@@ -3,8 +3,42 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy import event, Index, func
+import os
 
 db = SQLAlchemy()
+
+
+# ============================================================================
+# URL RESOLUTION HELPER
+# ============================================================================
+
+def _resolve_image_url(image_path, fallback_id=None, fallback_type="product"):
+    """
+    Resolve image URL to full URL for API responses.
+    Inline helper to avoid circular imports with utils.image_utils.
+    """
+    # Lazy import Config to avoid circular imports
+    from config import Config
+    
+    if not image_path:
+        if getattr(Config, 'USE_PLACEHOLDER_IMAGES', False) and fallback_id:
+            dimensions = "600x400" if fallback_type == "shop" else "400x300"
+            placeholder_service = getattr(Config, 'PLACEHOLDER_IMAGE_SERVICE', 'https://placehold.co')
+            return f"{placeholder_service}/{dimensions}?text={fallback_type}&seed={fallback_id}"
+        return None
+    
+    # If already absolute URL, return as-is
+    if image_path.startswith(("http://", "https://")):
+        return image_path
+    
+    # Prepend API base URL for relative paths
+    api_base = getattr(Config, 'API_BASE_URL', 'http://127.0.0.1:5001')
+    if image_path.startswith("/"):
+        return f"{api_base}{image_path}"
+    
+    # For paths without leading slash, assume uploads path
+    static_path = getattr(Config, 'STATIC_IMAGE_PATH', '/uploads')
+    return f"{api_base}{static_path}/{image_path}"
 
 
 # ============================================================================
@@ -145,7 +179,7 @@ class User(db.Model, TimestampMixin, SerializerMixin):
                 "city": s.city or "",
                 "is_primary": s.id == self.primary_shop_id,
                 "product_count": s.products.count(),
-                "rating": round(s.rating or 4.0, 1)
+                "rating": round(s.rating or 0.0, 1)
             }
             for s in self.shops.order_by(Shop.created_at.desc()).all()
         ]
@@ -175,7 +209,7 @@ class Shop(db.Model, TimestampMixin, SerializerMixin):
     gstin = db.Column(db.String(20))
     lat = db.Column(db.Float, index=True)
     lon = db.Column(db.Float, index=True)
-    rating = db.Column(db.Float, default=4.0)
+    rating = db.Column(db.Float, default=0.0)
     is_popular = db.Column(db.Boolean, default=False, index=True)
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
 
@@ -183,6 +217,7 @@ class Shop(db.Model, TimestampMixin, SerializerMixin):
     reviews = db.relationship("Review", backref="shop", lazy="dynamic", cascade="all, delete-orphan")
     sales_data = db.relationship("SalesData", back_populates="shop", lazy="dynamic", cascade="all, delete-orphan")
     products = db.relationship("Product", backref="shop", lazy="dynamic", cascade="all, delete-orphan")
+    images = db.relationship("ShopImage", back_populates="shop", lazy="dynamic", cascade="all, delete-orphan", order_by="ShopImage.ordering")
 
     # Composite index for geo queries
     __table_args__ = (
@@ -193,24 +228,50 @@ class Shop(db.Model, TimestampMixin, SerializerMixin):
     def __repr__(self):
         return f"<Shop {self.name}>"
     
+    def get_primary_image_url(self, resolve=False):
+        """
+        Get URL of primary shop image.
+        Checks image_url field first, then ShopImage table.
+        
+        Args:
+            resolve: If True, return full resolved URL for API responses
+        """
+        raw_url = None
+        if self.image_url:
+            raw_url = self.image_url
+        else:
+            # Fall back to first image from ShopImage relationship
+            try:
+                first_image = self.images.first()
+                if first_image:
+                    raw_url = first_image.url
+            except (AttributeError, IndexError):
+                pass
+        
+        if resolve:
+            return _resolve_image_url(raw_url, self.id, "shop")
+        return raw_url
+    
     def to_card_dict(self):
-        """Return shop info for card/list display."""
+        """Return shop info for card/list display with resolved image URLs."""
         return {
             "id": self.id,
             "name": self.name,
             "city": self.city,
-            "rating": round(self.rating or 4.0, 1),
-            "image_url": self.image_url,
+            "rating": round(self.rating or 0.0, 1),
+            "image_url": self.get_primary_image_url(resolve=True),
             "is_popular": self.is_popular,
             "location": self.location
         }
     
     def to_detail_dict(self, include_owner=False):
-        """Return detailed shop info."""
+        """Return detailed shop info with resolved image URLs."""
         result = self.to_dict()
-        result["rating"] = round(self.rating or 4.0, 1)
+        result["rating"] = round(self.rating or 0.0, 1)
         result["product_count"] = self.products.count()
         result["review_count"] = self.reviews.count()
+        # Resolve main image_url
+        result["image_url"] = self.get_primary_image_url(resolve=True)
         if include_owner and self.owner:
             result["owner"] = self.owner.to_public_dict()
         return result
@@ -286,7 +347,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
     _serializable_fields = [
         'id', 'name', 'slug', 'sku', 'category', 'description', 'price',
         'msrp', 'badge', 'rating', 'is_trending', 'is_active', 'shop_id',
-        'distributor_id', 'created_at', 'updated_at'
+        'distributor_id', 'image_url', 'created_at', 'updated_at'
     ]
 
     id = db.Column(db.Integer, primary_key=True)
@@ -301,6 +362,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
     rating = db.Column(db.Float, default=4.0)
     is_trending = db.Column(db.Boolean, default=False, index=True)
     is_active = db.Column(db.Boolean, default=True, index=True)
+    image_url = db.Column(db.String(512))
 
     shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
     distributor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
@@ -323,13 +385,29 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
     def __repr__(self):
         return f"<Product {self.name} ({self.id})>"
     
-    def get_primary_image_url(self):
-        """Get URL of primary product image."""
-        primary = self.images.filter_by(ordering=0).first()
-        return primary.url if primary else None
+    def get_primary_image_url(self, resolve=False):
+        """
+        Get URL of primary product image. 
+        Checks image_url field first, then ProductImage table.
+        
+        Args:
+            resolve: If True, return full resolved URL for API responses
+        """
+        raw_url = None
+        # First check direct image_url field (synced with first ProductImage)
+        if self.image_url:
+            raw_url = self.image_url
+        else:
+            # Fall back to first image from ProductImage relationship
+            primary = self.images.filter_by(ordering=0).first()
+            raw_url = primary.url if primary else None
+        
+        if resolve:
+            return _resolve_image_url(raw_url, self.id, "product")
+        return raw_url
     
     def to_card_dict(self):
-        """Return product info for card/list display."""
+        """Return product info for card/list display with resolved image URLs."""
         return {
             "id": self.id,
             "name": self.name,
@@ -338,17 +416,21 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
             "price_formatted": f"₹{self.price:,.0f}" if self.price else "₹0",
             "rating": round(self.rating or 4.0, 1),
             "is_trending": self.is_trending,
-            "image": self.get_primary_image_url(),
+            "image": self.get_primary_image_url(resolve=True),
             "shop_name": self.shop.name if self.shop else None
         }
     
     def to_detail_dict(self, include_shop=True, include_inventory=True):
-        """Return detailed product info."""
+        """Return detailed product info with resolved image URLs."""
         result = self.to_dict()
         result["price_formatted"] = f"₹{self.price:,.0f}" if self.price else "₹0"
         result["rating"] = round(self.rating or 4.0, 1)
-        result["image"] = self.get_primary_image_url()
-        result["images"] = [{"url": img.url, "alt": img.alt} for img in self.images.order_by(ProductImage.ordering).limit(10)]
+        result["image"] = self.get_primary_image_url(resolve=True)
+        # Resolve all image URLs in the images array
+        result["images"] = [
+            {"url": _resolve_image_url(img.url, self.id, "product"), "alt": img.alt} 
+            for img in self.images.order_by(ProductImage.ordering).limit(10)
+        ]
         
         if include_shop and self.shop:
             result["shop"] = self.shop.to_card_dict()
@@ -363,7 +445,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
         return result
     
     def to_inventory_dict(self):
-        """Return product info for inventory management."""
+        """Return product info for inventory management with resolved image URLs."""
         inv = self.inventory
         return {
             "id": self.id,
@@ -375,7 +457,46 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
             "sku": self.sku or f"AUTO-{self.id}",
             "rating": round(self.rating or 4.0, 1),
             "shop_id": self.shop_id,
-            "image": self.get_primary_image_url()
+            "image": self.get_primary_image_url(resolve=True),
+            "images": [
+                {"id": img.id, "url": _resolve_image_url(img.url, self.id, "product"), "alt": img.alt} 
+                for img in self.images.order_by(ProductImage.ordering).limit(4)
+            ]
+        }
+
+
+# ============================================================================
+# SHOP IMAGE MODEL
+# ============================================================================
+
+class ShopImage(db.Model, TimestampMixin, SerializerMixin):
+    """
+    Model for storing multiple images per shop (up to 4 images).
+    """
+    __tablename__ = "shop_images"
+    
+    _serializable_fields = ['id', 'shop_id', 'url', 'alt', 'ordering', 'created_at']
+
+    id = db.Column(db.Integer, primary_key=True)
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
+    url = db.Column(db.String(512), nullable=False)
+    alt = db.Column(db.String(255))
+    ordering = db.Column(db.Integer, default=0)  # 0-3 for up to 4 images
+    
+    # Relationship back to shop
+    shop = db.relationship("Shop", back_populates="images")
+    
+    def __repr__(self):
+        return f"<ShopImage {self.id} shop={self.shop_id}>"
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "shop_id": self.shop_id,
+            "url": self.url,
+            "alt": self.alt,
+            "ordering": self.ordering,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
 
@@ -898,6 +1019,139 @@ class InquiryRecipient(db.Model, TimestampMixin, SerializerMixin):
 
     def __repr__(self):
         return f"<InquiryRecipient {self.inquiry_id} -> {self.recipient_id}>"
+
+
+# ============================================================================
+# INQUIRY MESSAGE MODEL (Chat Messages)
+# ============================================================================
+
+class InquiryMessage(db.Model, TimestampMixin, SerializerMixin):
+    """Chat messages within an inquiry thread between shop owner and distributor."""
+    __tablename__ = "inquiry_messages"
+    
+    _serializable_fields = ['id', 'inquiry_recipient_id', 'sender_id', 'message', 'image_url', 'is_read', 'read_at', 'created_at']
+    
+    id = db.Column(db.Integer, primary_key=True)
+    inquiry_recipient_id = db.Column(db.Integer, db.ForeignKey("inquiry_recipients.id"), nullable=False, index=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    message = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(512))
+    is_read = db.Column(db.Boolean, default=False, index=True)
+    read_at = db.Column(db.DateTime)
+    
+    # Relationships
+    sender = db.relationship("User", foreign_keys=[sender_id], backref="sent_messages")
+    inquiry_recipient = db.relationship("InquiryRecipient", backref=db.backref("messages", lazy="dynamic", cascade="all, delete-orphan"))
+    
+    # Index for unread messages
+    __table_args__ = (
+        Index('idx_inquiry_message_unread', 'inquiry_recipient_id', 'is_read'),
+    )
+
+    def __repr__(self):
+        return f"<InquiryMessage {self.id} in thread {self.inquiry_recipient_id}>"
+    
+    def to_chat_dict(self):
+        """Return message formatted for chat display."""
+        return {
+            "id": self.id,
+            "sender_id": self.sender_id,
+            "sender_name": self.sender.full_name if self.sender else "Unknown",
+            "sender_role": self.sender.role if self.sender else "unknown",
+            "message": self.message,
+            "image_url": self.image_url,
+            "is_read": self.is_read,
+            "read_at": self.read_at.isoformat() if self.read_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+# ============================================================================
+# CACHED AI INSIGHTS MODEL
+# ============================================================================
+
+class CachedAIInsight(db.Model, TimestampMixin):
+    """
+    Stores AI-generated insights for a shop to avoid redundant AI API calls.
+    Insights are regenerated only when new sales data is uploaded.
+    """
+    __tablename__ = "cached_ai_insights"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
+    insight_type = db.Column(db.String(50), nullable=False, index=True)  # 'dashboard', 'upload', 'summary'
+    insights_json = db.Column(db.Text)  # JSON array of insights
+    demand_summary = db.Column(db.Text)
+    recommendation = db.Column(db.Text)
+    data_hash = db.Column(db.String(128))  # Hash of source data to detect staleness
+    is_stale = db.Column(db.Boolean, default=False, index=True)
+    expires_at = db.Column(db.DateTime, index=True)
+    
+    shop = db.relationship("Shop", backref=db.backref("cached_insights", lazy="dynamic", cascade="all, delete-orphan"))
+    
+    __table_args__ = (
+        Index('idx_cached_insight_shop_type', 'shop_id', 'insight_type'),
+        db.UniqueConstraint('shop_id', 'insight_type', name='uq_shop_insight_type'),
+    )
+    
+    def __repr__(self):
+        return f"<CachedAIInsight shop={self.shop_id} type={self.insight_type}>"
+    
+    def to_dict(self):
+        import json
+        return {
+            "id": self.id,
+            "shop_id": self.shop_id,
+            "insight_type": self.insight_type,
+            "insights": json.loads(self.insights_json) if self.insights_json else [],
+            "demand_summary": self.demand_summary,
+            "recommendation": self.recommendation,
+            "is_stale": self.is_stale,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None
+        }
+
+
+# ============================================================================
+# CACHED FORECAST MODEL
+# ============================================================================
+
+class CachedForecast(db.Model, TimestampMixin):
+    """
+    Stores Prophet-generated forecasts for a shop to avoid redundant computation.
+    Forecasts are regenerated only when new sales data is uploaded.
+    """
+    __tablename__ = "cached_forecasts"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=False, index=True)
+    forecast_type = db.Column(db.String(50), nullable=False, index=True)  # 'quarterly', 'weekly_trend', 'monthly_trend', 'yearly_trend'
+    forecast_json = db.Column(db.Text)  # Full forecast response as JSON
+    data_hash = db.Column(db.String(128))  # Hash of source data to detect staleness
+    is_stale = db.Column(db.Boolean, default=False, index=True)
+    expires_at = db.Column(db.DateTime, index=True)
+    
+    shop = db.relationship("Shop", backref=db.backref("cached_forecasts", lazy="dynamic", cascade="all, delete-orphan"))
+    
+    __table_args__ = (
+        Index('idx_cached_forecast_shop_type', 'shop_id', 'forecast_type'),
+        db.UniqueConstraint('shop_id', 'forecast_type', name='uq_shop_forecast_type'),
+    )
+    
+    def __repr__(self):
+        return f"<CachedForecast shop={self.shop_id} type={self.forecast_type}>"
+    
+    def to_dict(self):
+        import json
+        return {
+            "id": self.id,
+            "shop_id": self.shop_id,
+            "forecast_type": self.forecast_type,
+            "forecast": json.loads(self.forecast_json) if self.forecast_json else {},
+            "is_stale": self.is_stale,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None
+        }
 
 
 # ============================================================================
