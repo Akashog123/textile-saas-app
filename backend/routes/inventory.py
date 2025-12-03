@@ -1,18 +1,82 @@
-from flask import Blueprint, jsonify, request, send_file
-from models.model import db, Product, Inventory, SalesData, ProductCatalog, Shop
+from flask import Blueprint, jsonify, request, send_file, Response, current_app
+from models.model import db, Product, Inventory, SalesData, ProductCatalog, Shop, ProductImage
 from utils.auth_utils import token_required, roles_required, check_shop_ownership
 from utils.validation import validate_price, validate_quantity, validate_file_upload
-from utils.inventory_utils import ensure_inventory_tracking_columns
+from utils.inventory_utils import ensure_inventory_tracking_columns, ensure_product_image_url_column
+from utils.export_data import schedule_rag_refresh
+from utils.csv_templates import (
+    get_template_csv, validate_columns, TEMPLATE_INFO
+)
 from utils.response_helpers import (
     success_response, error_response, forbidden_response, 
     handle_exceptions
 )
+import os
 import pandas as pd
-from io import BytesIO, StringIO
+from io import BytesIO
 from datetime import datetime
 from config import Config
 
 inventory_bp = Blueprint("inventory", __name__)
+
+
+# ============================================================================
+# CSV TEMPLATE DOWNLOADS
+# ============================================================================
+
+@inventory_bp.route("/template/<template_type>", methods=["GET"])
+def download_template(template_type):
+    """
+    Download CSV template for imports.
+    
+    Args:
+        template_type: 'inventory', 'sales', or 'marketing'
+        
+    Query params:
+        include_sample: 'true' (default) or 'false' - whether to include sample row
+    """
+    valid_types = ["inventory", "sales", "marketing"]
+    if template_type not in valid_types:
+        return jsonify({
+            "status": "error",
+            "message": f"Invalid template type. Available: {', '.join(valid_types)}"
+        }), 400
+    
+    include_sample = request.args.get("include_sample", "true").lower() == "true"
+    
+    try:
+        csv_content = get_template_csv(template_type, include_sample=include_sample)
+        
+        return Response(
+            csv_content,
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={template_type}_template.csv",
+                "Content-Type": "text/csv; charset=utf-8"
+            }
+        )
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@inventory_bp.route("/template/<template_type>/info", methods=["GET"])
+def get_template_info(template_type):
+    """Get template column information and requirements."""
+    if template_type not in TEMPLATE_INFO:
+        return jsonify({
+            "status": "error",
+            "message": f"Unknown template type. Available: {', '.join(TEMPLATE_INFO.keys())}"
+        }), 400
+    
+    return jsonify({
+        "status": "success",
+        "template": TEMPLATE_INFO[template_type]
+    })
+
+
+# ============================================================================
+# INVENTORY ENDPOINTS
+# ============================================================================
 
 # Fetch Inventory Items for a Shop
 @inventory_bp.route("/", methods=["GET"])
@@ -21,6 +85,7 @@ inventory_bp = Blueprint("inventory", __name__)
 def get_inventory(current_user):
     """Fetch all inventory products for a given shop."""
     ensure_inventory_tracking_columns()
+    ensure_product_image_url_column()
     shop_id = request.args.get("shop_id")
     if not shop_id:
         return error_response("shop_id is required", 400)
@@ -118,19 +183,32 @@ def import_inventory(current_user):
             return jsonify({"status": "error", "message": "File must be .csv or .xlsx"}), 400
 
         # Normalize columns to lowercase
-        df.columns = [c.lower() for c in df.columns]
+        df.columns = [c.lower().strip() for c in df.columns]
+        
+        # Support common column aliases
+        column_aliases = {
+            'stock': 'purchase_qty',
+            'quantity': 'purchase_qty',
+            'qty': 'purchase_qty',
+            'initial_stock': 'purchase_qty',
+            'product_name': 'name',
+            'product': 'name',
+            'min_stock': 'minimum_stock',
+            'safety_stock': 'minimum_stock',
+            'reorder_level': 'minimum_stock',
+            'unit_price': 'price',
+            'cost': 'price',
+        }
+        df.columns = [column_aliases.get(c, c) for c in df.columns]
 
-        base_required = {"name", "category", "price", "sku", "minimum_stock"}
-        quantity_column = "purchase_qty" if "purchase_qty" in df.columns else "stock"
-        if quantity_column is None or quantity_column not in df.columns:
+        # Validate columns using centralized template
+        is_valid, missing, message = validate_columns(df.columns.tolist(), "inventory")
+        if not is_valid:
             return jsonify({
-                "status": "error",
-                "message": "File must include either 'purchase_qty' or 'stock' column to indicate amount purchased."
+                "status": "error", 
+                "message": message,
+                "hint": "Download the template from GET /api/v1/inventory/template/inventory"
             }), 400
-
-        required_cols = base_required | {quantity_column}
-        if not required_cols.issubset(set(df.columns)):
-            return jsonify({"status": "error", "message": f"File must contain columns: {', '.join(sorted(required_cols))}"}), 400
 
         # ensure shop_id is an integer (used in queries and new products)
         try:
@@ -148,27 +226,38 @@ def import_inventory(current_user):
         restock_summary = []
         for _, row in df.iterrows():
             sku = str(row.get("sku", "")).strip()
-            if not sku:
+            if not sku or pd.isna(row.get("sku")):
                 # skip rows without SKU
                 continue
 
-            name = row.get("name", "Unnamed Product")
-            category = row.get("category", "General")
+            name_val = row.get("name", "Unnamed Product")
+            name = str(name_val) if not pd.isna(name_val) else "Unnamed Product"
+            
+            category_val = row.get("category", "General")
+            category = str(category_val) if not pd.isna(category_val) else "General"
 
             # make price and stock robust to bad values
             try:
-                price = float(row.get("price", 0) or 0)
+                price_val = row.get("price", 0)
+                if pd.isna(price_val):
+                    price_val = 0
+                price = float(price_val or 0)
             except (ValueError, TypeError):
                 price = 0.0
             try:
-                purchase_qty_raw = row.get(quantity_column, 0)
-                purchase_qty = int(purchase_qty_raw if purchase_qty_raw is not None else 0)
+                purchase_qty_raw = row.get("purchase_qty", 0)
+                if pd.isna(purchase_qty_raw):
+                    purchase_qty_raw = 0
+                purchase_qty = int(float(purchase_qty_raw or 0))  # float first to handle "50.0" strings
             except (ValueError, TypeError):
                 purchase_qty = 0
             if purchase_qty < 0:
                 purchase_qty = 0
             try:
-                minimum_stock = int(row.get("minimum_stock", 0) or 0)
+                min_stock_val = row.get("minimum_stock", 0)
+                if pd.isna(min_stock_val):
+                    min_stock_val = 0
+                minimum_stock = int(float(min_stock_val or 0))
             except (ValueError, TypeError):
                 minimum_stock = 0
 
@@ -192,6 +281,7 @@ def import_inventory(current_user):
                 product.price = price
                 if distributor_id:
                     product.distributor_id = distributor_id
+                
                 inv = Inventory.query.filter_by(product_id=product.id).first()
                 if inv:
                     if purchase_qty:
@@ -229,6 +319,7 @@ def import_inventory(current_user):
                     print(f"[Import - product create failed] sku={sku} error={e}")
                     continue
 
+
                 db.session.add(Inventory(
                     product_id=new_product.id,
                     qty_available=purchase_qty,
@@ -248,27 +339,52 @@ def import_inventory(current_user):
             })
 
         db.session.commit()
+        
+        # Trigger RAG refresh if new products were added
+        if added > 0:
+            schedule_rag_refresh(current_app._get_current_object(), delay_seconds=3)
+        
         return jsonify({
             "status": "success",
-            "message": f"Import successful. Added {added}, Updated {updated}.",
+            "message": f"Import successful. Added {added}, Updated {updated}. Use ZIP bulk upload for images.",
             "added": added,
             "updated": updated,
             "total_units_added": total_units_added,
-            "restock_summary": restock_summary
+            "restock_summary": restock_summary,
+            "image_upload_hint": "Upload product images via POST /api/v1/inventory/images/bulk-upload with a ZIP file containing SKU-named images (e.g., COT-001.jpg, COT-001_1.jpg)"
         }), 201
 
     except Exception as e:
         db.session.rollback()
-        print(f"[Error - Import Inventory] {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[Error - Import Inventory] {e}\n{error_trace}")
         return jsonify({"status": "error", "message": "Failed to import inventory.", "error": str(e)}), 500
 
 # Edit Inventory (price, stock)
 @inventory_bp.route("/edit", methods=["POST"])
 @token_required
 def edit_inventory(current_user):
-    """Edit price, stock, or distributor of a product."""
+    """Edit price, stock, distributor, or images of a product."""
     try:
-        data = request.get_json()
+        # Support both JSON and multipart form data
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            data = request.form.to_dict()
+            # Convert string values to appropriate types
+            if 'price' in data and data['price']:
+                data['price'] = float(data['price'])
+            if 'stock' in data and data['stock']:
+                data['stock'] = int(data['stock'])
+            if 'minimum_stock' in data and data['minimum_stock']:
+                data['minimum_stock'] = int(data['minimum_stock'])
+            if 'distributor_id' in data:
+                if data['distributor_id'] == '' or data['distributor_id'] == 'null':
+                    data['distributor_id'] = None
+                else:
+                    data['distributor_id'] = int(data['distributor_id'])
+        else:
+            data = request.get_json()
+        
         product_id = data.get("product_id")
         price = data.get("price")
         stock = data.get("stock")
@@ -331,8 +447,78 @@ def edit_inventory(current_user):
             except ValueError as e:
                 return jsonify({"status": "error", "message": str(e)}), 400
 
+        # Handle image uploads (multipart form data)
+        images_uploaded = 0
+        if request.files:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+            from config import Config
+            
+            # Create product images folder
+            product_images_folder = os.path.join(Config.UPLOAD_FOLDER, "product_images")
+            os.makedirs(product_images_folder, exist_ok=True)
+            
+            allowed_exts = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+            
+            # Get uploaded files (support 'images' or 'images[]')
+            files = request.files.getlist("images") or request.files.getlist("images[]")
+            
+            if files:
+                # Get current image count
+                existing_count = ProductImage.query.filter_by(product_id=product_id).count()
+                max_images = 4
+                
+                for idx, file in enumerate(files):
+                    if existing_count + idx >= max_images:
+                        break  # Max 4 images
+                    
+                    if not file or file.filename == '':
+                        continue
+                    
+                    ext = os.path.splitext(file.filename)[1].lower()
+                    if ext not in allowed_exts:
+                        continue
+                    
+                    # Validate file
+                    is_valid, message = validate_file_upload(file, allowed_exts, max_size_mb=5)
+                    if not is_valid:
+                        continue
+                    
+                    # Generate unique filename
+                    unique_id = uuid.uuid4().hex[:8]
+                    safe_name = secure_filename(file.filename)
+                    filename = f"product_{product_id}_{unique_id}_{safe_name}"
+                    filepath = os.path.join(product_images_folder, filename)
+                    
+                    # Save file
+                    file.seek(0)
+                    file.save(filepath)
+                    
+                    # Get next ordering value
+                    max_order = db.session.query(db.func.max(ProductImage.ordering)).filter_by(product_id=product_id).scalar() or -1
+                    
+                    # Create database record
+                    product_image = ProductImage(
+                        product_id=product_id,
+                        url=f"/uploads/product_images/{filename}",
+                        alt=f"{product.name} image {max_order + 2}",
+                        ordering=max_order + 1
+                    )
+                    db.session.add(product_image)
+                    images_uploaded += 1
+                    
+                    # Set first uploaded image as primary if product has no image_url
+                    if not product.image_url:
+                        product.image_url = f"/uploads/product_images/{filename}"
+
         db.session.commit()
-        return jsonify({"status": "success", "message": "Inventory updated successfully"}), 200
+        
+        message = "Inventory updated successfully"
+        if images_uploaded > 0:
+            message = f"Inventory updated and {images_uploaded} image(s) uploaded"
+        
+        return jsonify({"status": "success", "message": message, "images_uploaded": images_uploaded}), 200
 
     except Exception as e:
         db.session.rollback()
@@ -360,12 +546,149 @@ def delete_inventory(current_user):
         Inventory.query.filter_by(product_id=product_id).delete()
         db.session.delete(product)
         db.session.commit()
+
+        schedule_rag_refresh(current_app._get_current_object(), delay_seconds=2)
+        
         return jsonify({"status": "success", "message": f"Deleted product ID {product_id} successfully"}), 200
 
     except Exception as e:
         db.session.rollback()
         print(f"[Error - Delete Inventory] {e}")
         return jsonify({"status": "error", "message": "Failed to delete product.", "error": str(e)}), 500
+
+
+# ============================================================================
+# PRODUCT IMAGE MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@inventory_bp.route("/product/<int:product_id>/images", methods=["GET"])
+@token_required
+def get_product_images(current_user, product_id):
+    """Get all images for a product."""
+    try:
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({"status": "error", "message": "Product not found"}), 404
+        
+        images = ProductImage.query.filter_by(product_id=product_id).order_by(ProductImage.ordering).all()
+        
+        return jsonify({
+            "status": "success",
+            "product_id": product_id,
+            "images": [
+                {
+                    "id": img.id,
+                    "url": img.url,
+                    "alt": img.alt,
+                    "ordering": img.ordering
+                }
+                for img in images
+            ],
+            "max_images": 4,
+            "can_upload_more": len(images) < 4
+        }), 200
+    except Exception as e:
+        print(f"[Error - Get Product Images] {e}")
+        return jsonify({"status": "error", "message": "Failed to fetch images"}), 500
+
+
+@inventory_bp.route("/product/<int:product_id>/images/<int:image_id>", methods=["DELETE"])
+@token_required
+def delete_product_image(current_user, product_id, image_id):
+    """Delete a specific product image."""
+    import os
+    from config import Config
+    
+    try:
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({"status": "error", "message": "Product not found"}), 404
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), product.shop_id):
+            return jsonify({"status": "error", "message": "Not authorized"}), 403
+        
+        image = ProductImage.query.filter_by(id=image_id, product_id=product_id).first()
+        if not image:
+            return jsonify({"status": "error", "message": "Image not found"}), 404
+        
+        # Delete physical file
+        if image.url.startswith("/uploads/"):
+            filepath = os.path.join(Config.BASE_DIR, image.url.lstrip("/"))
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception as e:
+                    print(f"[Warning] Could not delete file: {e}")
+        
+        # If this was the primary image, update product.image_url
+        if product.image_url == image.url:
+            # Get next image if exists
+            next_image = ProductImage.query.filter(
+                ProductImage.product_id == product_id,
+                ProductImage.id != image_id
+            ).order_by(ProductImage.ordering).first()
+            product.image_url = next_image.url if next_image else None
+        
+        db.session.delete(image)
+        
+        # Re-order remaining images
+        remaining = ProductImage.query.filter_by(product_id=product_id).filter(ProductImage.id != image_id).order_by(ProductImage.ordering).all()
+        for idx, img in enumerate(remaining):
+            img.ordering = idx
+        
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Image deleted",
+            "remaining_images": len(remaining)
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Error - Delete Product Image] {e}")
+        return jsonify({"status": "error", "message": "Failed to delete image"}), 500
+
+
+@inventory_bp.route("/product/<int:product_id>/images/<int:image_id>/set-primary", methods=["PUT"])
+@token_required
+def set_primary_product_image(current_user, product_id, image_id):
+    """Set a product image as the primary image."""
+    try:
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({"status": "error", "message": "Product not found"}), 404
+        
+        # Validate ownership
+        if not check_shop_ownership(current_user.get("id"), product.shop_id):
+            return jsonify({"status": "error", "message": "Not authorized"}), 403
+        
+        image = ProductImage.query.filter_by(id=image_id, product_id=product_id).first()
+        if not image:
+            return jsonify({"status": "error", "message": "Image not found"}), 404
+        
+        # Update product's primary image
+        product.image_url = image.url
+        
+        # Reorder to put this image first
+        all_images = ProductImage.query.filter_by(product_id=product_id).order_by(ProductImage.ordering).all()
+        for img in all_images:
+            if img.id == image_id:
+                img.ordering = 0
+            elif img.ordering < image.ordering:
+                img.ordering += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Primary image updated",
+            "primary_image_url": image.url
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Error - Set Primary Image] {e}")
+        return jsonify({"status": "error", "message": "Failed to set primary image"}), 500
 
 # Export Inventory as Excel
 @inventory_bp.route("/export", methods=["GET"])
@@ -551,3 +874,160 @@ def get_available_distributors(current_user):
     except Exception as e:
         print(f"[Error - Get Distributors] {e}")
         return jsonify({"status": "error", "message": "Failed to fetch distributors"}), 500
+
+
+# Bulk Upload Product Images via ZIP
+@inventory_bp.route("/images/bulk-upload", methods=["POST"])
+@token_required
+@roles_required('shop_owner', 'shop_manager')
+def bulk_upload_product_images(current_user):
+    """
+    Upload product images in bulk via ZIP file.
+    
+    Images should be named by SKU:
+    - Single image: SKU.jpg (e.g., COT-001.jpg)
+    - Multiple images: SKU_1.jpg, SKU_2.jpg (e.g., COT-001_1.jpg, COT-001_2.jpg)
+    
+    Supported formats: .jpg, .jpeg, .png, .webp
+    Max 4 images per product.
+    """
+    import zipfile
+    import tempfile
+    import shutil
+    import uuid
+    from werkzeug.utils import secure_filename
+    
+    try:
+        shop_id = request.form.get("shop_id")
+        if not shop_id:
+            return jsonify({"status": "error", "message": "shop_id is required"}), 400
+        
+        if not check_shop_ownership(current_user.get("id"), shop_id):
+            return jsonify({"status": "error", "message": "You don't have permission to manage this shop"}), 403
+        
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"status": "error", "message": "No ZIP file provided"}), 400
+        
+        if not file.filename.lower().endswith('.zip'):
+            return jsonify({"status": "error", "message": "File must be a .zip archive"}), 400
+        
+        # Validate file size (50MB max for ZIP)
+        is_valid, message = validate_file_upload(file, ['.zip'], max_size_mb=50)
+        if not is_valid:
+            return jsonify({"status": "error", "message": message}), 400
+        
+        # Create temp directory for extraction
+        temp_dir = tempfile.mkdtemp()
+        allowed_exts = {'.jpg', '.jpeg', '.png', '.webp'}
+        
+        try:
+            # Extract ZIP
+            with zipfile.ZipFile(file, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            # Create product images folder
+            product_images_folder = os.path.join(Config.UPLOAD_FOLDER, "product_images")
+            os.makedirs(product_images_folder, exist_ok=True)
+            
+            # Get all products for this shop
+            products = Product.query.filter_by(shop_id=shop_id).all()
+            sku_to_product = {p.sku.upper(): p for p in products if p.sku}
+            
+            results = {
+                "matched": 0,
+                "images_added": 0,
+                "skipped": [],
+                "errors": []
+            }
+            
+            # Process images by SKU
+            sku_images = {}  # {SKU: [(ordering, filepath), ...]}
+            
+            for root, dirs, files in os.walk(temp_dir):
+                for filename in files:
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext not in allowed_exts:
+                        continue
+                    
+                    # Parse SKU from filename
+                    base_name = os.path.splitext(filename)[0]
+                    
+                    # Handle SKU_1, SKU_2 pattern or just SKU
+                    if '_' in base_name and base_name.rsplit('_', 1)[1].isdigit():
+                        sku = base_name.rsplit('_', 1)[0].upper()
+                        ordering = int(base_name.rsplit('_', 1)[1]) - 1  # 0-indexed
+                    else:
+                        sku = base_name.upper()
+                        ordering = 0
+                    
+                    filepath = os.path.join(root, filename)
+                    
+                    if sku not in sku_images:
+                        sku_images[sku] = []
+                    sku_images[sku].append((ordering, filepath, filename))
+            
+            # Process each SKU's images
+            for sku, images in sku_images.items():
+                if sku not in sku_to_product:
+                    results["skipped"].append(f"{sku} - Product not found")
+                    continue
+                
+                product = sku_to_product[sku]
+                
+                # Sort by ordering and limit to 4
+                images.sort(key=lambda x: x[0])
+                images = images[:4]
+                
+                # Delete existing images for this product
+                ProductImage.query.filter_by(product_id=product.id).delete()
+                
+                # Reset product's primary image_url
+                product.image_url = None
+                
+                for idx, (_, src_path, orig_filename) in enumerate(images):
+                    # Generate unique filename
+                    unique_id = uuid.uuid4().hex[:8]
+                    ext = os.path.splitext(orig_filename)[1].lower()
+                    new_filename = f"product_{product.id}_{unique_id}{ext}"
+                    dest_path = os.path.join(product_images_folder, new_filename)
+                    
+                    # Copy file
+                    shutil.copy2(src_path, dest_path)
+                    
+                    # Create database record
+                    image_url = f"/uploads/product_images/{new_filename}"
+                    product_image = ProductImage(
+                        product_id=product.id,
+                        url=image_url,
+                        alt=f"{product.name} image {idx + 1}",
+                        ordering=idx
+                    )
+                    db.session.add(product_image)
+                    results["images_added"] += 1
+                    
+                    # Set first image (ordering=0) as product's primary image_url
+                    if idx == 0:
+                        product.image_url = image_url
+                
+                results["matched"] += 1
+            
+            db.session.commit()
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Bulk upload complete. {results['matched']} products updated with {results['images_added']} images.",
+                **results
+            }), 200
+            
+        finally:
+            # Cleanup temp directory
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+    except zipfile.BadZipFile:
+        return jsonify({"status": "error", "message": "Invalid or corrupted ZIP file"}), 400
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"[Error - Bulk Upload Images] {e}\n{traceback.format_exc()}")
+        return jsonify({"status": "error", "message": "Failed to process images", "error": str(e)}), 500
