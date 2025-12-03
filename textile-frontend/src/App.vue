@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import NavBar from "@/components/NavBar.vue"
 import { getCurrentSession, logout } from '@/api/apiAuth'
 import { applyTheme } from '@/styles/theme-config'
+import ChatWidget from './components/ChatWidget.vue'
 
 // Apply theme on app initialization
 onMounted(() => {
@@ -115,6 +116,7 @@ const handleStorageEvent = (event) => {
     <main class="main-content">
       <router-view :key="$route.fullPath" />
     </main>
+    <ChatWidget/>
   </div>
 </template>
 
