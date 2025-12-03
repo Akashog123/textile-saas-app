@@ -82,7 +82,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { findStoresWithAI, compareImageWithCatalog } from '@/api/apiAI'
+import { findStoresWithAI } from '@/api/apiAI'
 import { voiceSearchUtils } from '@/utils/voiceSearchUtils'
 
 // Props
@@ -276,18 +276,11 @@ const handleImageFile = async (event) => {
   const file = event.target.files[0]
   if (!file) return
 
-  isImageSearching.value = true
-  try {
-    const response = await compareImageWithCatalog(file)
-    emit('search-results', response.data)
-  } catch (error) {
-    console.error('Image search failed:', error)
-    emit('search-error', error)
-  } finally {
-    isImageSearching.value = false
-    // Clear the input
-    event.target.value = ''
-  }
+  // Emit the file to parent component for processing
+  emit('image-search', { file })
+  
+  // Clear the input
+  event.target.value = ''
 }
 </script>
 
