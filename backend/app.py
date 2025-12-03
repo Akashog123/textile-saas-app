@@ -1,12 +1,16 @@
 #app.py
 import os
 import sys
-from flask import Flask, jsonify, send_from_directory
+import google.generativeai as genai
+from flask import Flask, jsonify, send_from_directory , request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from models.model import db
 from config import Config
-from flask_migrate import Migrate
+import numpy as np # Ensure numpy is installed
+from routes.chatbot_routes import chatbot_bp
+from services.rag_service import rag_service
+from utils.rag_pipeline import rag_pipeline
 
 # Environment Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +32,6 @@ from routes.heatmap_routes import heatmap_bp
 from routes.trending_routes import trending_shops_bp
 from routes.ai_find_stores import ai_bp
 from routes.top_selling_routes import top_selling_bp
-from routes.image_routes import image_bp
 from routes.stores_routes import stores_bp
 from routes.product_routes import product_bp
 from routes.inquiry import inquiry_bp
@@ -42,7 +45,10 @@ from routes.catalog_routes import catalog_bp
 from routes.nearby_search import nearby_bp
 from routes.performance_routes import performance_bp 
 from routes.review_routes import reviews_bp
-
+from routes.customer_routes import customer_bp
+from routes.image_search_routes import image_search_bp
+from routes.supply_chain_routes import supply_chain_bp
+from utils.export_data import fetch_rag_data
 # Flask Application Setup
 app = Flask(
     __name__,
@@ -61,7 +67,6 @@ CORS(
 
 # Initialize Extensions
 db.init_app(app)
-migrate = Migrate(app, db)
 # Security Headers Middleware
 @app.after_request
 def add_security_headers(response):
@@ -92,7 +97,6 @@ app.register_blueprint(heatmap_bp, url_prefix="/api/v1/region-demand-heatmap")
 app.register_blueprint(ai_bp, url_prefix="/api/v1/ai-find-stores")
 app.register_blueprint(top_selling_bp, url_prefix="/api/v1/top-selling-products")
 app.register_blueprint(trending_shops_bp, url_prefix="/api/v1/trending-shops")
-app.register_blueprint(image_bp, url_prefix="/api/v1/compare-images")
 app.register_blueprint(stores_bp, url_prefix="/api/v1/stores")
 app.register_blueprint(product_bp, url_prefix="/api/v1/products")
 app.register_blueprint(inquiry_bp, url_prefix="/api/v1/inquiry")
@@ -107,6 +111,13 @@ app.register_blueprint(catalog_bp, url_prefix="/api/v1/catalog")
 app.register_blueprint(nearby_bp)
 app.register_blueprint(performance_bp, url_prefix="/api/v1/performance")
 app.register_blueprint(reviews_bp, url_prefix="/api/v1")
+app.register_blueprint(chatbot_bp, url_prefix="/api/v1/chatbot")
+app.register_blueprint(customer_bp)
+app.register_blueprint(image_search_bp, url_prefix="/api/v1/image-search")
+app.register_blueprint(supply_chain_bp, url_prefix="/api/v1/supply-chain")
+
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
 # Utility Routes
 @app.route("/uploads/<path:filename>")
@@ -262,7 +273,28 @@ register_commands(app)
 if __name__ == "__main__":
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     with app.app_context():
+        rag_service.load_from_disk_startup(BASE_DIR)
+
+        if not rag_service.is_initialized:
+            from utils.export_data import fetch_rag_data
+            data = fetch_rag_data()
+            rag_service.load_from_memory(data, BASE_DIR)
+
+        rag_pipeline.init_app(app)
+    
+    with app.app_context():
         db.create_all()
+
+        # Enable SQLite WAL mode for better concurrent access
+        try:
+            from sqlalchemy import text
+            db.session.execute(text("PRAGMA journal_mode=WAL"))
+            db.session.execute(text("PRAGMA busy_timeout=60000"))  # 60 second timeout
+            db.session.commit()
+            print("[SQLite] WAL mode enabled for better concurrency")
+        except Exception as e:
+            print(f"[SQLite] Could not enable WAL mode: {e}")
+
         # Run comprehensive seeding on startup for development
         if os.getenv("AUTO_SEED", "true").lower() == "true":
             try:
@@ -274,9 +306,17 @@ if __name__ == "__main__":
                 print(f"Seeding failed: {e}")
                 print("Continuing with application startup...")
 
+        # Initialize product image search index
+        try:
+            from services.product_image_search import init_product_image_search
+            init_product_image_search()
+        except Exception as e:
+            print(f"[ProductImageSearch] Init failed: {e}")
+            print("Image search will initialize on first use...")
+
     print("\nRegistered Flask Routes:")
     for rule in app.url_map.iter_rules():
         print(rule)
     print("\n───────────────────────────────\n")
 
-    app.run(host="127.0.0.1", port=5001, debug=True)
+    app.run(host="127.0.0.1", port=5001, debug=True , threaded=True)

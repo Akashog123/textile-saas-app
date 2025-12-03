@@ -63,3 +63,4 @@ backend/se_textile.db
 run_app.py
 
 
+/backend/services/manager_kbs
