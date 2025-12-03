@@ -3,29 +3,35 @@ from flask import Blueprint, request, jsonify, current_app
 from models.model import db, Review, User, Shop
 from datetime import datetime
 from sqlalchemy import func
+from utils.auth_utils import token_required
+import logging
+
+logger = logging.getLogger(__name__)
 reviews_bp = Blueprint("reviews", __name__)
 
 @reviews_bp.route("/customer/shops/<int:shop_id>/reviews", methods=["GET"])
 def get_shop_reviews(shop_id):
     try:
-        q = Review.query.filter(Review.shop_id == shop_id).order_by(Review.created_at.desc())
-        reviews = q.all()
+        # Optimized query: fetch reviews with explicit ordering
+        reviews = Review.query.filter(Review.shop_id == shop_id).order_by(Review.created_at.desc()).all()
 
-        # Build frontend-friendly reviews list
-        reviews_list = []
-        for r in reviews:
-            user = User.query.get(r.user_id) if r.user_id else None
-            reviews_list.append({
+        # Build frontend-friendly reviews list (no N+1 queries)
+        # Since user_name is stored on Review model, use that directly
+        reviews_list = [
+            {
                 "id": r.id,
-                "user_name": r.user_name or (user.username if user else "Anonymous"),
+                "user_id": r.user_id,
+                "user_name": r.user_name or "Anonymous",
                 "rating": r.rating,
-                "title": r.title,
+                "title": r.title or "",
                 "body": r.body or "",
                 "is_verified": bool(getattr(r, "is_verified_purchase", False)),
                 "created_at": r.created_at.isoformat() if getattr(r, "created_at", None) else None
-            })
+            }
+            for r in reviews
+        ]
 
-        # Aggregates
+        # Aggregates in single query
         agg = db.session.query(func.avg(Review.rating).label("avg"), func.count(Review.id).label("count")) \
                         .filter(Review.shop_id == shop_id).one()
         avg = float(agg.avg) if agg.avg is not None else 0.0
@@ -38,7 +44,8 @@ def get_shop_reviews(shop_id):
 
 
 @reviews_bp.route("/customer/shops/<int:shop_id>/reviews", methods=["POST"])
-def post_shop_review(shop_id):
+@token_required
+def post_shop_review(current_user, shop_id):
     try:
         data = request.get_json(force=True)
         rating = data.get("rating")
@@ -51,14 +58,14 @@ def post_shop_review(shop_id):
         if len(comment.strip()) < 1:
             return jsonify({"message": "comment/body is required"}), 400
 
-        # If you have authenticated user info (e.g. stored on request context), use it.
-        # For now we'll allow anonymous reviews (user_id can be None)
-        user_id = None
-        user_name = None
-        # Example: if you use token auth and set current user in request (adapt if needed)
-        # if hasattr(request, "current_user") and request.current_user:
-        #     user_id = request.current_user.id
-        #     user_name = request.current_user.username
+        # Get user info from token (current_user is set by @token_required)
+        user_id = current_user.get("id")
+        user_name = current_user.get("full_name") or current_user.get("username")
+
+        # Check if user already has a review for this shop (one review per user per shop)
+        existing_review = Review.query.filter_by(user_id=user_id, shop_id=shop_id).first()
+        if existing_review:
+            return jsonify({"message": "You already have a review for this shop. Please edit or delete your existing review."}), 409
 
         # Create and save review
         review = Review(
@@ -68,7 +75,7 @@ def post_shop_review(shop_id):
             rating=int(rating),
             title=title,
             body=comment,
-            user_name=data.get("user_name") or None,
+            user_name=user_name,
         )
 
         # If model contains `is_verified_purchase`, set it
@@ -85,6 +92,7 @@ def post_shop_review(shop_id):
         # prepare response in frontend-friendly shape
         saved = {
             "id": review.id,
+            "user_id": review.user_id,
             "user_name": review.user_name or "Anonymous",
             "rating": review.rating,
             "title": review.title,
@@ -102,11 +110,16 @@ def post_shop_review(shop_id):
 
 
 @reviews_bp.route("/customer/shops/<int:shop_id>/reviews/<int:review_id>", methods=["PUT"])
-def update_shop_review(shop_id, review_id):
+@token_required
+def update_shop_review(current_user, shop_id, review_id):
     try:
         review = Review.query.filter_by(id=review_id, shop_id=shop_id).first()
         if not review:
             return jsonify({"message": "Review not found"}), 404
+
+        # Check if user owns this review
+        if review.user_id != current_user.get("id"):
+            return jsonify({"message": "You can only edit your own reviews"}), 403
 
         data = request.get_json(force=True)
         
@@ -125,9 +138,6 @@ def update_shop_review(shop_id, review_id):
             if len(comment.strip()) < 1:
                 return jsonify({"message": "comment/body is required"}), 400
             review.body = comment
-        
-        if "user_name" in data:
-            review.user_name = data.get("user_name")
 
         # Update the updated_at timestamp
         review.updated_at = datetime.utcnow()
@@ -137,6 +147,7 @@ def update_shop_review(shop_id, review_id):
         # Prepare response
         saved = {
             "id": review.id,
+            "user_id": review.user_id,
             "user_name": review.user_name or "Anonymous",
             "rating": review.rating,
             "title": review.title,
@@ -155,11 +166,16 @@ def update_shop_review(shop_id, review_id):
 
 
 @reviews_bp.route("/customer/shops/<int:shop_id>/reviews/<int:review_id>", methods=["DELETE"])
-def delete_shop_review(shop_id, review_id):
+@token_required
+def delete_shop_review(current_user, shop_id, review_id):
     try:
         review = Review.query.filter_by(id=review_id, shop_id=shop_id).first()
         if not review:
             return jsonify({"message": "Review not found"}), 404
+
+        # Check if user owns this review
+        if review.user_id != current_user.get("id"):
+            return jsonify({"message": "You can only delete your own reviews"}), 403
 
         db.session.delete(review)
         db.session.commit()
