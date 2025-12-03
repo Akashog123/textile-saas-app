@@ -221,16 +221,53 @@
                   />
                 </div>
                 <div class="form-group">
-                  <label for="shopAddress" class="form-label"
-                    >Shop Address</label
-                  >
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="shopAddress" class="form-label mb-0">Shop Address</label>
+                    <button 
+                      type="button" 
+                      class="btn btn-sm btn-outline-primary" 
+                      @click="useCurrentLocationRegister"
+                      :disabled="locationLoading"
+                    >
+                      <span v-if="locationLoading" class="spinner-border spinner-border-sm me-1"></span>
+                      <span v-else>📍</span>
+                      Use Current Location
+                    </button>
+                  </div>
                   <input
                     id="shopAddress"
                     class="form-control"
                     v-model.trim="registerForm.shop.address"
                     required
-                    placeholder="Enter shop address"
+                    placeholder="Enter shop address or use map"
                   />
+                </div>
+                <!-- Map for location selection -->
+                <div class="form-group">
+                  <small class="text-muted d-block mb-2">Click on the map or drag the marker to set your shop location</small>
+                  <div id="register-map" class="register-map-container"></div>
+                  <div class="row mt-2">
+                    <div class="col-6">
+                      <label class="form-label small">Latitude</label>
+                      <input 
+                        type="text" 
+                        class="form-control form-control-sm" 
+                        :value="registerForm.shop.latitude?.toFixed(6) || ''" 
+                        readonly 
+                        placeholder="Auto-filled" 
+                      />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small">Longitude</label>
+                      <input 
+                        type="text" 
+                        class="form-control form-control-sm" 
+                        :value="registerForm.shop.longitude?.toFixed(6) || ''" 
+                        readonly 
+                        placeholder="Auto-filled" 
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label for="shopMobile" class="form-label">Mobile</label>
@@ -257,16 +294,53 @@
                   />
                 </div>
                 <div class="form-group">
-                  <label for="plantAddress" class="form-label"
-                    >Plant Address</label
-                  >
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="plantAddress" class="form-label mb-0">Plant Address</label>
+                    <button 
+                      type="button" 
+                      class="btn btn-sm btn-outline-primary" 
+                      @click="useCurrentLocationRegister"
+                      :disabled="locationLoading"
+                    >
+                      <span v-if="locationLoading" class="spinner-border spinner-border-sm me-1"></span>
+                      <span v-else>📍</span>
+                      Use Current Location
+                    </button>
+                  </div>
                   <input
                     id="plantAddress"
                     class="form-control"
                     v-model.trim="registerForm.manufacturer.address"
                     required
-                    placeholder="Enter plant address"
+                    placeholder="Enter plant address or use map"
                   />
+                </div>
+                <!-- Map for location selection (shared container) -->
+                <div class="form-group">
+                  <small class="text-muted d-block mb-2">Click on the map or drag the marker to set your plant location</small>
+                  <div id="register-map" class="register-map-container"></div>
+                  <div class="row mt-2">
+                    <div class="col-6">
+                      <label class="form-label small">Latitude</label>
+                      <input 
+                        type="text" 
+                        class="form-control form-control-sm" 
+                        :value="registerForm.manufacturer.latitude?.toFixed(6) || ''" 
+                        readonly 
+                        placeholder="Auto-filled" 
+                      />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small">Longitude</label>
+                      <input 
+                        type="text" 
+                        class="form-control form-control-sm" 
+                        :value="registerForm.manufacturer.longitude?.toFixed(6) || ''" 
+                        readonly 
+                        placeholder="Auto-filled" 
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label for="plantMobile" class="form-label">Mobile</label>
@@ -352,13 +426,212 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from "vue";
+import L from "leaflet";
+import { ref, nextTick, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/api/axios";
 
 defineOptions({
   name: "Login and Register View",
 });
+
+// ---------- Map & Nominatim helpers for registration ----------
+const mapRef = ref(null);
+const markerRef = ref(null);
+const mapInitialized = ref(false);
+const locationLoading = ref(false);
+const DEFAULT_COORDS = { lat: 10.8505, lon: 76.2711 }; // Kerala, India
+const CACHE_TTL = 1000 * 60 * 60;
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/reverse';
+let lastGeocodeTs = 0;
+let pendingGeoPromise = null;
+let geocodingInFlight = false;
+
+function cacheKey(lat, lon) {
+  return `geo:${Number(lat).toFixed(5)}:${Number(lon).toFixed(5)}`;
+}
+function getCachedAddress(lat, lon) {
+  try {
+    const k = cacheKey(lat, lon);
+    const raw = localStorage.getItem(k);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed._ts > CACHE_TTL) {
+      localStorage.removeItem(k);
+      return null;
+    }
+    return parsed.data;
+  } catch (e) {
+    console.warn('geocode cache read failed', e);
+    return null;
+  }
+}
+function setCachedAddress(lat, lon, data) {
+  try {
+    const k = cacheKey(lat, lon);
+    localStorage.setItem(k, JSON.stringify({ _ts: Date.now(), data }));
+  } catch (e) {
+    console.warn('geocode cache write failed', e);
+  }
+}
+
+async function nominatimReverse(lat, lon, attempt = 0) {
+  const cached = getCachedAddress(lat, lon);
+  if (cached) return cached;
+
+  const now = Date.now();
+  const delta = now - lastGeocodeTs;
+  const wait = delta >= 1000 ? 0 : 1000 - delta;
+
+  if (wait > 0) {
+    if (pendingGeoPromise) return pendingGeoPromise;
+    pendingGeoPromise = new Promise((resolve) => {
+      setTimeout(async () => {
+        try {
+          const d = await nominatimReverse(lat, lon, attempt);
+          resolve(d);
+        } finally {
+          pendingGeoPromise = null;
+        }
+      }, wait);
+    });
+    return pendingGeoPromise;
+  }
+
+  lastGeocodeTs = Date.now();
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(lat),
+    lon: String(lon),
+    addressdetails: '1',
+    email: 'ops@setextile.example'
+  });
+
+  const res = await fetch(`${NOMINATIM_BASE}?${params.toString()}`);
+  if (!res.ok) {
+    if (res.status === 429 && attempt < 3) {
+      await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+      return nominatimReverse(lat, lon, attempt + 1);
+    }
+    throw new Error(`Nominatim error ${res.status}`);
+  }
+  const data = await res.json();
+  setCachedAddress(lat, lon, data);
+  return data;
+}
+
+function destroyMap() {
+  if (markerRef.value) markerRef.value = null;
+  if (mapRef.value) {
+    mapRef.value.remove();
+    mapRef.value = null;
+  }
+  mapInitialized.value = false;
+}
+
+async function initRegisterMap() {
+  if (mapInitialized.value) return;
+  await nextTick();
+  const el = document.getElementById('register-map');
+  if (!el) return;
+
+  const lat = DEFAULT_COORDS.lat;
+  const lon = DEFAULT_COORDS.lon;
+
+  mapRef.value = L.map(el, { center: [lat, lon], zoom: 6 });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(mapRef.value);
+
+  markerRef.value = L.marker([lat, lon], { draggable: true }).addTo(mapRef.value);
+
+  markerRef.value.on('dragend', (ev) => {
+    const pos = ev.target.getLatLng();
+    updateRegisterCoords(pos.lat, pos.lng);
+  });
+
+  mapRef.value.on('click', (e) => {
+    const { lat: clickedLat, lng: clickedLng } = e.latlng;
+    markerRef.value.setLatLng([clickedLat, clickedLng]);
+    updateRegisterCoords(clickedLat, clickedLng);
+  });
+
+  mapInitialized.value = true;
+}
+
+function setRegisterMapMarker(lat, lon, center = true) {
+  if (!mapInitialized.value) return;
+  if (markerRef.value) {
+    markerRef.value.setLatLng([lat, lon]);
+  }
+  if (center && mapRef.value) mapRef.value.setView([lat, lon], 15);
+}
+
+function updateRegisterCoords(lat, lon) {
+  if (registerForm.value.role === 'shop_owner') {
+    registerForm.value.shop.latitude = lat;
+    registerForm.value.shop.longitude = lon;
+  } else if (registerForm.value.role === 'manufacturer') {
+    registerForm.value.manufacturer.latitude = lat;
+    registerForm.value.manufacturer.longitude = lon;
+  }
+  reverseGeocodeRegister(lat, lon).catch(() => {});
+}
+
+async function reverseGeocodeRegister(lat, lon) {
+  if (geocodingInFlight) return;
+  geocodingInFlight = true;
+  try {
+    const data = await nominatimReverse(lat, lon);
+    const address = data.display_name || (data.address ? Object.values(data.address).join(', ') : '');
+    if (registerForm.value.role === 'shop_owner') {
+      registerForm.value.shop.address = address;
+    } else if (registerForm.value.role === 'manufacturer') {
+      registerForm.value.manufacturer.address = address;
+    }
+  } finally {
+    geocodingInFlight = false;
+  }
+}
+
+function useCurrentLocationRegister() {
+  if (!navigator.geolocation) {
+    registerError.value = 'Geolocation not supported by your browser.';
+    return;
+  }
+  // Check if we're on HTTPS (required for geolocation in most browsers)
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    registerError.value = 'Location access requires HTTPS. Please use the map to select your location.';
+    return;
+  }
+  locationLoading.value = true;
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    updateRegisterCoords(lat, lon);
+    if (!mapInitialized.value) await initRegisterMap();
+    setRegisterMapMarker(lat, lon, true);
+    try {
+      await reverseGeocodeRegister(lat, lon);
+    } catch (e) {
+      console.warn('reverse geocode failed', e);
+    }
+    locationLoading.value = false;
+  }, (err) => {
+    console.error('geolocation error', err);
+    let errorMsg = 'Failed to get current location.';
+    if (err.code === 1) {
+      errorMsg = 'Location permission denied. Please allow location access or use the map.';
+    } else if (err.code === 2) {
+      errorMsg = 'Location unavailable. Please use the map to select your location.';
+    } else if (err.code === 3) {
+      errorMsg = 'Location request timed out. Please try again or use the map.';
+    }
+    registerError.value = errorMsg;
+    locationLoading.value = false;
+  }, { timeout: 10000, enableHighAccuracy: true });
+}
 
 const router = useRouter();
 const activeTab = ref("login");
@@ -383,12 +656,16 @@ const registerForm = ref({
     name: "",
     address: "",
     mobile: "",
+    latitude: null,
+    longitude: null,
   },
   manufacturer: {
     // manufacturer-only
     plantName: "",
     address: "",
     mobile: "",
+    latitude: null,
+    longitude: null,
   },
   password: "",
   password2: "",
@@ -398,6 +675,22 @@ const registerForm = ref({
 const loadingRegister = ref(false);
 const registerError = ref("");
 const registerSuccess = ref("");
+
+// Watch role changes to init/destroy map (must be after registerForm is defined)
+watch(() => registerForm.value.role, async (newRole, oldRole) => {
+  if (['shop_owner', 'manufacturer'].includes(newRole)) {
+    // Delay to let DOM render the map container
+    await nextTick();
+    await new Promise(r => setTimeout(r, 100));
+    await initRegisterMap();
+    // Invalidate map size after display
+    if (mapRef.value) {
+      setTimeout(() => mapRef.value.invalidateSize(), 200);
+    }
+  } else if (['shop_owner', 'manufacturer'].includes(oldRole)) {
+    destroyMap();
+  }
+});
 
 const handleLogin = async () => {
   loginError.value = "";
@@ -526,12 +819,20 @@ const handleRegister = async () => {
       base.contact = registerForm.value.shop.mobile;
       base.address = registerForm.value.shop.address;
       base.shop_name = registerForm.value.shop.name;
+      if (registerForm.value.shop.latitude && registerForm.value.shop.longitude) {
+        base.latitude = registerForm.value.shop.latitude;
+        base.longitude = registerForm.value.shop.longitude;
+      }
     }
 
     if (registerForm.value.role === "manufacturer") {
       base.contact = registerForm.value.manufacturer.mobile;
       base.address = registerForm.value.manufacturer.address;
       base.plant_name = registerForm.value.manufacturer.plantName;
+      if (registerForm.value.manufacturer.latitude && registerForm.value.manufacturer.longitude) {
+        base.latitude = registerForm.value.manufacturer.latitude;
+        base.longitude = registerForm.value.manufacturer.longitude;
+      }
     }
 
     const resp = await api.post("/auth/register", base);
@@ -545,13 +846,15 @@ const handleRegister = async () => {
     if (data.status === "success") {
       registerSuccess.value = data.message || "Account created successfully! Please sign in.";
       activeTab.value = "login";
+      // Destroy map before resetting form
+      destroyMap();
       Object.assign(registerForm.value, {
         name: "",
         username: "",
         role: "",
         email: "",
-        shop: { name: "", address: "", mobile: "" },
-        manufacturer: { plantName: "", address: "", mobile: "" },
+        shop: { name: "", address: "", mobile: "", latitude: null, longitude: null },
+        manufacturer: { plantName: "", address: "", mobile: "", latitude: null, longitude: null },
         password: "",
         password2: "",
         terms: false,
@@ -979,6 +1282,16 @@ const handleRegister = async () => {
 .spinner-border-sm {
   width: 1rem;
   height: 1rem;
+}
+
+/* Map container for registration */
+.register-map-container {
+  height: 200px;
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #f8fafc;
 }
 
 /* Custom scrollbar for form content if needed */
