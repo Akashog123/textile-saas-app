@@ -85,9 +85,22 @@ def resolve_shop_image(shop, fallback=True):
     Returns:
         str: Image URL
     """
+    # Try shop's direct image_url field
     if hasattr(shop, 'image_url') and shop.image_url:
         return get_image_url(shop.image_url, shop.id, "shop")
     
+    # Try first image from images relationship (ShopImage table)
+    if hasattr(shop, 'images'):
+        try:
+            images_rel = shop.images
+            # Handle dynamic relationship - use first() for lazy queries
+            first_image = images_rel.first() if hasattr(images_rel, 'first') else (images_rel[0] if images_rel else None)
+            if first_image and hasattr(first_image, 'url') and first_image.url:
+                return get_image_url(first_image.url, shop.id, "shop")
+        except (AttributeError, IndexError):
+            pass
+    
+    # Final fallback to placeholder
     if fallback:
         return get_image_url(None, getattr(shop, 'id', None), "shop")
     

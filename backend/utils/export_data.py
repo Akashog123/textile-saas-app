@@ -1,4 +1,10 @@
 from models.model import db, Product, Shop, Review, Inventory
+import threading
+import os
+
+# Flag to prevent multiple simultaneous refreshes
+_rag_refresh_in_progress = False
+_rag_refresh_lock = threading.Lock()
 
 def fetch_rag_data():
     """
@@ -49,3 +55,62 @@ def fetch_rag_data():
     except Exception as e:
         print(f"   DB Fetch Error: {e}")
         return []
+
+
+def trigger_rag_refresh_async(app=None):
+    """
+    Trigger RAG refresh in background thread.
+    This is called when products are added/updated to keep chatbot knowledge current.
+    Uses debouncing to prevent excessive refreshes.
+    """
+    global _rag_refresh_in_progress
+    
+    with _rag_refresh_lock:
+        if _rag_refresh_in_progress:
+            print("[RAG] Refresh already in progress, skipping...")
+            return False
+        _rag_refresh_in_progress = True
+    
+    def _do_refresh():
+        global _rag_refresh_in_progress
+        try:
+            from flask import current_app
+            from services.rag_service import rag_service
+            
+            # Use provided app or get current app
+            flask_app = app or current_app._get_current_object()
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+            with flask_app.app_context():
+                print("[RAG] Auto-refreshing knowledge base...")
+                data = fetch_rag_data()
+                if data:
+                    rag_service.load_from_memory(data, base_dir)
+                    print(f"[RAG] Knowledge base updated with {len(data)} products")
+                else:
+                    print("[RAG] No data to refresh")
+        except Exception as e:
+            print(f"[RAG] Auto-refresh failed: {e}")
+        finally:
+            with _rag_refresh_lock:
+                _rag_refresh_in_progress = False
+    
+    # Run in background thread
+    thread = threading.Thread(target=_do_refresh, daemon=True)
+    thread.start()
+    return True
+
+
+def schedule_rag_refresh(app=None, delay_seconds=5):
+    """
+    Schedule a RAG refresh after a short delay.
+    This allows multiple product changes to batch together.
+    """
+    def _delayed_refresh():
+        import time
+        time.sleep(delay_seconds)
+        trigger_rag_refresh_async(app)
+    
+    thread = threading.Thread(target=_delayed_refresh, daemon=True)
+    thread.start()
+    print(f"[RAG] Refresh scheduled in {delay_seconds} seconds")
