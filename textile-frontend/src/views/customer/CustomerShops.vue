@@ -68,7 +68,7 @@
                 <div class="d-flex gap-2 align-items-center">
                   <div class="rating small">
                     <span v-for="i in 5" :key="i" :class="i <= shop.rating ? 'text-warning' : 'text-muted'">★</span>
-                    <span class="ms-1 text-muted" style="font-size: 0.85rem">{{ shop.rating?.toFixed(1) || shop.rating }} ({{ shop.reviews_count || 0 }})</span>
+                    <span class="ms-1 text-muted" style="font-size: 0.85rem">{{ shop.rating?.toFixed(1) || shop.rating }}</span>
                   </div>
                   <small class="text-muted">&middot; {{ shop.address }}</small>
                 </div>
@@ -76,12 +76,14 @@
 
               <!-- NEW: quick review button on the list item -->
               <div class="text-end ms-3">
-                <button class="btn btn-sm btn-outline-primary mb-2" @click.stop="openQuickReview(shop)">
+                <button 
+                  class="btn btn-sm btn-outline-primary mb-2" 
+                  @click.stop="openQuickReview(shop)"
+                  :disabled="!currentUser"
+                  :title="!currentUser ? 'Please login to write a review' : 'Write a review for this shop'"
+                >
                   <i class="bi bi-pencil-square me-1"></i>Write Review
                 </button>
-                <div>
-                  <small class="text-muted">{{ shop.reviews_count ?? '-' }} reviews</small>
-                </div>
               </div>
             </div>
           </div>
@@ -131,7 +133,18 @@
           <h6 class="mb-0">Products Available</h6>
           <!-- NEW: Button to open review form for this shop -->
           <div>
-            <button class="btn btn-sm btn-outline-primary" @click="openReviewModal()">
+            <button 
+              v-if="userReviewForShop" 
+              class="btn btn-sm btn-outline-warning" 
+              @click="openReviewModal()"
+            >
+              <i class="bi bi-pencil"></i> Edit My Review
+            </button>
+            <button 
+              v-else 
+              class="btn btn-sm btn-outline-primary" 
+              @click="openReviewModal()"
+            >
               <i class="bi bi-star"></i> Add Review
             </button>
           </div>
@@ -219,13 +232,23 @@
     <div v-if="showReviewModal" class="modal-overlay" @click="closeReviewModal">
       <div class="shop-profile-modal" @click.stop>
         <button class="btn-close float-end" @click="closeReviewModal"></button>
-        <h5 class="mb-3">{{ isEditingReview ? 'Edit' : 'Write' }} a review for {{ selectedShop?.name || quickReviewShop?.name }}</h5>
+        <h5 class="mb-3">
+          {{ isEditingReview ? 'Edit Your Review' : 'Write a Review' }} 
+          <br>
+          <small class="text-muted">{{ selectedShop?.name || quickReviewShop?.name }}</small>
+        </h5>
 
         <form @submit.prevent="submitReview">
           <div class="row g-3">
             <div class="col-md-12">
-              <label class="form-label">Your name (optional)</label>
-              <input v-model="newReview.user_name" class="form-control" placeholder="Your name" />
+              <label class="form-label">Your Name</label>
+              <input 
+                :value="currentUser?.full_name || currentUser?.username || 'Anonymous'" 
+                class="form-control" 
+                disabled 
+                placeholder="Your name" 
+              />
+              <small class="text-muted">Logged in as: <strong>{{ currentUser?.full_name || currentUser?.username }}</strong></small>
             </div>
 
             <div class="col-md-6">
@@ -245,8 +268,8 @@
             </div>
 
             <div class="col-md-12">
-              <label class="form-label">Title</label>
-              <input v-model="newReview.title" class="form-control" placeholder="Short title (optional)" />
+              <label class="form-label">Title (optional)</label>
+              <input v-model="newReview.title" class="form-control" placeholder="Short title" />
             </div>
 
             <div class="col-md-12">
@@ -273,6 +296,7 @@ import SearchBar from '@/components/SearchBar.vue';
 import MapmyIndiaMap from '@/components/MapmyIndiaMap.vue';
 // NEW: reviews API (make sure these endpoints exist in your frontend api layer)
 import { getShopReviews, createReview, updateReview, deleteReview } from '@/api/apiReviews';
+import { getCurrentSession } from '@/api/apiAuth';
 
 const searchQuery = ref('');
 const filterRating = ref(false);
@@ -291,10 +315,14 @@ const shops = ref([]);
 const shopReviews = ref([]);
 const reviewsLoading = ref(false);
 
+// Current user info
+const currentUser = ref(null);
+const userReviewForShop = ref(null); // User's existing review for the selected shop
+
 // Review modal state
 const showReviewModal = ref(false);
 const quickReviewShop = ref(null); // if user clicked quick review from list
-const newReview = ref({ rating: 5, title: '', body: '', user_name: '' });
+const newReview = ref({ rating: 5, title: '', body: '' });
 const isEditingReview = ref(false);
 const editingReviewId = ref(null);
 
@@ -310,6 +338,21 @@ const shopsWithCoordinates = computed(() => {
     lng: shop.lng || parseFloat(shop.longitude) || 77.2090 + (Math.random() - 0.5) * 0.1
   }));
 });
+
+/**
+ * Fetch current user session
+ */
+const fetchCurrentUser = async () => {
+  try {
+    const response = await getCurrentSession();
+    if (response.data && response.data.user) {
+      currentUser.value = response.data.user;
+    }
+  } catch (err) {
+    console.error('[User Session Error]', err);
+    currentUser.value = null;
+  }
+};
 
 /**
  * Fetch all shops from backend
@@ -356,6 +399,7 @@ const fetchShopDetails = async (shopId) => {
 const fetchReviews = async (shopId) => {
   if (!shopId) {
     shopReviews.value = [];
+    userReviewForShop.value = null;
     return;
   }
   reviewsLoading.value = true;
@@ -363,14 +407,23 @@ const fetchReviews = async (shopId) => {
     const res = await getShopReviews(shopId);
     if (res?.data?.reviews) {
       shopReviews.value = res.data.reviews;
+      // Check if current user has a review for this shop
+      if (currentUser.value) {
+        userReviewForShop.value = shopReviews.value.find(r => r.user_id === currentUser.value.id) || null;
+      }
     } else if (Array.isArray(res?.data)) {
       shopReviews.value = res.data;
+      if (currentUser.value) {
+        userReviewForShop.value = shopReviews.value.find(r => r.user_id === currentUser.value.id) || null;
+      }
     } else {
       shopReviews.value = [];
+      userReviewForShop.value = null;
     }
   } catch (err) {
     console.error('Failed to load reviews', err);
     shopReviews.value = [];
+    userReviewForShop.value = null;
   } finally {
     reviewsLoading.value = false;
   }
@@ -419,8 +472,8 @@ const selectShop = async (shop) => {
   if (shop.id) {
     const details = await fetchShopDetails(shop.id);
     selectedShop.value = details || shop;
-    // load reviews for that shop
-    await fetchReviews(shop.id);
+    // Lazy load reviews - don't wait for it
+    fetchReviews(shop.id).catch(err => console.error('Failed to load reviews', err));
   } else {
     selectedShop.value = shop;
     shopReviews.value = shop.reviews || [];
@@ -501,27 +554,66 @@ const handleUserLocationFound = (location) => {
 
 // NEW: Open review modal for selected shop (from modal)
 const openReviewModal = () => {
-  newReview.value = { rating: 5, title: '', body: '', user_name: '' };
-  isEditingReview.value = false;
-  editingReviewId.value = null;
+  if (!currentUser.value) {
+    alert('Please login to write a review');
+    return;
+  }
+  // If user already has a review, load it for editing
+  if (userReviewForShop.value) {
+    newReview.value = {
+      rating: userReviewForShop.value.rating,
+      title: userReviewForShop.value.title,
+      body: userReviewForShop.value.body
+    };
+    isEditingReview.value = true;
+    editingReviewId.value = userReviewForShop.value.id;
+  } else {
+    newReview.value = { rating: 5, title: '', body: '' };
+    isEditingReview.value = false;
+    editingReviewId.value = null;
+  }
   quickReviewShop.value = null;
   showReviewModal.value = true;
 };
 
 // NEW: Open quick review from list with shop preselected
 const openQuickReview = (shop) => {
+  if (!currentUser.value) {
+    alert('Please login to write a review');
+    return;
+  }
   quickReviewShop.value = shop;
   selectedShop.value = shop; // set selected so modal shows shop name
-  newReview.value = { rating: 5, title: '', body: '', user_name: '' };
-  isEditingReview.value = false;
-  editingReviewId.value = null;
+  
+  // Check if user already has a review for this shop
+  const existingReview = shopReviews.value.find(r => r.user_id === currentUser.value.id);
+  if (existingReview) {
+    newReview.value = {
+      rating: existingReview.rating,
+      title: existingReview.title,
+      body: existingReview.body
+    };
+    isEditingReview.value = true;
+    editingReviewId.value = existingReview.id;
+  } else {
+    newReview.value = { rating: 5, title: '', body: '' };
+    isEditingReview.value = false;
+    editingReviewId.value = null;
+  }
   showReviewModal.value = true;
 };
 
 // NEW: Edit an existing review
 const editReview = (review) => {
+  if (!currentUser.value) {
+    alert('Please login to edit a review');
+    return;
+  }
+  if (review.user_id !== currentUser.value.id) {
+    alert('You can only edit your own reviews');
+    return;
+  }
   newReview.value = {
-    user_name: review.user_name,
     rating: review.rating,
     title: review.title,
     body: review.body
@@ -542,8 +634,7 @@ const closeReviewModal = () => {
 const submitReview = async () => {
   const targetShop = quickReviewShop.value || selectedShop.value;
   if (!targetShop || !targetShop.id) {
-    console.log(targetShop,targetShop.id)
-    alert('Shop not identified.');;
+    alert('Shop not identified.');
     return;
   }
   if (!newReview.value.body || newReview.value.body.trim().length < 5) {
@@ -560,47 +651,46 @@ const submitReview = async () => {
       shop_id: targetShop.id,
       rating: newReview.value.rating,
       title: newReview.value.title,
-      body: newReview.value.body,
-      user_name: newReview.value.user_name
+      body: newReview.value.body
     };
 
     let res;
     if (isEditingReview.value && editingReviewId.value) {
       // Update existing review
       res = await updateReview(targetShop.id, editingReviewId.value, payload);
-      if (res && (res.status === 200 || res.status === 201) && (res.data?.status === 'success' || res.data?.review)) {
+      if (res) {
         alert('Review updated successfully!');
         await fetchReviews(targetShop.id);
         closeReviewModal();
       } else {
-        alert(res?.data?.message || 'Failed to update review');
+        alert('Failed to update review');
       }
     } else {
       // Create new review
       res = await createReview(payload);
-      if (res && (res.status === 200 || res.status === 201) && (res.data?.status === 'success' || res.data?.id)) {
+      if (res) {
         alert('Thanks! Your review was submitted.');
-        // reload reviews and update local count if present
         await fetchReviews(targetShop.id);
-        // if shops list contains this shop, increment local reviews_count
-        const idx = shops.value.findIndex(s => String(s.id) === String(targetShop.id));
-        if (idx !== -1) {
-          shops.value[idx].reviews_count = (shops.value[idx].reviews_count || 0) + 1;
-        }
         closeReviewModal();
       } else {
-        alert(res?.data?.message || 'Failed to submit review');
+        alert('Failed to submit review');
       }
     }
   } catch (err) {
     console.error('submit/update review failed', err);
     alert(err?.response?.data?.message || 'Failed to submit/update review');
+    // Ensure modal closes even on error, but don't refresh reviews
+    closeReviewModal();
   }
 };
 
 // NEW: Delete review
 const deleteReviewWithConfirm = async (reviewId) => {
-  if (!confirm('Are you sure you want to delete this review?')) {
+  if (!currentUser.value) {
+    alert('Please login to delete a review');
+    return;
+  }
+  if (!confirm('Are you sure you want to delete this review? You can write a new review after deletion.')) {
     return;
   }
 
@@ -613,8 +703,9 @@ const deleteReviewWithConfirm = async (reviewId) => {
   try {
     const res = await deleteReview(targetShop.id, reviewId);
     if (res && (res.status === 200 || res.data?.status === 'success')) {
-      alert('Review deleted successfully!');
+      alert('Review deleted successfully! You can now write a new review for this shop.');
       await fetchReviews(targetShop.id);
+      userReviewForShop.value = null;
     } else {
       alert(res?.data?.message || 'Failed to delete review');
     }
@@ -637,6 +728,7 @@ const formatDate = (iso) => {
 
 // Fetch data on mount
 onMounted(() => {
+  fetchCurrentUser();
   fetchShops();
 });
 </script>

@@ -105,11 +105,9 @@ def get_shop_details(shop_id):
             except Exception:
                 price = 0.0
 
+            # DO NOT call AI caption here - it's too slow for bulk product display
+            # AI captions can be generated on-demand or in background jobs
             caption = ""
-            try:
-                caption = generate_ai_caption(product.name, product.category, price)
-            except Exception:
-                logger.exception("AI caption failed for product %s", getattr(product, "id", "n/a"))
 
             product_data.append({
                 "id": product.id,
