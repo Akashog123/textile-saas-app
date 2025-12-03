@@ -163,19 +163,35 @@ def roles_required(*allowed_roles):
 # Resource Ownership Validation Helpers
 def check_shop_ownership(user_id, shop_id):
     """
-    Check if user owns the specified shop.
+    Check if user owns or manages the specified shop.
     
     Args:
         user_id: User ID to check
         shop_id: Shop ID to validate
     
     Returns:
-        bool: True if user owns shop, False otherwise
+        bool: True if user owns or manages shop, False otherwise
     """
     try:
         shop_id = int(shop_id)
+        # Check if user is the owner
         shop = Shop.query.filter_by(id=shop_id, owner_id=user_id).first()
-        return shop is not None
+        if shop:
+            return True
+        
+        # Also check if user is assigned as a manager to this shop
+        user = User.query.get(user_id)
+        if user and user.role == 'shop_manager':
+            # Check if user's primary_shop_id matches
+            if user.primary_shop_id == shop_id:
+                return True
+            # Check if user is in the shop's managers
+            shop = Shop.query.get(shop_id)
+            if shop and hasattr(shop, 'managers'):
+                if user in shop.managers:
+                    return True
+        
+        return False
     except (ValueError, TypeError):
         return False
 
