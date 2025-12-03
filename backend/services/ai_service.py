@@ -33,45 +33,25 @@ DEFAULT_PRIORITIES = [
 # ============================================================================
 class AIResponseCache:
     """
-    In-memory cache for AI API responses to minimize redundant calls.
-    Uses TTL-based expiration and input hashing for cache keys.
+    AI Response Cache DISABLED - always fetches fresh responses.
     """
     def __init__(self, ttl_seconds: int = 1800, max_size: int = 100):
-        self._cache: Dict[str, Tuple[Any, float]] = {}
-        self.ttl = ttl_seconds  # 30 minutes default
-        self.max_size = max_size
+        pass  # No storage
     
     def _generate_key(self, func_name: str, *args, **kwargs) -> str:
-        """Generate cache key from function name and arguments."""
-        key_data = f"{func_name}:{str(args)}:{str(sorted(kwargs.items()))}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return ""
     
     def get(self, func_name: str, *args, **kwargs) -> Optional[Any]:
-        """Get cached response if valid."""
-        key = self._generate_key(func_name, *args, **kwargs)
-        if key in self._cache:
-            value, timestamp = self._cache[key]
-            if time.time() - timestamp < self.ttl:
-                print(f"[AI Cache HIT] {func_name}")
-                return value
-            else:
-                del self._cache[key]  # Expired
+        # Always return None - cache disabled for fresh data
         return None
     
     def set(self, func_name: str, value: Any, *args, **kwargs):
-        """Store response in cache."""
-        # Evict oldest if at capacity
-        if len(self._cache) >= self.max_size:
-            oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
-            del self._cache[oldest_key]
-        
-        key = self._generate_key(func_name, *args, **kwargs)
-        self._cache[key] = (value, time.time())
-        print(f"[AI Cache SET] {func_name}")
+        # No-op - caching disabled
+        pass
     
     def clear(self):
-        """Clear all cached responses."""
-        self._cache.clear()
+        # No-op - nothing to clear
+        pass
 
 
 # Global cache instance
@@ -144,6 +124,7 @@ def generate_ai_caption(product_name: str = None, category: str = None, price: f
         Price: ₹{price_str}
         {f'Description: {description}' if description else ''}
         Tone: Elegant, aesthetic, and festive to attract buyers.
+        Only output the caption without any other extra text.
         """
         
         try:
@@ -535,6 +516,11 @@ def generate_recommendation(region_data, trending_products, engine="auto"):
 def generate_production_priorities(df: pd.DataFrame):
     """AI-driven production scaling suggestions.
     
+    Expects DataFrame with standardized columns from sales template:
+    - product_name: Product name
+    - revenue: Sales revenue (quantity_sold * selling_price)
+    - region: Optional region/area
+    
     Returns defaults immediately if DataFrame is empty or insufficient.
     """
     try:
@@ -543,12 +529,19 @@ def generate_production_priorities(df: pd.DataFrame):
             print("[Production Priorities] Skipping - insufficient data")
             return DEFAULT_PRIORITIES, [], []
         
+        # Normalize column names to lowercase
+        df.columns = [c.lower().strip() for c in df.columns]
+        product_col = "product_name" if "product_name" in df.columns else None
+        sales_col = "revenue" if "revenue" in df.columns else None
+        region_col = "region" if "region" in df.columns else None
+        
         # Check for required columns
-        if "Product" not in df.columns or "Sales" not in df.columns:
-            print("[Production Priorities] Skipping - missing required columns (Product, Sales)")
+        if not product_col or not sales_col:
+            print(f"[Production Priorities] Skipping - missing required columns (product_name, revenue). Found: {list(df.columns)}")
             return DEFAULT_PRIORITIES, [], []
         
-        products = df.groupby("Product")["Sales"].sum().reset_index().sort_values("Sales", ascending=False)
+        products = df.groupby(product_col)[sales_col].sum().reset_index().sort_values(sales_col, ascending=False)
+        products.columns = ['Product', 'Sales']  # Standardize for internal use
         
         # Skip if no meaningful product data
         if products.empty or products["Sales"].sum() < 1:
@@ -557,13 +550,17 @@ def generate_production_priorities(df: pd.DataFrame):
         
         # Calculate real growth/decline from data if we have region info
         # Group by product and region for regional analysis
-        region_data = {}
-        if "Region" in df.columns:
-            region_data = df.groupby(["Product", "Region"])["Sales"].sum().reset_index()
+        region_data = pd.DataFrame()
+        if region_col:
+            try:
+                region_data = df.groupby([product_col, region_col])[sales_col].sum().reset_index()
+                region_data.columns = ['Product', 'Region', 'Sales']
+            except Exception:
+                region_data = pd.DataFrame()
         
         # Get top region per product for display
         def get_top_region(product_name):
-            if not region_data.empty if isinstance(region_data, pd.DataFrame) else not region_data:
+            if isinstance(region_data, pd.DataFrame) and not region_data.empty:
                 prod_regions = region_data[region_data["Product"] == product_name]
                 if not prod_regions.empty:
                     return prod_regions.loc[prod_regions["Sales"].idxmax(), "Region"]

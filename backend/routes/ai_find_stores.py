@@ -237,5 +237,6 @@ def ai_find_stores():
         "status": "success",
         "message": "Matching stores identified" if matches else "No direct AI matches; returning fallback results.",
         "matches_found": len(matches),
-        "matching_stores": matches
+        "matching_stores": matches,
+        "transcript": user_prompt  # Return the transcribed/original prompt for frontend use
     }), 200
