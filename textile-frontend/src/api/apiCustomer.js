@@ -10,6 +10,14 @@ import api from './axios';
 export const getTrendingFabrics = () => {
     return api.get('/customer/trending-fabrics');
 };
+export const getShopReviews = (shopId) => {
+  return api.get(`/customer/shops/${shopId}/reviews`);
+};
+
+export const submitShopReview = (shopId, payload) => {
+  return api.post(`/customer/shops/${shopId}/reviews`, payload);
+};
+
 
 /**
  * Get popular shops based on sales and ratings

@@ -1,3 +1,5 @@
+#SE-Textile-App\backend\app.py
+#models\model.py
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy import event, Index, func
@@ -220,7 +222,8 @@ class Review(db.Model, TimestampMixin):
     __tablename__ = "reviews"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    user_name = db.Column(db.String(150), nullable=True)   # new column
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True, index=True)
     shop_id = db.Column(db.Integer, db.ForeignKey("shops.id"), nullable=True, index=True)
     rating = db.Column(db.Integer, nullable=False)
