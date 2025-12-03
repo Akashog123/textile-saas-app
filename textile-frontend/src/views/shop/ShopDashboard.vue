@@ -3,67 +3,76 @@
     <!-- Hero Header Section -->
     <div class="dashboard-hero mb-4 animate-fade-in">
       <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-        <div>
-          <h3 class="hero-title mb-2 d-flex align-items-center">
-            <i class="bi bi-shop-window me-2"></i>
-            Shop Manager
-          </h3>
-          <p class="hero-subtitle mb-0">
-            Welcome back! Here's your business overview.
-          </p>
-          <small class="text-muted d-block mt-1">Upload supports CSV/XLS/XLSX files up to 16MB.</small>
+        <div class="d-flex align-items-center gap-3">
+          <div class="hero-icon-box bg-white p-3 rounded-circle shadow-sm d-none d-md-block">
+             <i class="bi bi-shop-window fs-3 text-primary"></i>
+          </div>
+          <div>
+            <h3 class="hero-title mb-1">Shop Manager</h3>
+            <p class="hero-subtitle mb-0 text-muted">
+              Welcome back! Here's your business overview.
+            </p>
+          </div>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-gradient btn-sm d-flex align-items-center" @click="handleUploadSalesData">
+          <button class="btn btn-gradient btn-sm d-flex align-items-center shadow-sm" @click="openSalesUploadModal">
             <i class="bi bi-cloud-arrow-up me-2"></i>
             Upload Sales Data
+          </button>
+          <button class="btn btn-gradient btn-sm d-flex align-items-center border shadow-sm" @click="openUploadLogsModal" title="View recent upload activity">
+            <i class="bi bi-clock-history me-2"></i>
+            History
           </button>
         </div>
       </div>
     </div>
 
     <!-- Top metric cards with animations -->
-    <div class="row g-3 mb-4">
+    <div class="row g-4 mb-4">
       <div
         class="col-12 col-sm-6 col-lg-3"
         v-for="(metric, index) in metrics"
         :key="index"
       >
         <div
-          class="metric-card p-3 h-100"
+          class="metric-card p-4 h-100 d-flex flex-column justify-content-between"
           :style="{ animationDelay: (index * 0.1) + 's' }"
         >
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <small class="metric-label">{{ metric.label }}</small>
-            <div class="metric-icon" :class="metric.iconClass">
-              <i :class="metric.icon"></i>
+          <div class="d-flex align-items-start justify-content-between mb-3">
+            <div>
+              <small class="metric-label text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">{{ metric.label }}</small>
+              <div class="metric-value mt-1">{{ metric.value }}</div>
+            </div>
+            <div class="metric-icon rounded-3 d-flex align-items-center justify-content-center" :class="metric.iconClass" style="width: 48px; height: 48px;">
+              <i :class="metric.icon" class="fs-4"></i>
             </div>
           </div>
-          <div class="d-flex align-items-end justify-content-between">
-            <div class="metric-value">{{ metric.value }}</div>
-            <div class="metric-change" :class="metric.changeClass">
+          <div class="d-flex align-items-center">
+            <div class="metric-change badge rounded-pill fw-normal" :class="metric.changeClass === 'positive' ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'">
               <i :class="metric.changeIcon" class="me-1"></i>
               {{ metric.change }}
             </div>
+            <small class="text-muted ms-2" style="font-size: 0.75rem;">vs last period</small>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Main content grid -->
-    <div class="row g-3">
+    <div class="row g-4">
+      <!-- Sales Summary -->
       <div class="col-lg-6 d-flex">
-        <div class="card modern-card w-100">
-          <div class="card-body d-flex flex-column">
+        <div class="card modern-card w-100 border-0 shadow-sm">
+          <div class="card-body p-4 d-flex flex-column">
             <div class="d-flex align-items-center justify-content-between mb-4">
-              <h6 class="card-title mb-0">
-                <i class="bi bi-graph-up me-2"></i>
+              <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
+                <span class="bg-primary-soft text-primary rounded p-1 me-2"><i class="bi bi-graph-up"></i></span>
                 Sales Summary
-                <small class="text-muted ms-2 fw-normal">{{ salesDateRange }}</small>
+                <small class="text-muted ms-2 fw-normal" style="font-size: 0.8rem;">{{ salesDateRange }}</small>
               </h6>
               <span 
                 class="badge px-3 py-2 rounded-pill" 
-                :class="salesComparison.trend === 'up' ? 'bg-success-soft' : salesComparison.trend === 'down' ? 'bg-danger-soft' : 'bg-secondary-soft'"
+                :class="salesComparison.trend === 'up' ? 'bg-success-soft text-success' : salesComparison.trend === 'down' ? 'bg-danger-soft text-danger' : 'bg-secondary-soft text-secondary'"
                 v-if="salesGrowth"
               >
                 <i :class="salesComparison.trend === 'up' ? 'bi bi-arrow-up me-1' : salesComparison.trend === 'down' ? 'bi bi-arrow-down me-1' : 'bi bi-dash me-1'"></i>
@@ -72,26 +81,42 @@
             </div>
             
             <!-- Loading State -->
-            <div v-if="salesSummaryLoading" class="summary-content p-4 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+            <div v-if="salesSummaryLoading" class="flex-grow-1 d-flex align-items-center justify-content-center py-5">
               <div class="text-center">
                 <div class="spinner-border text-primary mb-2" role="status"></div>
-                <p class="text-muted mb-0">Loading sales data...</p>
+                <p class="text-muted mb-0 small">Loading sales data...</p>
+              </div>
+            </div>
+            
+            <!-- Empty State - No Sales Data -->
+            <div v-else-if="!hasSalesData" class="flex-grow-1 d-flex align-items-center justify-content-center py-4">
+              <div class="text-center">
+                <div class="empty-state-icon mb-3">
+                  <i class="bi bi-bar-chart-line text-muted" style="font-size: 3rem; opacity: 0.4;"></i>
+                </div>
+                <h6 class="text-muted fw-semibold mb-2">No Sales Data Yet</h6>
+                <p class="text-muted small mb-3" style="max-width: 250px;">
+                  Upload your sales data to see revenue insights, trends, and category performance.
+                </p>
+                <button class="btn btn-primary btn-sm" @click="openSalesUploadModal">
+                  <i class="bi bi-upload me-1"></i> Upload Sales Data
+                </button>
               </div>
             </div>
             
             <!-- Data State -->
-            <div v-else class="summary-content p-4 rounded flex-grow-1 d-flex flex-column justify-content-center">
-              <div class="summary-item mb-4">
+            <div v-else class="flex-grow-1 d-flex flex-column">
+              <div class="summary-item mb-4 p-3 bg-light rounded-3">
                 <div class="d-flex align-items-start gap-3">
-                  <div class="check-icon-circle" :class="salesComparison.trend === 'down' ? 'bg-danger-soft text-danger' : ''">
+                  <div class="check-icon-circle flex-shrink-0" :class="salesComparison.trend === 'down' ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'">
                     <i :class="salesComparison.trend === 'up' ? 'bi bi-graph-up-arrow' : salesComparison.trend === 'down' ? 'bi bi-graph-down-arrow' : 'bi bi-dash-lg'"></i>
                   </div>
                   <div>
-                    <p class="mb-1 fw-medium">
+                    <p class="mb-1 fw-medium text-dark">
                       {{ salesComparison.message || 'Upload sales data to see weekly insights' }}
                     </p>
                     <small class="text-muted" v-if="topCategory">
-                      {{ topCategory.name }} showing highest demand ({{ topCategory.percentage }}%)
+                      <strong class="text-dark">{{ topCategory.name }}</strong> showing highest demand ({{ topCategory.percentage }}%)
                     </small>
                     <small class="text-muted" v-else>
                       Upload data to see category insights
@@ -99,35 +124,36 @@
                   </div>
                 </div>
               </div>
-              <div class="summary-stats row g-3 mb-4">
+
+              <div class="row g-3 mb-4">
                 <div class="col-6">
-                  <div class="stat-box h-100">
-                    <small class="text-muted d-block mb-1">Total Quantity</small>
+                  <div class="stat-box h-100 p-3 border rounded-3 bg-white text-center">
+                    <small class="text-muted d-block mb-1 text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Quantity</small>
                     <strong class="fs-4 text-dark">{{ salesSummaryMetrics.totalQuantity.toLocaleString() }}</strong>
                   </div>
                 </div>
                 <div class="col-6">
-                  <div class="stat-box h-100">
-                    <small class="text-muted d-block mb-1">Total Revenue</small>
+                  <div class="stat-box h-100 p-3 border rounded-3 bg-white text-center">
+                    <small class="text-muted d-block mb-1 text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Revenue</small>
                     <strong class="fs-4 text-dark">{{ salesSummaryMetrics.totalRevenue }}</strong>
                   </div>
                 </div>
               </div>
               
               <!-- Daily Breakdown Mini Chart -->
-              <div v-if="salesSummaryData?.daily_breakdown?.length" class="daily-mini-chart">
-                <small class="text-muted d-block mb-2">Daily Breakdown</small>
-                <div class="d-flex align-items-end gap-1" style="height: 40px;">
+              <div v-if="salesSummaryData?.daily_breakdown?.length" class="daily-mini-chart mt-auto">
+                <small class="text-muted d-block mb-2 fw-bold" style="font-size: 0.75rem;">Daily Breakdown</small>
+                <div class="d-flex align-items-end gap-1" style="height: 60px;">
                   <div 
                     v-for="(day, idx) in salesSummaryData.daily_breakdown" 
                     :key="idx"
-                    class="daily-bar bg-primary"
-                    :style="{ height: `${Math.max(10, (day.revenue / Math.max(...salesSummaryData.daily_breakdown.map(d => d.revenue), 1)) * 100)}%` }"
+                    class="daily-bar bg-primary rounded-top"
+                    :style="{ height: `${Math.max(10, (day.revenue / Math.max(...salesSummaryData.daily_breakdown.map(d => d.revenue), 1)) * 100)}%`, opacity: 0.7 }"
                     :title="`${day.day_name}: ${day.revenue_formatted}`"
                   ></div>
                 </div>
-                <div class="d-flex justify-content-between mt-1">
-                  <small v-for="(day, idx) in salesSummaryData.daily_breakdown" :key="idx" class="text-muted" style="font-size: 0.65rem;">
+                <div class="d-flex justify-content-between mt-2">
+                  <small v-for="(day, idx) in salesSummaryData.daily_breakdown" :key="idx" class="text-muted text-uppercase" style="font-size: 0.65rem;">
                     {{ day.day_name?.substring(0, 2) }}
                   </small>
                 </div>
@@ -137,12 +163,13 @@
         </div>
       </div>
 
+      <!-- Sales Growth Trend -->
       <div class="col-lg-6 d-flex">
-        <div class="card modern-card w-100">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <h6 class="card-title mb-0">
-                <i class="bi bi-activity me-2"></i>
+        <div class="card modern-card w-100 border-0 shadow-sm">
+          <div class="card-body p-4 d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+              <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
+                <span class="bg-info-soft text-info rounded p-1 me-2"><i class="bi bi-activity"></i></span>
                 Sales Growth Trend
               </h6>
               <div class="btn-group btn-group-sm" role="group">
@@ -174,19 +201,19 @@
             </div>
             
             <!-- Growth Badge -->
-            <div v-if="salesTrendData?.growth_percent !== undefined" class="mb-2">
+            <div v-if="salesTrendData?.growth_percent !== undefined" class="mb-3 d-flex align-items-center">
               <span 
-                class="badge px-2 py-1 rounded-pill"
-                :class="salesTrendData.trend === 'up' ? 'bg-success-soft' : salesTrendData.trend === 'down' ? 'bg-danger-soft' : 'bg-secondary-soft'"
+                class="badge px-2 py-1 rounded-pill me-2"
+                :class="salesTrendData.trend === 'up' ? 'bg-success-soft text-success' : salesTrendData.trend === 'down' ? 'bg-danger-soft text-danger' : 'bg-secondary-soft text-secondary'"
               >
                 <i :class="salesTrendData.trend === 'up' ? 'bi bi-arrow-up' : salesTrendData.trend === 'down' ? 'bi bi-arrow-down' : 'bi bi-dash'" class="me-1"></i>
                 {{ salesTrendData.growth_percent_formatted }}
               </span>
-              <small class="text-muted ms-2">{{ salesTrendData.total_revenue_formatted }} total</small>
+              <small class="text-muted">{{ salesTrendData.total_revenue_formatted }} total revenue</small>
             </div>
             
             <!-- Loading State -->
-            <div v-if="chartLoading" class="chart-container flex-grow-1 d-flex align-items-center justify-content-center">
+            <div v-if="chartLoading" class="flex-grow-1 d-flex align-items-center justify-content-center">
               <div class="text-center">
                 <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
                 <p class="text-muted small mb-0">Loading chart...</p>
@@ -194,16 +221,16 @@
             </div>
             
             <!-- No Data State -->
-            <div v-else-if="!salesTrendData || salesTrendData.status === 'no_data'" class="chart-container flex-grow-1 d-flex align-items-center justify-content-center">
-              <div class="text-center">
+            <div v-else-if="!salesTrendData || salesTrendData.status === 'no_data'" class="flex-grow-1 d-flex align-items-center justify-content-center bg-light rounded-3">
+              <div class="text-center p-4">
                 <i class="bi bi-bar-chart-line fs-2 text-muted mb-2"></i>
                 <p class="text-muted small mb-0">Upload sales data to see trends</p>
               </div>
             </div>
             
             <!-- Chart -->
-            <div v-else class="chart-container flex-grow-1 d-flex flex-column justify-content-center" @click="viewDetailedChart">
-              <div class="chart-wrapper">
+            <div v-else class="flex-grow-1 d-flex flex-column justify-content-center position-relative" @click="viewDetailedChart">
+              <div class="chart-wrapper w-100" style="height: 220px;">
                 <svg viewBox="0 0 400 180" class="w-100 h-100" preserveAspectRatio="none">
                   <defs>
                     <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
@@ -246,7 +273,7 @@
                   <div>{{ chartTooltip.value }}</div>
                 </div>
               </div>
-              <div class="chart-labels d-flex justify-content-between mt-3 px-2">
+              <div class="chart-labels d-flex justify-content-between mt-2 px-2">
                 <small 
                   class="text-muted fw-medium" 
                   v-for="(label, idx) in chartLabels" 
@@ -259,33 +286,35 @@
         </div>
       </div>
 
+      <!-- Demand Forecast -->
       <div class="col-lg-6 d-flex">
-        <div class="card modern-card w-100">
-          <div class="card-body d-flex flex-column">
+        <div class="card modern-card w-100 border-0 shadow-sm">
+          <div class="card-body p-4 d-flex flex-column">
             <div class="d-flex align-items-center justify-content-between mb-4">
-              <h6 class="card-title mb-0">
-                <i class="bi bi-graph-up-arrow me-2"></i>
+              <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
+                <span class="bg-warning-soft text-warning rounded p-1 me-2"><i class="bi bi-graph-up-arrow"></i></span>
                 Next Quarter Demand Forecast
               </h6>
               <span v-if="quarterlyForecastData?.summary?.confidence_level" class="badge" :class="{
-                'bg-success-soft': quarterlyForecastData.summary.confidence_level === 'High',
-                'bg-warning-soft': quarterlyForecastData.summary.confidence_level === 'Medium',
-                'bg-danger-soft': quarterlyForecastData.summary.confidence_level === 'Low'
-              }">
+                'bg-success-soft text-success': quarterlyForecastData.summary.confidence_level === 'High',
+                'bg-warning-soft text-warning': quarterlyForecastData.summary.confidence_level === 'Medium',
+                'bg-danger-soft text-danger': quarterlyForecastData.summary.confidence_level === 'Low' || quarterlyForecastData.summary.confidence_level === 'Very Low'
+              }" :title="getConfidenceTooltip(quarterlyForecastData.summary)">
+                <i v-if="quarterlyForecastData.summary.confidence_level === 'Very Low'" class="bi bi-exclamation-triangle me-1"></i>
                 {{ quarterlyForecastData.summary.confidence_level }} Confidence
               </span>
             </div>
             
             <!-- Loading State -->
-            <div v-if="quarterlyForecastLoading" class="forecast-container p-3 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+            <div v-if="quarterlyForecastLoading" class="flex-grow-1 d-flex align-items-center justify-content-center py-5">
               <div class="text-center">
                 <div class="spinner-border text-primary mb-2" role="status"></div>
-                <p class="text-muted mb-0">Generating forecast...</p>
+                <p class="text-muted mb-0 small">Generating forecast...</p>
               </div>
             </div>
             
             <!-- Error State -->
-            <div v-else-if="quarterlyForecastError" class="forecast-container p-4 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+            <div v-else-if="quarterlyForecastError" class="flex-grow-1 d-flex align-items-center justify-content-center bg-light rounded-3 p-4">
               <div class="text-center">
                 <i class="bi bi-exclamation-triangle fs-1 text-warning mb-2"></i>
                 <p class="text-muted mb-2">{{ quarterlyForecastError }}</p>
@@ -296,32 +325,34 @@
             </div>
             
             <!-- No Data State -->
-            <div v-else-if="!quarterlyForecastData || quarterlyForecastData.status === 'no_data'" class="forecast-container p-4 rounded flex-grow-1 d-flex align-items-center justify-content-center">
+            <div v-else-if="!quarterlyForecastData || quarterlyForecastData.status === 'no_data' || quarterlyForecastData.status === 'insufficient_data'" class="flex-grow-1 d-flex align-items-center justify-content-center bg-light rounded-3 p-4">
               <div class="text-center">
                 <i class="bi bi-bar-chart-line fs-1 text-muted mb-2"></i>
-                <p class="fw-medium mb-1">No Forecast Data Available</p>
-                <small class="text-muted d-block mb-3">Upload at least 30 days of sales data to generate demand forecasts</small>
+                <p class="fw-medium mb-1">{{ quarterlyForecastData?.status === 'insufficient_data' ? 'Insufficient Sales Data' : 'No Forecast Data Available' }}</p>
+                <small class="text-muted d-block mb-3">
+                  {{ quarterlyForecastData?.insights?.[0]?.message || 'Upload at least 7 days of sales data to generate forecasts.' }}
+                </small>
               </div>
             </div>
             
             <!-- Data State -->
-            <div v-else class="forecast-container p-3 rounded flex-grow-1">
+            <div v-else class="flex-grow-1 d-flex flex-column">
               <!-- Total Predicted Revenue -->
-              <div v-if="quarterlyForecastData?.summary" class="forecast-total mb-3 p-3 bg-primary-soft rounded text-center">
-                <small class="text-muted d-block">Predicted Quarter Revenue</small>
-                <strong class="fs-4 text-primary">{{ quarterlyForecastData.summary.total_predicted_revenue_formatted || '₹0' }}</strong>
+              <div v-if="quarterlyForecastData?.summary" class="mb-4 p-3 bg-primary-soft rounded-3 text-center">
+                <small class="text-primary d-block fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Predicted Quarter Revenue</small>
+                <strong class="fs-3 text-primary">{{ quarterlyForecastData.summary.total_predicted_revenue_formatted || '₹0' }}</strong>
                 <div v-if="quarterlyForecastData.summary.total_predicted_quantity" class="mt-1">
                   <small class="text-muted">Est. {{ quarterlyForecastData.summary.total_predicted_quantity.toLocaleString() }} units</small>
                 </div>
               </div>
               
-              <!-- Category Forecasts - Show actionable items -->
-              <div v-if="actionableForecasts.length > 0">
+              <!-- Category Forecasts -->
+              <div v-if="actionableForecasts.length > 0" class="mb-4">
                 <div class="d-flex align-items-center justify-content-between mb-2">
-                  <small class="text-muted">Top Categories</small>
+                  <small class="text-muted fw-bold">Top Categories</small>
                   <button 
                     v-if="quarterlyForecastData?.category_forecast?.length > 3" 
-                    class="btn btn-link btn-sm p-0 text-primary"
+                    class="btn btn-link btn-sm p-0 text-primary text-decoration-none"
                     @click="showAllCategories = !showAllCategories"
                   >
                     {{ showAllCategories ? 'Show Less' : `View All (${quarterlyForecastData.category_forecast.length})` }}
@@ -334,75 +365,36 @@
                     :key="index"
                   >
                     <div
-                      class="forecast-item h-100 d-flex flex-column align-items-center justify-content-center text-center p-2"
-                      :class="{ 'border-primary': forecast.is_actionable }"
+                      class="forecast-item h-100 d-flex flex-column align-items-center justify-content-center text-center p-2 border rounded-3"
+                      :class="{ 'border-primary bg-primary-soft-hover': forecast.is_actionable }"
                       @click="viewForecastDetails(forecast)"
                     >
-                      <div class="forecast-icon mb-1" :class="getTrendIconBg(forecast.trend)">
-                        <i :class="getTrendIcon(forecast.trend)" :style="{ color: getTrendColor(forecast.trend) }"></i>
+                      <div class="forecast-icon mb-2 rounded-circle d-flex align-items-center justify-content-center" :class="getTrendIconBg(forecast.trend)" style="width: 40px; height: 40px;">
+                        <i :class="getTrendIcon(forecast.trend)" :style="{ color: getTrendColor(forecast.trend) }" class="fs-6"></i>
                       </div>
-                      <small class="d-block fw-bold mb-1 text-dark text-truncate" style="max-width: 100%; font-size: 0.75rem;">{{ forecast.name }}</small>
-                      <div class="forecast-badge small" :class="getTrendBadgeClass(forecast.trend)">
+                      <small class="d-block fw-bold mb-1 text-dark text-truncate w-100" style="font-size: 0.75rem;">{{ forecast.name }}</small>
+                      <div class="forecast-badge small px-2 py-0" :class="getTrendBadgeClass(forecast.trend)">
                         <i :class="forecast.trend === 'up' ? 'bi bi-arrow-up' : forecast.trend === 'down' ? 'bi bi-arrow-down' : 'bi bi-dash'" class="me-1"></i>
                         {{ formatTrendPercent(forecast) }}
                       </div>
                       <small class="text-muted mt-1" style="font-size: 0.65rem;">{{ forecast.predicted }}</small>
-                      <small v-if="forecast.insight" class="text-primary mt-1 d-none d-md-block" style="font-size: 0.6rem;">{{ forecast.insight }}</small>
                     </div>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Fallback to static forecasts if no data -->
-              <div v-else class="row g-3">
-                <div
-                  class="col-4"
-                  v-for="(forecast, index) in forecasts"
-                  :key="index"
-                >
-                  <div
-                    class="forecast-item h-100 d-flex flex-column align-items-center justify-content-center text-center p-3"
-                    @click="viewForecastDetails(forecast)"
-                  >
-                    <div class="forecast-icon mb-2" :class="forecast.iconBg">
-                      <i :class="forecast.icon" :style="{ color: forecast.color }"></i>
-                    </div>
-                    <small class="d-block fw-bold mb-1 text-dark text-truncate" style="max-width: 100%;">{{ forecast.name }}</small>
-                    <div class="forecast-badge" :class="forecast.badgeClass">
-                      <i :class="forecast.trendIcon" class="me-1"></i>
-                      {{ forecast.trend }}
-                    </div>
-                    <small v-if="forecast.predicted" class="text-muted mt-1" style="font-size: 0.7rem;">{{ forecast.predicted }}</small>
                   </div>
                 </div>
               </div>
               
               <!-- Monthly Breakdown -->
-              <div v-if="quarterlyForecastData?.monthly_forecast?.length" class="mt-3">
-                <small class="text-muted d-block mb-2">Monthly Breakdown</small>
+              <div v-if="quarterlyForecastData?.monthly_forecast?.length" class="mt-auto">
+                <small class="text-muted d-block mb-2 fw-bold">Monthly Breakdown</small>
                 <div class="d-flex gap-2">
                   <div 
                     v-for="(month, idx) in quarterlyForecastData.monthly_forecast" 
                     :key="idx"
-                    class="flex-fill p-2 rounded text-center monthly-breakdown-item"
-                    :class="idx === 0 ? 'bg-primary-soft' : 'bg-light'"
+                    class="flex-fill p-2 rounded text-center monthly-breakdown-item border bg-light"
                   >
-                    <small class="text-muted d-block" style="font-size: 0.65rem;">{{ month.month?.split(' ')[0] }}</small>
-                    <strong class="small">{{ month.predicted_revenue_formatted }}</strong>
+                    <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">{{ month.month?.split(' ')[0] }}</small>
+                    <strong class="small text-dark">{{ month.predicted_revenue_formatted }}</strong>
                   </div>
-                </div>
-              </div>
-              
-              <!-- Insights from Forecast -->
-              <div v-if="quarterlyForecastData?.insights?.length" class="mt-3">
-                <div 
-                  v-for="(insight, idx) in quarterlyForecastData.insights.slice(0, 2)" 
-                  :key="idx"
-                  class="d-flex align-items-start gap-2 p-2 rounded mb-2"
-                  :class="insight.type === 'warning' ? 'bg-warning-soft' : 'bg-light'"
-                >
-                  <i :class="insight.icon || 'bi bi-lightbulb'" class="text-primary mt-1"></i>
-                  <small class="text-muted">{{ insight.message }}</small>
                 </div>
               </div>
             </div>
@@ -410,31 +402,56 @@
         </div>
       </div>
 
+      <!-- AI Insights -->
       <div class="col-lg-6 d-flex">
-        <div class="card modern-card ai-insights-card w-100">
-          <div class="card-body d-flex flex-column">
+        <div class="card modern-card ai-insights-card w-100 border-0 shadow-sm">
+          <div class="card-body p-4 d-flex flex-column">
             <div class="d-flex justify-content-between align-items-center mb-4">
-              <h6 class="card-title mb-0">
-                <i class="bi bi-stars me-2"></i>
+              <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
+                <span class="bg-primary-soft text-primary rounded p-1 me-2"><i class="bi bi-stars"></i></span>
                 AI-Powered Insights
               </h6>
-              <button class="btn btn-outline-primary btn-sm" @click="generateInsightsPDF" :disabled="generatingPDF">
+              <button class="btn btn-gradient btn-sm rounded" @click="generateInsightsPDF" :disabled="generatingPDF">
                 <span v-if="generatingPDF"><span class="spinner-border spinner-border-sm me-1"></span>Generating...</span>
-                <span v-else><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</span>
+                <span v-else><i class="bi bi-download me-1"></i>Export Report</span>
               </button>
             </div>
-            <div class="insights-container flex-grow-1 custom-scrollbar">
+            <div class="insights-container flex-grow-1 custom-scrollbar pe-2">
               <div
-                class="insight-item mb-3"
+                class="insight-item mb-3 p-3 rounded-3"
+                :class="[
+                  insight.type === 'success' ? 'insight-success' : 
+                  insight.type === 'warning' ? 'insight-warning' : 'insight-info'
+                ]"
                 v-for="(insight, index) in aiInsights"
                 :key="index"
               >
                 <div class="d-flex align-items-start gap-3">
-                  <div class="insight-icon flex-shrink-0">
+                  <div 
+                    class="insight-icon flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center" 
+                    :class="[
+                      insight.type === 'success' ? 'bg-success-soft text-success' : 
+                      insight.type === 'warning' ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary'
+                    ]"
+                    style="width: 40px; height: 40px;"
+                  >
                     <i :class="insight.icon"></i>
                   </div>
                   <div class="flex-grow-1">
-                    <strong class="d-block mb-1 text-dark">{{ insight.title }}</strong>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <strong class="text-dark" style="font-size: 0.95rem;">{{ insight.title }}</strong>
+                      <span 
+                        v-if="insight.category" 
+                        class="badge rounded-pill"
+                        :class="[
+                          insight.type === 'success' ? 'bg-success-soft text-success' : 
+                          insight.type === 'warning' ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary'
+                        ]"
+                        style="font-size: 0.65rem; font-weight: 500;"
+                      >
+                        {{ insight.category }}
+                      </span>
+                    </div>
                     <p class="mb-0 small text-muted lh-sm">
                       {{ insight.description }}
                     </p>
@@ -446,16 +463,17 @@
         </div>
       </div>
 
+      <!-- Smart Reorder Suggestions -->
       <div class="col-12">
-        <div class="card modern-card">
-          <div class="card-body">
+        <div class="card modern-card border-0 shadow-sm">
+          <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
-              <h6 class="card-title mb-0">
-                <i class="bi bi-cart-check me-2"></i>
+              <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
+                <span class="bg-success-soft text-success rounded p-1 me-2"><i class="bi bi-cart-check"></i></span>
                 Smart Reorder Suggestions
               </h6>
               <button
-                class="btn btn-outline-gradient btn-sm"
+                class="btn btn-outline-primary btn-sm rounded-pill"
                 @click="viewAllSuggestions"
               >
                 <i class="bi bi-grid-3x3-gap me-1"></i>
@@ -464,9 +482,9 @@
             </div>
             
             <!-- Grouped reorder suggestions -->
-            <div v-if="Object.keys(groupedReorderSuggestions).length === 0" class="text-center py-5 text-muted">
+            <div v-if="Object.keys(groupedReorderSuggestions).length === 0" class="text-center py-5 text-muted bg-light rounded-3">
               <div class="empty-state-icon mb-3">
-                <i class="bi bi-inbox"></i>
+                <i class="bi bi-inbox fs-1"></i>
               </div>
               <p class="mb-0">No reorder suggestions at this time</p>
             </div>
@@ -475,12 +493,12 @@
               <div 
                 v-for="(products, distributorName) in groupedReorderSuggestions" 
                 :key="distributorName"
-                class="distributor-group mb-4"
+                class="distributor-group mb-4 border rounded-3 overflow-hidden"
               >
-                <div class="distributor-header p-3 rounded-top bg-light-subtle border-bottom">
-                  <div class="d-flex align-items-center justify-content-between">
+                <div class="distributor-header p-3 bg-light border-bottom">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div class="d-flex align-items-center gap-3">
-                      <div class="distributor-icon">
+                      <div class="distributor-icon bg-white p-2 rounded shadow-sm text-primary">
                         <i class="bi bi-building"></i>
                       </div>
                       <div>
@@ -498,46 +516,41 @@
                   </div>
                 </div>
                 
-                <div class="reorder-carousel">
-                  <div class="carousel-track" style="overflow-x: auto;">
+                <div class="reorder-carousel p-3 bg-white">
+                  <div class="carousel-track d-flex gap-3" style="overflow-x: auto; padding-bottom: 10px;">
                     <div
-                      class="reorder-card"
+                      class="reorder-card border rounded-3 flex-shrink-0"
+                      style="width: 280px;"
                       v-for="(product, index) in products"
                       :key="index"
                       @click="viewProduct(product)"
                     >
-                      <div class="product-image-wrapper">
+                      <div class="product-image-wrapper position-relative" style="height: 180px;">
                         <img
                           :src="product.image"
                           :alt="product.name"
-                          class="product-image"
+                          class="product-image w-100 h-100 object-fit-cover"
                         />
-                        <div class="product-badge">
-                          <i class="bi bi-lightning-fill"></i>
+                        <div class="product-badge position-absolute top-0 end-0 m-2 badge bg-danger rounded-pill shadow-sm">
+                          <i class="bi bi-lightning-fill me-1"></i>
                           Low Stock
                         </div>
                       </div>
                       <div class="product-details p-3">
-                        <h6 class="product-name mb-1">{{ product.name }}</h6>
-                        <p class="product-supplier mb-2">
+                        <h6 class="product-name mb-1 text-truncate" :title="product.name">{{ product.name }}</h6>
+                        <p class="product-supplier mb-2 text-muted small">
                           <i class="bi bi-tag me-1"></i>
                           {{ product.category }}
                         </p>
-                        <div class="mb-2">
-                          <small class="text-muted d-block">Current: {{ product.currentStock }} units</small>
-                          <small class="text-danger d-block">Min Required: {{ product.minimumStock }} units</small>
+                        <div class="d-flex justify-content-between mb-2 small">
+                          <span class="text-muted">Stock: {{ product.currentStock }}</span>
+                          <span class="text-danger fw-bold">Min: {{ product.minimumStock }}</span>
                         </div>
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                          <span class="product-quantity text-success fw-bold"
+                        <div class="d-flex align-items-center justify-content-between mt-3 pt-3 border-top">
+                          <span class="product-quantity text-success fw-bold small"
                             >Reorder: {{ product.quantity }}</span
                           >
-                          <span class="product-price">{{ product.price }}</span>
-                        </div>
-                        <div class="product-sku mb-3">
-                          <small class="text-muted">SKU: {{ product.sku }}</small>
-                        </div>
-                        <div class="text-muted small mt-2">
-                          Review supplier contact to place the order directly.
+                          <span class="product-price fw-bold">{{ product.price }}</span>
                         </div>
                       </div>
                     </div>
@@ -658,6 +671,117 @@
       </div>
     </transition>
 
+    <!-- Upload Logs Modal -->
+    <transition name="modal-fade">
+      <div v-if="showUploadLogsModal" class="modal-overlay" @click="closeUploadLogsModal">
+        <div class="quick-view-modal" @click.stop style="max-width: 700px;">
+          <button class="modal-close-btn" @click="closeUploadLogsModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <div class="text-center mb-4">
+            <div class="insight-icon-large mb-3 text-primary">
+              <i class="bi bi-clock-history fs-1"></i>
+            </div>
+            <h4 class="mb-2">Recent Upload Activity</h4>
+            <p class="text-muted">Last 6 sales data uploads with SLA insights</p>
+          </div>
+          <div v-if="uploadLogsLoading" class="text-center py-4">
+            <div class="spinner-border text-primary mb-3"></div>
+            <p class="text-muted mb-0">Fetching logs…</p>
+          </div>
+          <div v-else-if="uploadLogsError" class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle me-2"></i>{{ uploadLogsError }}
+          </div>
+          <div v-else-if="uploadLogs.length === 0" class="text-center py-4 text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+            <p class="mb-0">No uploads recorded yet.</p>
+            <small>Upload sales data to see activity here</small>
+          </div>
+          <div v-else class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Started</th>
+                  <th>Status</th>
+                  <th>Rows</th>
+                  <th>Duration</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="log in uploadLogs" :key="log.id">
+                  <td>
+                    <small class="text-muted">{{ formatLogDate(log.started_at) }}</small>
+                  </td>
+                  <td>
+                    <span :class="['badge', log.status === 'completed' ? 'bg-success-soft text-success' : log.status === 'failed' ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-warning']">
+                      {{ log.status }}
+                    </span>
+                  </td>
+                  <td>{{ log.rows_processed || 0 }}</td>
+                  <td>
+                    {{ log.duration_ms ? (log.duration_ms / 1000).toFixed(1) + 's' : '—' }}
+                    <small v-if="log.sla_breached" class="text-danger d-block">SLA exceeded</small>
+                  </td>
+                  <td>
+                    <small>{{ log.message || '—' }}</small>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Sales Upload Modal -->
+    <transition name="modal-fade">
+      <div v-if="showSalesUploadModal" class="modal-overlay" @click="closeSalesUploadModal">
+        <div class="quick-view-modal" @click.stop style="max-width: 600px;">
+          <button class="modal-close-btn" @click="closeSalesUploadModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <div class="text-center mb-4">
+            <div class="insight-icon-large mb-3 text-primary">
+              <i class="bi bi-cloud-arrow-up fs-1"></i>
+            </div>
+            <h4 class="mb-2">Upload Sales Data</h4>
+            <p class="text-muted">Update your sales records to get fresh insights</p>
+          </div>
+
+          <div class="modal-body">
+            <!-- Step 1 -->
+            <div class="step-section mb-4">
+                <h6><span class="badge rounded me-2">1</span>Prepare Data</h6>
+                <p class="text-muted small mb-2">Download the template to ensure your data is formatted correctly.</p>
+                <button class="btn btn-sm btn-gradient" @click="handleDownloadSalesTemplate">
+                    <i class="bi bi-file-earmark-arrow-down me-1"></i> Download CSV Template
+                </button>
+            </div>
+            <hr class="text-muted opacity-25">
+
+            <!-- Step 2 -->
+            <div class="step-section mb-4">
+                <h6><span class="badge rounded me-2">2</span>Upload Sales Data</h6>
+                <p class="text-muted small mb-2">Upload your filled CSV or Excel file. Supported formats: .csv, .xlsx, .xls</p>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <input type="file" class="form-control form-control-sm" ref="salesFileInput" accept=".csv,.xlsx,.xls" @change="onSalesFileSelect">
+                    <button class="btn btn-sm btn-gradient" @click="uploadSalesFile" :disabled="!selectedSalesFile || salesUploading">
+                        <span v-if="salesUploading" class="spinner-border spinner-border-sm me-1"></span>
+                        Upload
+                    </button>
+                </div>
+                <div v-if="salesUploadStatus" class="mt-2 small" :class="salesUploadStatus.type === 'success' ? 'text-success' : 'text-danger'">
+                    <i :class="salesUploadStatus.type === 'success' ? 'bi bi-check-circle' : 'bi bi-exclamation-circle'"></i>
+                    {{ salesUploadStatus.message }}
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Toast Notification -->
     <transition name="toast">
       <div v-if="showToast" class="toast-notification">
@@ -669,7 +793,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { 
   getShopDashboard, 
   uploadSalesData as uploadSalesDataAPI, 
@@ -678,27 +802,38 @@ import {
   generateSalesReportPdf,
   getSalesSummary,
   getQuarterlyForecast,
-  getSalesGrowthTrend
+  getSalesGrowthTrend,
+  downloadSalesTemplate
 } from '@/api/apiShop';
 
 // Loading and error states
 const loading = ref(false);
 const error = ref('');
 
+// Request deduplication flags to prevent multiple simultaneous requests
+const requestInProgress = ref({
+  dashboard: false,
+  salesSummary: false,
+  quarterlyForecast: false,
+  salesTrend: false,
+  uploadLogs: false
+});
+
+
 // Dashboard data from backend
 const dashboardData = ref(null);
 
-// NEW: Sales Summary (Last 7 Days) data
+// Sales Summary (Last 7 Days) data
 const salesSummaryData = ref(null);
 const salesSummaryLoading = ref(false);
 const salesSummaryError = ref('');
 
-// NEW: Quarterly Forecast data
+// Quarterly Forecast data
 const quarterlyForecastData = ref(null);
 const quarterlyForecastLoading = ref(false);
 const quarterlyForecastError = ref('');
 
-// NEW: Sales Growth Trend chart data
+// Sales Growth Trend chart data
 const salesTrendData = ref(null);
 const chartLoading = ref(false);
 const chartPeriod = ref('weekly');
@@ -713,9 +848,29 @@ const forecastError = ref('');
 const uploadLogs = ref([]);
 const uploadLogsLoading = ref(false);
 const uploadLogsError = ref('');
+const showUploadLogsModal = ref(false);
+
+// Sales Upload Modal State
+const showSalesUploadModal = ref(false);
+const salesFileInput = ref(null);
+const selectedSalesFile = ref(null);
+const salesUploading = ref(false);
+const salesUploadStatus = ref(null);
 
 // PDF generation state
 const generatingPDF = ref(false);
+
+// Check if shop has sales data
+const hasSalesData = computed(() => {
+  // Check if we actually have meaningful sales data (not just zeros)
+  const hasSummaryData = salesSummaryData.value?.status === 'success' && 
+    (salesSummaryData.value?.metrics?.total_quantity > 0 || salesSummaryData.value?.metrics?.total_revenue > 0);
+  const hasDashboardData = dashboardData.value && 
+    dashboardData.value.weekly_sales && 
+    dashboardData.value.weekly_sales !== '₹0' &&
+    dashboardData.value.weekly_sales !== '₹0.00';
+  return hasSummaryData || hasDashboardData;
+});
 
 // Sales summary computed properties
 const salesDateRange = computed(() => {
@@ -870,21 +1025,22 @@ const formatTrendPercent = (forecast) => {
   return `${forecast.proportion}%`;
 };
 
-// Shop ID - get from logged-in user
+// Shop ID - get from logged-in user (consistent with multishop mechanism)
 const shopId = computed(() => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  return user.shop_id || user.id; // Adjust based on your user object structure
+  // Priority: primary_shop_id > shop_id > first shop from shops array
+  return user.primary_shop_id || user.shop_id || (user.shops && user.shops[0]?.id) || null;
 });
 
 // Metrics Data - dynamically populated from backend
 const metrics = ref([
   {
-    label: 'Weekly Sales',
+    label: 'Avg Order Value',
     value: '₹0',
     change: '+0%',
     changeClass: 'positive',
     changeIcon: 'bi bi-arrow-up',
-    icon: 'bi bi-currency-rupee',
+    icon: 'bi bi-receipt',
     iconClass: 'bg-success-soft',
   },
   {
@@ -1034,7 +1190,9 @@ const formatLogDate = (timestamp) => {
 };
 
 const fetchUploadLogs = async () => {
-  if (!shopId.value) return;
+  if (!shopId.value || requestInProgress.value.uploadLogs) return;
+  
+  requestInProgress.value.uploadLogs = true;
   uploadLogsLoading.value = true;
   uploadLogsError.value = '';
   try {
@@ -1049,18 +1207,44 @@ const fetchUploadLogs = async () => {
     uploadLogsError.value = err.response?.data?.message || 'Failed to load upload history';
   } finally {
     uploadLogsLoading.value = false;
+    requestInProgress.value.uploadLogs = false;
   }
 };
 
 /**
+ * Open Upload Logs Modal
+ */
+const openUploadLogsModal = async () => {
+  showUploadLogsModal.value = true;
+  if (uploadLogs.value.length === 0) {
+    await fetchUploadLogs();
+  }
+};
+
+/**
+ * Close Upload Logs Modal
+ */
+const closeUploadLogsModal = () => {
+  showUploadLogsModal.value = false;
+};
+
+/**
  * Fetch dashboard data from backend
+ * Uses deduplication to prevent multiple simultaneous requests
  */
 const fetchDashboard = async () => {
   if (!shopId.value) {
     error.value = 'Shop ID not found. Please log in again.';
     return;
   }
+  
+  // Prevent duplicate requests
+  if (requestInProgress.value.dashboard) {
+    console.log('[Dashboard] Request already in progress, skipping');
+    return;
+  }
 
+  requestInProgress.value.dashboard = true;
   loading.value = true;
   error.value = '';
   try {
@@ -1072,7 +1256,15 @@ const fetchDashboard = async () => {
       updateReorderSuggestions(payload);
       updateForecastsFromData(payload);
       updateInsightsFromData(payload);
-      if (response.data?.warning) {
+      // Handle info messages (non-alarming, informational)
+      if (response.data?.info) {
+        toastMessage.value = response.data.info;
+        toastIcon.value = 'bi bi-info-circle';
+        showToast.value = true;
+        setTimeout(() => (showToast.value = false), 6000);
+      }
+      // Handle warning messages (potential issues)
+      else if (response.data?.warning) {
         toastMessage.value = response.data.warning;
         toastIcon.value = 'bi bi-exclamation-triangle';
         showToast.value = true;
@@ -1085,6 +1277,7 @@ const fetchDashboard = async () => {
     // Keep default values if API fails
   } finally {
     loading.value = false;
+    requestInProgress.value.dashboard = false;
   }
 };
 
@@ -1092,9 +1285,14 @@ const fetchDashboard = async () => {
  * Update metrics from dashboard data
  */
 const updateMetricsFromData = (data) => {
-  // metrics[0] = Weekly Sales
-  if (data.weekly_sales !== undefined) {
-    metrics.value[0].value = data.weekly_sales || '₹0';
+  // metrics[0] = Avg Order Value (from sales summary if available)
+  if (salesSummaryData.value?.metrics?.average_order_value_formatted) {
+    metrics.value[0].value = salesSummaryData.value.metrics.average_order_value_formatted;
+  } else if (data.weekly_sales && data.total_orders) {
+    // Fallback: calculate from dashboard data
+    const weeklySalesNum = parseFloat(data.weekly_sales.replace(/[₹,]/g, '')) || 0;
+    const avgOrderVal = data.total_orders > 0 ? weeklySalesNum / data.total_orders : 0;
+    metrics.value[0].value = `₹${avgOrderVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   }
   // metrics[1] = Pending Reorders
   if (data.pending_reorders !== undefined) {
@@ -1176,110 +1374,221 @@ const updateForecastsFromData = (data) => {
  */
 /**
  * Update AI insights from dashboard data
+ * Maps insight categories to appropriate icons and styles
  */
+const getInsightIcon = (insight) => {
+  // If backend sends icon directly, use it
+  if (insight.icon && insight.icon.startsWith('bi-')) {
+    return `bi ${insight.icon}`;
+  }
+  
+  // Map categories to icons
+  const iconMap = {
+    'Performance': 'bi bi-speedometer2',
+    'Timing': 'bi bi-calendar-check',
+    'Pricing': 'bi bi-cash-stack',
+    'Strategy': 'bi bi-lightbulb',
+    'Trend': 'bi bi-graph-up-arrow',
+    'Product': 'bi bi-star',
+    'Inventory': 'bi bi-box-seam'
+  };
+  
+  return iconMap[insight.category] || 'bi bi-lightbulb';
+};
+
+const getInsightTypeClass = (insight) => {
+  const typeMap = {
+    'success': 'insight-success',
+    'warning': 'insight-warning',
+    'info': 'insight-info'
+  };
+  return typeMap[insight.type] || 'insight-info';
+};
+
 const updateInsightsFromData = (data) => {
   if (data.ai_insights && data.ai_insights.length > 0) {
-    aiInsights.value = data.ai_insights.map(insight => ({
-      icon: insight.category === 'Trend' ? 'bi bi-graph-up-arrow' : 
-            insight.category === 'Inventory' ? 'bi bi-box-seam' : 'bi bi-lightbulb',
-      title: insight.title,
-      description: limitSentences(insight.description || insight.impact, 4)
-    }));
+    aiInsights.value = data.ai_insights.map(insight => {
+      // Map backend 'impact' field to frontend 'type' field
+      let insightType = insight.type || 'info';
+      if (!insight.type && insight.impact) {
+        const impactMap = {
+          'Positive': 'success',
+          'Action': 'warning',
+          'Negative': 'warning',
+          'Critical': 'warning'
+        };
+        insightType = impactMap[insight.impact] || 'info';
+      }
+      
+      return {
+        icon: getInsightIcon(insight),
+        title: insight.title,
+        description: limitSentences(insight.message || insight.description || '', 4),
+        type: insightType,
+        category: insight.category || 'General'
+      };
+    });
   } else {
-    // Default insights
+    // Default insights only if no data available
     aiInsights.value = [
       {
         icon: 'bi bi-lightbulb-fill',
         title: 'Upload Sales Data',
-        description: limitSentences('Upload your sales data to get AI-powered insights and forecasts.', 4)
+        description: limitSentences('Upload your sales data to get AI-powered insights and forecasts.', 4),
+        type: 'info',
+        category: 'Getting Started'
       }
     ];
   }
 };
 
 /**
- * Upload sales data file
+ * Sales Upload Modal Functions
+ */
+const openSalesUploadModal = () => {
+  showSalesUploadModal.value = true;
+  selectedSalesFile.value = null;
+  salesUploadStatus.value = null;
+  if (salesFileInput.value) salesFileInput.value.value = '';
+};
+
+const closeSalesUploadModal = () => {
+  showSalesUploadModal.value = false;
+};
+
+const onSalesFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (!file) {
+    selectedSalesFile.value = null;
+    return;
+  }
+  if (file.size > 16 * 1024 * 1024) {
+    salesUploadStatus.value = { type: 'error', message: 'File too large (max 16MB)' };
+    event.target.value = '';
+    selectedSalesFile.value = null;
+    return;
+  }
+  selectedSalesFile.value = file;
+  salesUploadStatus.value = null;
+};
+
+const uploadSalesFile = async () => {
+  if (!shopId.value || !selectedSalesFile.value) return;
+
+  salesUploading.value = true;
+  salesUploadStatus.value = { type: 'info', message: 'Uploading and analyzing data...' };
+
+  try {
+    const response = await uploadSalesDataAPI(shopId.value, selectedSalesFile.value);
+    
+    if (response.data?.status === 'error') {
+      throw new Error(response.data.message || 'Analysis failed');
+    }
+
+    // Update AI Insights directly on dashboard
+    if (response.data && (response.data.ai_insights || response.data.demand_summary)) {
+      const newInsights = [];
+      if (response.data.demand_summary) {
+        newInsights.push({
+          icon: 'bi bi-graph-up-arrow',
+          title: 'Demand Summary',
+          description: limitSentences(response.data.demand_summary, 4),
+          type: 'info',
+          category: 'Analysis'
+        });
+      }
+      if (response.data.recommendation) {
+        newInsights.push({
+          icon: 'bi bi-lightbulb-fill',
+          title: 'AI Recommendation',
+          description: limitSentences(response.data.recommendation, 4),
+          type: 'success',
+          category: 'Action'
+        });
+      }
+      if (response.data.ai_insights && response.data.ai_insights.length > 0) {
+        response.data.ai_insights.forEach(item => {
+          newInsights.push({
+            icon: getInsightIcon(item),
+            title: item.title,
+            description: limitSentences(item.message || item.description || item.impact, 4),
+            type: item.type || 'info',
+            category: item.category || 'General'
+          });
+        });
+      }
+      if (newInsights.length > 0) {
+        aiInsights.value = newInsights;
+      }
+    }
+
+    // Refresh dashboard
+    try {
+      await fetchDashboard();
+    } catch (refreshErr) {
+      console.error('[Dashboard Refresh Error]', refreshErr);
+    }
+
+    const timingMessage = formatUploadTiming(response.data?.upload_log);
+    salesUploadStatus.value = { type: 'success', message: timingMessage || 'Upload successful!' };
+    
+    // Show toast as well
+    toastMessage.value = 'Sales data uploaded successfully!';
+    toastIcon.value = 'bi bi-check-circle-fill';
+    showToast.value = true;
+    setTimeout(() => (showToast.value = false), 3000);
+
+  } catch (err) {
+    console.error('[Upload Error]', err);
+    let errorMsg = 'Upload failed';
+    if (err.response?.status === 409) {
+      const timingMessage = formatUploadTiming(err.response.data?.upload_log);
+      errorMsg = `${err.response.data?.message || 'Duplicate file detected'} ${timingMessage}`.trim();
+    } else if (err.response?.status === 400) {
+      errorMsg = err.response.data?.message || 'Invalid file format';
+    } else if (err.response?.status === 403) {
+      errorMsg = 'You do not have permission to upload sales data';
+    } else {
+      errorMsg = err.response?.data?.message || err.message || 'Upload failed. Please try again.';
+    }
+    salesUploadStatus.value = { type: 'error', message: errorMsg };
+  } finally {
+    salesUploading.value = false;
+  }
+};
+
+/**
+ * Download CSV template for sales data upload
+ */
+const handleDownloadSalesTemplate = async () => {
+  try {
+    const response = await downloadSalesTemplate();
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'sales_template.csv';
+    link.click();
+    window.URL.revokeObjectURL(url);
+    toastMessage.value = 'Template downloaded! Fill in your sales data and upload.';
+    toastIcon.value = 'bi bi-check-circle-fill';
+    showToast.value = true;
+    setTimeout(() => (showToast.value = false), 3000);
+  } catch (err) {
+    console.error('[Template Download Error]', err);
+    toastMessage.value = 'Failed to download template';
+    toastIcon.value = 'bi bi-exclamation-circle-fill';
+    showToast.value = true;
+    setTimeout(() => (showToast.value = false), 3000);
+  }
+};
+
+/**
+ * Upload sales data file - Production grade implementation
+ * Shows rotating progress messages until processing completes
  */
 const handleUploadSalesData = async () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.csv,.xlsx,.xls';
-  
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Validate file size (16MB max)
-    if (file.size > 16 * 1024 * 1024) {
-      toastMessage.value = 'File too large (max 16MB)';
-      toastIcon.value = 'bi bi-exclamation-circle-fill';
-      showToast.value = true;
-      setTimeout(() => (showToast.value = false), 3000);
-      return;
-    }
-
-    loading.value = true;
-    
-    // Open modal immediately in loading state
-    showInsightsModal.value = true;
-    insightsLoading.value = true;
-    uploadInsights.value = null;
-
-    try {
-      // toastMessage.value = 'Uploading periodic sales data...';
-      // toastIcon.value = 'bi bi-upload';
-      // showToast.value = true;
-
-      const response = await uploadSalesDataAPI(shopId.value, file);
-      
-      const timingMessage = formatUploadTiming(response.data?.upload_log);
-      toastMessage.value = timingMessage || 'Analysis complete!';
-      toastIcon.value = response.data?.upload_log?.sla_breached
-        ? 'bi bi-exclamation-circle-fill'
-        : 'bi bi-check-circle-fill';
-      showToast.value = true;
-      
-      // Update Modal Content
-      if (response.data && (response.data.ai_insights || response.data.demand_summary)) {
-        uploadInsights.value = {
-          ai_insights: (response.data.ai_insights || []).map(item => ({
-            ...item,
-            description: limitSentences(item.description || item.impact, 4)
-          })),
-          demand_summary: limitSentences(response.data.demand_summary, 4),
-          recommendation: limitSentences(response.data.recommendation, 4)
-        };
-      } else {
-         // Fallback if no specific insights returned
-         uploadInsights.value = {
-            demand_summary: "Data uploaded successfully.",
-            ai_insights: []
-         };
-      }
-      
-      // Refresh dashboard after upload
-      await fetchDashboard();
-      await fetchUploadLogs();
-    } catch (err) {
-      console.error('[Upload Error]', err);
-      if (err.response?.status === 409 && err.response?.data?.upload_log) {
-        const duplicateOf = err.response.data.duplicate_of;
-        const timingMessage = formatUploadTiming(err.response.data.upload_log);
-        toastMessage.value = `${err.response.data.message} ${timingMessage}`.trim();
-      } else {
-        toastMessage.value = err.response?.data?.message || 'Upload failed';
-      }
-      toastIcon.value = 'bi bi-exclamation-circle-fill';
-      showToast.value = true;
-      showInsightsModal.value = false; // Close modal on error
-    } finally {
-      loading.value = false;
-      insightsLoading.value = false;
-      setTimeout(() => (showToast.value = false), 3000);
-    }
-  };
-  
-  input.click();
+  openSalesUploadModal();
 };
 
 /**
@@ -1443,16 +1752,44 @@ const getConfidenceClass = (confidence) => {
     case 'High': return 'bg-success';
     case 'Medium': return 'bg-warning';
     case 'Low': return 'bg-danger';
+    case 'Very Low': return 'bg-danger';
     default: return 'bg-secondary';
   }
 };
 
 /**
- * NEW: Fetch comprehensive sales summary for last 7 days
+ * Get tooltip text for confidence level with data quality info
+ */
+const getConfidenceTooltip = (summary) => {
+  if (!summary) return '';
+  
+  const daysUsed = summary.historical_days_used || 0;
+  const qualityScore = summary.data_quality_score || 0;
+  const minRecommended = summary.minimum_recommended_days || 90;
+  
+  let tooltip = `Data Quality Score: ${qualityScore.toFixed(0)}%\n`;
+  tooltip += `Historical Data: ${daysUsed} days\n`;
+  
+  if (daysUsed < minRecommended) {
+    tooltip += `Recommended: ${minRecommended}+ days for better accuracy`;
+  } else {
+    tooltip += `Sufficient data for reliable forecasts`;
+  }
+  
+  return tooltip;
+};
+
+/**
+ * Fetch comprehensive sales summary for last 7 days
+ * Uses deduplication to prevent multiple simultaneous requests
  */
 const fetchSalesSummary = async () => {
-  if (!shopId.value) return;
+  if (!shopId.value || requestInProgress.value.salesSummary) {
+    console.log('[SalesSummary] Skipping - no shop or request in progress');
+    return;
+  }
   
+  requestInProgress.value.salesSummary = true;
   salesSummaryLoading.value = true;
   salesSummaryError.value = '';
   
@@ -1476,6 +1813,11 @@ const fetchSalesSummary = async () => {
         }));
         aiInsights.value = [...summaryInsights, ...aiInsights.value.slice(0, 2)];
       }
+      
+      // Update avg order value metric
+      if (salesSummaryData.value?.metrics?.average_order_value_formatted) {
+        metrics.value[0].value = salesSummaryData.value.metrics.average_order_value_formatted;
+      }
     } else {
       salesSummaryError.value = response.data?.message || 'Failed to load sales summary';
     }
@@ -1484,15 +1826,21 @@ const fetchSalesSummary = async () => {
     salesSummaryError.value = err.response?.data?.message || 'Failed to load sales summary';
   } finally {
     salesSummaryLoading.value = false;
+    requestInProgress.value.salesSummary = false;
   }
 };
 
 /**
- * NEW: Fetch quarterly demand forecast
+ * Fetch quarterly demand forecast
+ * Uses deduplication to prevent multiple simultaneous requests
  */
 const fetchQuarterlyForecast = async () => {
-  if (!shopId.value) return;
+  if (!shopId.value || requestInProgress.value.quarterlyForecast) {
+    console.log('[QuarterlyForecast] Skipping - no shop or request in progress');
+    return;
+  }
   
+  requestInProgress.value.quarterlyForecast = true;
   quarterlyForecastLoading.value = true;
   quarterlyForecastError.value = '';
   
@@ -1513,6 +1861,7 @@ const fetchQuarterlyForecast = async () => {
     quarterlyForecastError.value = err.response?.data?.message || 'Failed to load forecast';
   } finally {
     quarterlyForecastLoading.value = false;
+    requestInProgress.value.quarterlyForecast = false;
   }
 };
 
@@ -1592,11 +1941,19 @@ const updateForecastCardsFromData = (categoryData) => {
 };
 
 /**
- * NEW: Fetch sales growth trend data for chart
+ * Fetch sales growth trend data for chart
+ * Uses deduplication to prevent multiple simultaneous requests
  */
-const fetchSalesGrowthTrend = async () => {
+const fetchSalesGrowthTrend = async (forceRefresh = false) => {
   if (!shopId.value) return;
   
+  // Skip if already fetching (unless forced, e.g., period change)
+  if (requestInProgress.value.salesTrend && !forceRefresh) {
+    console.log('[SalesGrowthTrend] Request already in progress, skipping');
+    return;
+  }
+  
+  requestInProgress.value.salesTrend = true;
   chartLoading.value = true;
   
   try {
@@ -1611,6 +1968,7 @@ const fetchSalesGrowthTrend = async () => {
     salesTrendData.value = null;
   } finally {
     chartLoading.value = false;
+    requestInProgress.value.salesTrend = false;
   }
 };
 
@@ -1620,7 +1978,8 @@ const fetchSalesGrowthTrend = async () => {
 const changeChartPeriod = (period) => {
   if (chartPeriod.value === period) return;
   chartPeriod.value = period;
-  fetchSalesGrowthTrend();
+  // Force refresh when changing period
+  fetchSalesGrowthTrend(true);
 };
 
 /**
@@ -1645,14 +2004,58 @@ const hideChartTooltip = () => {
   chartTooltip.value.visible = false;
 };
 
+/**
+ * Initialize dashboard data loading
+ * Fetches data sequentially to avoid overwhelming the server
+ * Primary data (dashboard + sales summary) loads first, then secondary data
+ */
+const initializeDashboard = async () => {
+  if (!shopId.value) {
+    error.value = 'Shop ID not found. Please log in again.';
+    return;
+  }
+  
+  try {
+    // Phase 1: Load essential data first (dashboard provides base data)
+    await fetchDashboard();
+    
+    // Phase 2: Load sales summary (provides metrics for cards)
+    await fetchSalesSummary();
+    
+    // Phase 3: Load supplementary data in parallel (these can use cached data from backend)
+    await Promise.all([
+      fetchSalesGrowthTrend(),
+      fetchQuarterlyForecast(),
+      fetchUploadLogs()
+    ]);
+  } catch (err) {
+    console.error('[Dashboard Init Error]', err);
+    error.value = 'Failed to initialize dashboard';
+  }
+};
+
+/**
+ * Refresh all dashboard data (called after upload or inventory changes)
+ * Resets request flags to ensure fresh data is fetched
+ */
+const refreshDashboard = async () => {
+  // Reset request flags to ensure we can fetch fresh data
+  requestInProgress.value = {
+    dashboard: false,
+    salesSummary: false,
+    quarterlyForecast: false,
+    salesTrend: false,
+    uploadLogs: false
+  };
+  
+  // Re-initialize to fetch fresh data
+  await initializeDashboard();
+};
+
 // Fetch dashboard data on mount
 onMounted(() => {
-  fetchDashboard();
+  initializeDashboard();
   updateArrows();
-  fetchSalesSummary();
-  fetchQuarterlyForecast();
-  fetchSalesGrowthTrend();
-  fetchUploadLogs();
 });
 </script>
 
@@ -1874,6 +2277,8 @@ h6.card-title {
 .bg-info-soft { background: rgba(6, 182, 212, 0.1); color: #0891b2; }
 .bg-danger-soft { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
 .bg-secondary-soft { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+.bg-purple-soft { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+.bg-primary-soft-hover:hover { background: rgba(59, 130, 246, 0.15); border-color: var(--color-primary) !important; }
 
 /* ===== Sales Summary ===== */
 .summary-content {
@@ -2047,8 +2452,27 @@ h6.card-title {
 .trend-down { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
 
 /* ===== AI Insights ===== */
+.ai-insights-card {
+  background: linear-gradient(145deg, #ffffff, #f8faff);
+  border: 1px solid rgba(59, 130, 246, 0.15); /* Primary tint border */
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-insights-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
 .insights-container {
-  max-height: 300px;
+  max-height: 350px;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -2063,8 +2487,12 @@ h6.card-title {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(59, 130, 246, 0.2);
   border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.4);
 }
 
 .insight-item {
@@ -2072,27 +2500,99 @@ h6.card-title {
   background: white;
   border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, 0.04);
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.insight-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .insight-item:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
   transform: translateX(5px);
 }
 
+.insight-item:hover::before {
+  opacity: 1;
+}
+
 .insight-icon {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   background: var(--gradient-primary);
   color: white;
-  border-radius: 12px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  font-size: 1.25rem;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  transition: transform 0.3s ease;
+}
+
+.insight-item:hover .insight-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* Insight Type Variations */
+.insight-success {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.insight-success::before {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+}
+
+.insight-success:hover {
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.15);
+}
+
+.insight-warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.03) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.insight-warning::before {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+.insight-warning:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.15);
+}
+
+.insight-info {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.insight-info::before {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.insight-info:hover {
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.bg-warning-soft {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #d97706;
 }
 
 /* ===== Carousel ===== */
@@ -2368,6 +2868,22 @@ h6.card-title {
   animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.toast-notification .bi-info-circle {
+  color: #3b82f6;
+}
+
+.toast-notification .bi-check-circle-fill {
+  color: #10b981;
+}
+
+.toast-notification .bi-exclamation-triangle {
+  color: #f59e0b;
+}
+
+.toast-notification .bi-exclamation-circle-fill {
+  color: #ef4444;
+}
+
 @keyframes toastSlideIn {
   from {
     opacity: 0;
@@ -2558,5 +3074,56 @@ h6.card-title {
   .metric-value {
     font-size: 1.5rem;
   }
+}
+
+/* ===== Buttons ===== */
+.btn-gradient {
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.6rem 1.2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-gradient:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+.btn-gradient:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  color: white;
+}
+
+.btn-outline-gradient {
+  border: 2px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+              var(--gradient-primary) border-box;
+  color: var(--color-primary);
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-gradient:hover:not(:disabled) {
+  background: var(--gradient-primary) padding-box,
+              var(--gradient-primary) border-box;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
+}
+
+.btn-outline-gradient:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 </style>

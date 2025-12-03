@@ -123,9 +123,8 @@ def get_shop_details(shop_id):
             except Exception:
                 price = 0.0
 
-            # DO NOT call AI caption here - it's too slow for bulk product display
-            # AI captions can be generated on-demand or in background jobs
-            caption = ""
+            # AI captions are only for shop owners in marketing section
+
 
             product_data.append({
                 "id": product.id,
@@ -135,8 +134,7 @@ def get_shop_details(shop_id):
                 "category": product.category,
                 "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
                 "seller": product.shop.owner.full_name if product.shop and product.shop.owner else "Independent Seller",
-                "image": resolve_product_image(product),
-                "ai_caption": caption
+                "image": resolve_product_image(product)
             })
 
         shop_data = _serialize_shop(shop)
