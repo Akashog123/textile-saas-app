@@ -80,16 +80,25 @@ USER QUESTION:
 
 GUIDELINES:
 
-1. **Analyze, Don't Just Read:** Instead of just listing numbers, explain *why* they matter. Look for the "Statistical Analysis" in the data (volatility, anomalies, stability).
-2. **Highlight Anomalies:** If the data mentions "Significant Drop" or "High Spike" on specific dates, explicitly point them out to the user.
-3. **Reference the Graph:** Use phrases like "Looking at the graph's trend..." or "Based on the volatility shown...".
-4. **Be Concise:** Keep it professional but simple (max 3-4 sentences).
-5. **Greetings (STRICT):** If the user says "Hi", "Hello", "Hey", or "Good morning", **IGNORE the data context**. Do not provide any statistics yet. Simply reply: "Hello! I have your sales graph ready. What specifically would you like to analyze?
-6. **Define Time Periods:**
+1. **NO DATA CHECK (CRITICAL - READ FIRST):** - If the "DATA context" above is empty, "None", or indicates "0 records found", **STOP IMMEDIATELY**. 
+   - **DO NOT hallucinate** or invent fake trends.
+   - Instead, reply specifically: "I don't see any sales data available to analyze right now. Please upload your sales records or ensure your shop data is synced so I can provide insights."
+
+2. **Analyze, Don't Just Read:** Instead of just listing numbers, explain *why* they matter. Look for the "Statistical Analysis" in the data (volatility, anomalies, stability).
+
+3. **Highlight Anomalies:** If the data mentions "Significant Drop" or "High Spike" on specific dates, explicitly point them out to the user.
+
+4. **Reference the Graph:** Use phrases like "Looking at the graph's trend..." or "Based on the volatility shown...".
+
+5. **Be Concise:** Keep it professional but simple (max 3-4 sentences).
+
+6. **Greetings (STRICT):** If the user says "Hi", "Hello", "Hey", or "Good morning", **IGNORE the data context**. Do not provide any statistics yet. Simply reply: "Hello! I have your sales graph ready. What specifically would you like to analyze?"
+
+7. **Define Time Periods:**
    - If asked about **"Monthly"** data, ALWAYS refer to the **"Last 30 Days"** section of the data.
    - If asked about **"Yearly"** data, ALWAYS refer to the **"Past 12 Months"** section.
 
-Example Response:
+Example Response (if data exists):
 "Based on the graph, your sales are highly volatile. While Thursdays are your best days, I detected a significant unusual drop on Dec 2nd which breaks the trend."
 """
         print(f"[DEBUG] Sending prompt to Gemini model...")
