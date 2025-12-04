@@ -451,12 +451,16 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
             "id": self.id,
             "name": self.name,
             "category": self.category,
+            "description": self.description,
             "price": float(self.price) if self.price else 0,
             "stock": inv.qty_available if inv else 0,
             "minimum_stock": inv.safety_stock if inv else 0,
             "sku": self.sku or f"AUTO-{self.id}",
             "rating": round(self.rating or 4.0, 1),
             "shop_id": self.shop_id,
+            "distributor_id": self.distributor_id,
+            "distributor_username": self.distributor.username if self.distributor else None,
+            "distributor_name": self.distributor.full_name if self.distributor else None,
             "image": self.get_primary_image_url(resolve=True),
             "images": [
                 {"id": img.id, "url": _resolve_image_url(img.url, self.id, "product"), "alt": img.alt} 

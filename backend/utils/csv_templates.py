@@ -15,7 +15,7 @@ INVENTORY_COLUMNS = [
     "purchase_qty",   # Quantity being added to inventory (required)
     "minimum_stock",  # Safety stock level for reorder alerts (required)
     "description",    # Product description (optional)
-    "distributor_id", # ID of the distributor/supplier (optional)
+    "distributor_username", # Username of the distributor/supplier (optional)
 ]
 
 INVENTORY_REQUIRED = {"name", "sku", "category", "price", "purchase_qty", "minimum_stock"}
@@ -28,7 +28,7 @@ INVENTORY_SAMPLE_ROW = {
     "purchase_qty": "100",
     "minimum_stock": "20",
     "description": "Premium quality cotton fabric",
-    "distributor_id": "",
+    "distributor_username": "distributor1",
 }
 
 
@@ -172,7 +172,9 @@ TEMPLATE_INFO = {
             "SKU must be unique per shop",
             "price is the purchase/cost price",
             "purchase_qty is the quantity being added",
-            "minimum_stock triggers reorder alerts when inventory falls below this level"
+            "minimum_stock triggers reorder alerts when inventory falls below this level",
+            "description is optional product description text",
+            "distributor_username is the username of the distributor (e.g., distributor1)"
         ]
     },
     "sales": {
