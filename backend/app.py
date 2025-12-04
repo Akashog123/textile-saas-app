@@ -59,7 +59,7 @@ app.config.from_object(Config)
 # CORS Configuration
 CORS(
     app,
-    resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000","http://127.0.0.1:8000" ]}},
+    resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5001","http://127.0.0.1:5001" ]}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -87,6 +87,16 @@ def handle_error(error):
         return jsonify({"status": "error", "message": str(error)}), 500
     else:
         return jsonify({"status": "error", "message": "An internal error occurred"}), 500
+
+# Handle 413 Request Entity Too Large
+@app.errorhandler(413)
+def handle_request_entity_too_large(error):
+    """Handle file upload size exceeded"""
+    return jsonify({
+        "status": "error", 
+        "message": "File too large. Maximum upload size is 100MB.",
+        "max_size_mb": 100
+    }), 413
 
 # Register Blueprints
 app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")

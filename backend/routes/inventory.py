@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, send_file, Response, current_app
-from models.model import db, Product, Inventory, SalesData, ProductCatalog, Shop, ProductImage
+from models.model import db, Product, Inventory, SalesData, ProductCatalog, Shop, ProductImage, DistributorSupply, User
 from utils.auth_utils import token_required, roles_required, check_shop_ownership
 from utils.validation import validate_price, validate_quantity, validate_file_upload
 from utils.inventory_utils import ensure_inventory_tracking_columns, ensure_product_image_url_column
@@ -261,12 +261,29 @@ def import_inventory(current_user):
             except (ValueError, TypeError):
                 minimum_stock = 0
 
+            # Get description from row if provided
+            description_val = row.get("description", "")
+            description = str(description_val).strip() if description_val and not pd.isna(description_val) else None
+            
             # try to find existing product for this shop + sku
             product = Product.query.filter_by(sku=sku, shop_id=shop_id).first()
             
-            # Get distributor_id from row if provided
+            # Get distributor_id from distributor_username if provided
             distributor_id = None
-            if "distributor_id" in df.columns:
+            if "distributor_username" in df.columns:
+                try:
+                    dist_username = row.get("distributor_username")
+                    if dist_username and not pd.isna(dist_username):
+                        dist_username = str(dist_username).strip()
+                        if dist_username:
+                            from models.model import User
+                            distributor = User.query.filter_by(username=dist_username, role="distributor").first()
+                            if distributor:
+                                distributor_id = distributor.id
+                except (ValueError, TypeError):
+                    distributor_id = None
+            # Fallback: also check for legacy distributor_id column
+            elif "distributor_id" in df.columns:
                 try:
                     dist_id = row.get("distributor_id")
                     if dist_id and not pd.isna(dist_id):
@@ -279,6 +296,8 @@ def import_inventory(current_user):
                 product.name = name
                 product.category = category
                 product.price = price
+                if description:
+                    product.description = description
                 if distributor_id:
                     product.distributor_id = distributor_id
                 
@@ -299,12 +318,28 @@ def import_inventory(current_user):
                     )
                     db.session.add(inv)
                     total_units_added += purchase_qty
+                
+                # Create DistributorSupply record if distributor is assigned and quantity provided
+                if distributor_id and purchase_qty > 0:
+                    supply_record = DistributorSupply(
+                        distributor_id=distributor_id,
+                        product_id=product.id,
+                        shop_id=shop_id,
+                        quantity_supplied=purchase_qty,
+                        unit_price=price,
+                        total_value=price * purchase_qty,
+                        status="completed",
+                        notes=f"Restocked via CSV import"
+                    )
+                    db.session.add(supply_record)
+                
                 updated += 1
             else:
                 # create product with required shop_id
                 new_product = Product(
                     name=name,
                     category=category,
+                    description=description,
                     price=price,
                     sku=sku,
                     shop_id=shop_id,
@@ -327,6 +362,21 @@ def import_inventory(current_user):
                     total_purchased=purchase_qty,
                     total_sold=0
                 ))
+                
+                # Create DistributorSupply record if distributor is assigned
+                if distributor_id and purchase_qty > 0:
+                    supply_record = DistributorSupply(
+                        distributor_id=distributor_id,
+                        product_id=new_product.id,
+                        shop_id=shop_id,
+                        quantity_supplied=purchase_qty,
+                        unit_price=price,
+                        total_value=price * purchase_qty,
+                        status="completed",
+                        notes=f"Initial stock via CSV import"
+                    )
+                    db.session.add(supply_record)
+                
                 added += 1
                 total_units_added += purchase_qty
 
@@ -335,6 +385,7 @@ def import_inventory(current_user):
                 "product_name": name,
                 "added_quantity": purchase_qty,
                 "minimum_stock": minimum_stock,
+                "distributor_id": distributor_id,
                 "operation": "updated" if product else "added"
             })
 
@@ -912,8 +963,8 @@ def bulk_upload_product_images(current_user):
         if not file.filename.lower().endswith('.zip'):
             return jsonify({"status": "error", "message": "File must be a .zip archive"}), 400
         
-        # Validate file size (50MB max for ZIP)
-        is_valid, message = validate_file_upload(file, ['.zip'], max_size_mb=50)
+        # Validate file size (100MB max for ZIP)
+        is_valid, message = validate_file_upload(file, ['.zip'], max_size_mb=100)
         if not is_valid:
             return jsonify({"status": "error", "message": message}), 400
         

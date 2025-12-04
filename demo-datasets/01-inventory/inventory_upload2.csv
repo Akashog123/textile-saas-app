@@ -1,0 +1,21 @@
+name,sku,category,price,purchase_qty,minimum_stock,description,distributor_username
+Patola Double Ikat,PAT-001,Silk,6500,20,5,"Traditional Patola silk with intricate double ikat weaving from Gujarat",distributor2
+Maheshwari Silk Cotton,MAH-001,Silk,2600,55,12,"Classic Maheshwari fabric with reversible border design",distributor1
+Pochampally Ikat,POC-001,Cotton,1850,70,15,"Handwoven Pochampally ikat cotton from Telangana",
+Mangalagiri Cotton,MAN-001,Cotton,1100,90,20,"Soft Mangalagiri cotton with zari border, handloom finish",distributor2
+Mysore Crepe Silk,MYS-001,Silk,4200,35,8,"Premium Mysore crepe silk known for its luster and drape",distributor1
+Paithani Saree Fabric,PAI-001,Silk,7500,15,4,"Exquisite Paithani fabric with peacock motifs and gold border",
+Kalamkari Print Cotton,KAL-001,Cotton,1450,60,14,"Hand-painted Kalamkari cotton fabric with mythological designs",distributor2
+Rasavada Block Print,AJR-001,Cotton,1650,50,12,"Traditional Ajrakh block printed cotton from Kutch",distributor1
+Bandhani Fabric,BAN-001,Cotton,1350,75,16,"Tie-dye Bandhani fabric from Rajasthan with vibrant patterns",
+Ikat Weave Polyester,IKT-001,Polyester,750,110,25,"Affordable ikat pattern polyester blend for daily wear",distributor2
+Satin Silk,SAT-001,Satin,1550,80,18,"Smooth satin silk fabric with high sheen finish",distributor1
+Matka Silk,MAT-001,Silk,2900,40,10,"Rustic Matka silk with natural slubs, perfect for ethnic wear",distributor2
+Uppada Silk,UPP-001,Silk,4800,28,6,"Lightweight Uppada silk known for its jamdani weaving technique",
+Cotton Poplin,POP-001,Cotton,650,130,30,"Crisp cotton poplin for shirts and formal wear",distributor1
+Porotta Fabric,MOD-001,Modal,1250,65,15,"Soft modal fabric with silk-like touch, eco-friendly",
+Tencel Lyocell,TEN-001,Tencel,1400,55,12,"Sustainable Tencel fabric, breathable and biodegradable",distributor2
+Raw Silk Dupion,DUP-001,Silk,2100,45,10,"Textured dupion raw silk for structured garments",distributor1
+Chanderi Zari Work,CHN-002,Silk,3100,38,8,"Premium Chanderi with heavy zari work for festive occasions",distributor2
+Tant Cotton Bengal,TAN-001,Cotton,1200,85,18,"Traditional Bengal Tant cotton with lightweight weave",
+Sambalpuri Ikat,SAM-001,Cotton,1750,48,11,"Authentic Sambalpuri ikat cotton from Odisha",distributor1
