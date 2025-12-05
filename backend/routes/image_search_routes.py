@@ -62,7 +62,10 @@ def find_similar_products():
         return error_response(f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)}MB", 400)
     
     # Get limit parameter
-    limit = int(request.form.get('limit', 20))
+    try:
+        limit = int(request.form.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
     
     # Perform search
     results = search_products_by_image(image_file, limit=limit)
