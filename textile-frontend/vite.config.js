@@ -15,4 +15,6 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  // Allow WASM and ONNX files as assets
+  assetsInclude: ['**/*.wasm', '**/*.onnx'],
 })
