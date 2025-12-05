@@ -434,6 +434,50 @@ def get_bounding_box(lat: float, lon: float, radius_km: float) -> Tuple[float, f
 # SEARCH FUNCTIONS
 # ============================================================================
 
+def extract_search_filters(query: str) -> Tuple[str, Optional[float], Optional[float]]:
+    """
+    Extract price filters from natural language query.
+    Returns: (cleaned_query, min_price, max_price)
+    """
+    min_price = None
+    max_price = None
+    clean_query = query
+    
+    # Patterns for price extraction
+    # "under 500", "below 500", "< 500"
+    under_pattern = re.search(r'(?:under|below|less than|<)\s*₹?\s*(\d+(?:,\d+)*)', query, re.IGNORECASE)
+    if under_pattern:
+        try:
+            max_price = float(under_pattern.group(1).replace(',', ''))
+            # Remove the price part from query to improve semantic search
+            clean_query = re.sub(r'(?:under|below|less than|<)\s*₹?\s*(\d+(?:,\d+)*)', '', clean_query, flags=re.IGNORECASE)
+        except ValueError:
+            pass
+
+    # "above 500", "over 500", "> 500"
+    above_pattern = re.search(r'(?:above|over|more than|>)\s*₹?\s*(\d+(?:,\d+)*)', query, re.IGNORECASE)
+    if above_pattern:
+        try:
+            min_price = float(above_pattern.group(1).replace(',', ''))
+            clean_query = re.sub(r'(?:above|over|more than|>)\s*₹?\s*(\d+(?:,\d+)*)', '', clean_query, flags=re.IGNORECASE)
+        except ValueError:
+            pass
+            
+    # "between 500 and 1000", "500-1000"
+    range_pattern = re.search(r'(?:between)?\s*₹?\s*(\d+(?:,\d+)*)\s*(?:and|-|to)\s*₹?\s*(\d+(?:,\d+)*)', query, re.IGNORECASE)
+    if range_pattern:
+        try:
+            p1 = float(range_pattern.group(1).replace(',', ''))
+            p2 = float(range_pattern.group(2).replace(',', ''))
+            min_price = min(p1, p2)
+            max_price = max(p1, p2)
+            clean_query = re.sub(r'(?:between)?\s*₹?\s*(\d+(?:,\d+)*)\s*(?:and|-|to)\s*₹?\s*(\d+(?:,\d+)*)', '', clean_query, flags=re.IGNORECASE)
+        except ValueError:
+            pass
+
+    return clean_query.strip(), min_price, max_price
+
+
 def semantic_search_products(
     query: str,
     shop_id: Optional[int] = None,
@@ -441,13 +485,24 @@ def semantic_search_products(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     limit: int = 20
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Semantic search for products with optional filters.
     Falls back to text search if embeddings unavailable.
+    Returns dict with 'products' list and 'filters' dict.
     """
+    # Extract filters from query if not provided
+    clean_query, q_min_price, q_max_price = extract_search_filters(query)
+    
+    # Use extracted filters if explicit ones are not provided
+    if min_price is None: min_price = q_min_price
+    if max_price is None: max_price = q_max_price
+    
+    # Use cleaned query for semantic search (better results without numbers)
+    search_query = clean_query if clean_query else query
+
     # Check cache
-    cache_key = (query, shop_id, category, min_price, max_price, limit)
+    cache_key = (search_query, shop_id, category, min_price, max_price, limit)
     cached = search_cache.get('semantic_products', *cache_key)
     if cached:
         return cached
@@ -456,7 +511,10 @@ def semantic_search_products(
     
     # Try semantic search first
     if embedding_service.available and FAISS_AVAILABLE:
-        semantic_results = faiss_manager.search_products(query, top_k=limit * 2)
+        # Fetch more candidates to allow for filtering
+        candidate_limit = limit * 5
+        semantic_results = faiss_manager.search_products(search_query, top_k=candidate_limit)
+        
         if semantic_results:
             product_ids = [pid for pid, _ in semantic_results]
             score_map = {pid: score for pid, score in semantic_results}
@@ -478,13 +536,52 @@ def semantic_search_products(
             
             products = query_obj.all()
             
-            # Sort by semantic score
-            products.sort(key=lambda p: score_map.get(p.id, 0), reverse=True)
+            # Calculate combined scores with text match boosting
+            search_lower = search_query.lower()
+            search_terms = set(search_lower.split())
             
-            for product in products[:limit]:
+            def calculate_boosted_score(product, base_score):
+                """Boost score based on text match quality."""
+                name_lower = (product.name or '').lower()
+                category_lower = (product.category or '').lower()
+                
+                boost = 0.0
+                
+                # Exact name match - massive boost
+                if search_lower == name_lower:
+                    boost += 0.5
+                # Name contains full query
+                elif search_lower in name_lower:
+                    boost += 0.35
+                # Query contains product name
+                elif name_lower in search_lower:
+                    boost += 0.3
+                else:
+                    # Count matching words
+                    name_words = set(name_lower.split())
+                    matching_words = search_terms & name_words
+                    if matching_words:
+                        word_match_ratio = len(matching_words) / max(len(search_terms), len(name_words))
+                        boost += 0.25 * word_match_ratio
+                
+                # Category match boost
+                if category_lower and any(term in category_lower for term in search_terms):
+                    boost += 0.1
+                
+                # Combine: base semantic score + text match boost, cap at 1.0
+                return min(base_score + boost, 1.0)
+            
+            # Calculate boosted scores and sort
+            products_with_scores = [
+                (p, calculate_boosted_score(p, score_map.get(p.id, 0)))
+                for p in products
+            ]
+            products_with_scores.sort(key=lambda x: x[1], reverse=True)
+            
+            for product, boosted_score in products_with_scores[:limit]:
                 results.append({
                     **product.to_card_dict(),
-                    'relevance_score': round(score_map.get(product.id, 0) * 100, 2),
+                    'relevance_score': round(boosted_score * 100, 2),
                     'shop': product.shop.to_card_dict() if product.shop else None
                 })
     
@@ -494,8 +591,17 @@ def semantic_search_products(
             query, shop_id, category, min_price, max_price, limit
         )
     
-    search_cache.set('semantic_products', results, *cache_key)
-    return results
+    response = {
+        'products': results,
+        'filters': {
+            'min_price': min_price,
+            'max_price': max_price,
+            'extracted_query': clean_query
+        }
+    }
+    
+    search_cache.set('semantic_products', response, *cache_key)
+    return response
 
 
 def fallback_text_search_products(
@@ -506,8 +612,9 @@ def fallback_text_search_products(
     max_price: Optional[float] = None,
     limit: int = 20
 ) -> List[Dict[str, Any]]:
-    """Text-based product search fallback using SQL LIKE."""
+    """Text-based product search fallback using SQL LIKE with relevance scoring."""
     search_terms = query.lower().split()
+    search_lower = query.lower()
     
     query_obj = Product.query.filter(Product.is_active == True)
     
@@ -532,15 +639,50 @@ def fallback_text_search_products(
     if max_price is not None:
         query_obj = query_obj.filter(Product.price <= max_price)
     
-    products = query_obj.order_by(Product.rating.desc()).limit(limit).all()
+    products = query_obj.order_by(Product.rating.desc()).limit(limit * 2).all()
+    
+    # Calculate relevance scores based on text matching
+    def calc_text_relevance(product):
+        name_lower = (product.name or '').lower()
+        category_lower = (product.category or '').lower()
+        desc_lower = (product.description or '').lower()
+        
+        score = 0.5  # Base score for matching products
+        
+        # Exact name match
+        if search_lower == name_lower:
+            score = 1.0
+        # Name contains full query
+        elif search_lower in name_lower:
+            score = 0.95
+        # Query contains product name  
+        elif name_lower in search_lower:
+            score = 0.90
+        else:
+            # Count matching words in name
+            name_words = set(name_lower.split())
+            search_set = set(search_terms)
+            matching = name_words & search_set
+            if matching:
+                score = 0.5 + (0.35 * len(matching) / max(len(search_set), len(name_words)))
+        
+        # Category bonus
+        if category_lower and any(term in category_lower for term in search_terms):
+            score = min(score + 0.05, 1.0)
+        
+        return score
+    
+    # Score and sort products
+    scored_products = [(p, calc_text_relevance(p)) for p in products]
+    scored_products.sort(key=lambda x: x[1], reverse=True)
     
     return [
         {
             **p.to_card_dict(),
-            'relevance_score': 50.0,  # Default score for text search
+            'relevance_score': round(score * 100, 2),
             'shop': p.shop.to_card_dict() if p.shop else None
         }
-        for p in products
+        for p, score in scored_products[:limit]
     ]
 
 

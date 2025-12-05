@@ -1,15 +1,20 @@
 import os
 import tempfile
-import json
-import re
 import logging
 
 from flask import Blueprint, request, jsonify
 
 from config import Config
-from models.model import StoreRegion
+from models.model import Product
 from utils.audio_validation import validate_voice_file, get_audio_metadata
 from services.ai_providers import get_provider
+
+# Import semantic search for product matching
+try:
+    from services.search_service import semantic_search_products
+    SEMANTIC_SEARCH_AVAILABLE = True
+except ImportError:
+    SEMANTIC_SEARCH_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -74,23 +79,6 @@ def _transcribe_audio(file_storage):
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
             logger.debug(f"Cleaned up temporary file: {tmp_path}")
-def _parse_ai_matches(ai_text):
-    """
-    Extract JSON array from AI response safely.
-    AI sometimes returns text + JSON, so we isolate the JSON part.
-    """
-    try:
-        # Try direct JSON first
-        return json.loads(ai_text)
-    except json.JSONDecodeError:
-        # Fallback: extract JSON array using regex
-        match = re.search(r"\[.*\]", ai_text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except Exception:
-                return []
-    return []
 
 
 @ai_bp.route("/", methods=["POST"])
@@ -129,6 +117,11 @@ def ai_find_stores():
     data = request.get_json(silent=True) or request.form.to_dict() or {}
     user_prompt = (data.get("prompt") or "").strip()
     audio_file = request.files.get("voice") or request.files.get("voice_note")
+    
+    # Debug logging
+    logger.info(f"AI Find Stores - Form data: {request.form.to_dict()}")
+    logger.info(f"AI Find Stores - Files: {list(request.files.keys())}")
+    logger.info(f"AI Find Stores - Prompt: '{user_prompt}', Audio file: {audio_file}")
 
     if not user_prompt and not audio_file:
         return jsonify({
@@ -181,62 +174,54 @@ def ai_find_stores():
             "message": f"AI provider not configured; configure {Config.AI_PROVIDER} provider to use this endpoint."
         }), 503
 
-    stores = StoreRegion.query.all()
-    if not stores:
-        return jsonify({
-            "status": "success",
-            "matches_found": 0,
-            "matching_stores": [],
-            "message": "No store inventory available."
-        }), 200
+    # Search for matching products using semantic search (skip store location matching)
+    matching_products = []
+    extracted_filters = {}
+    logger.info(f"[Product Search] SEMANTIC_SEARCH_AVAILABLE={SEMANTIC_SEARCH_AVAILABLE}, user_prompt='{user_prompt[:100] if user_prompt else 'None'}...'")
+    
+    if user_prompt and SEMANTIC_SEARCH_AVAILABLE:
+        try:
+            search_result = semantic_search_products(
+                query=user_prompt,
+                limit=20
+            )
+            matching_products = search_result.get('products', [])
+            extracted_filters = search_result.get('filters', {})
+            logger.info(f"Found {len(matching_products)} matching products for: {user_prompt[:50]}...")
+        except Exception as e:
+            logger.error(f"Product search error: {e}", exc_info=True)
+            matching_products = []
+    elif user_prompt and not SEMANTIC_SEARCH_AVAILABLE:
+        logger.warning("[Product Search] Semantic search not available, falling back to text search")
+        # Fallback to basic text search
+        try:
+            from models.model import Product
+            search_terms = user_prompt.lower().split()[:5]
+            from sqlalchemy import or_
+            query_obj = Product.query.filter(Product.is_active == True)
+            for term in search_terms:
+                pattern = f'%{term}%'
+                query_obj = query_obj.filter(
+                    or_(
+                        Product.name.ilike(pattern),
+                        Product.category.ilike(pattern),
+                        Product.description.ilike(pattern)
+                    )
+                )
+            products = query_obj.limit(20).all()
+            matching_products = [p.to_card_dict() for p in products]
+            logger.info(f"Text search found {len(matching_products)} products")
+        except Exception as e:
+            logger.error(f"Fallback text search error: {e}")
+            matching_products = []
 
-    store_data = [{
-        "StoreName": s.StoreName,
-        "City": s.City,
-        "Product_description": s.Product_description,
-        "Latitude": s.Latitude,
-        "Longitude": s.Longitude,
-        "RegionName": s.RegionName,
-        "ImagePath": s.ImagePath
-    } for s in stores]
-
-    prompt = (
-        "You are a helpful assistant for textile buyers.\n"
-        f"Customer query: "
-        f"{user_prompt}.\n"
-        "Return a JSON array of stores from the provided list that best match the needs.\n"
-        "Include StoreName, City, RegionName, Product_description, Latitude, Longitude, ImagePath,"
-        " and a short reason field."
-        f"\nStores: {store_data[:50]}"
-    )
-
-    try:
-        ai_resp_text = ai_provider.generate_text(prompt)
-        matches = _parse_ai_matches(ai_resp_text)
-    except Exception as exc:
-        logger.error(f"[AI Find Stores] {Config.AI_PROVIDER} error:", exc)
-        matches = []
-
-    if not matches and user_prompt:
-        fallback = []
-        prompt_lower = user_prompt.lower()
-        for store in store_data:
-            haystack = " ".join(filter(None, [
-                store.get("StoreName"),
-                store.get("City"),
-                store.get("RegionName"),
-                store.get("Product_description")
-            ])).lower()
-            if prompt_lower in haystack:
-                store_copy = store.copy()
-                store_copy["reason"] = "Matched via keyword search fallback."
-                fallback.append(store_copy)
-        matches = fallback
-
+    logger.info(f"[Response] transcript='{user_prompt[:50] if user_prompt else ''}...', products={len(matching_products)}")
+    
     return jsonify({
         "status": "success",
-        "message": "Matching stores identified" if matches else "No direct AI matches; returning fallback results.",
-        "matches_found": len(matches),
-        "matching_stores": matches,
-        "transcript": user_prompt  # Return the transcribed/original prompt for frontend use
+        "message": "Matching products found" if matching_products else "No matching products found.",
+        "transcript": user_prompt,  # Return the transcribed/original prompt for frontend use
+        "products": matching_products,
+        "products_found": len(matching_products),
+        "filters": extracted_filters
     }), 200
