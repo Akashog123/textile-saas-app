@@ -109,7 +109,7 @@
           <div class="row align-items-center">
             <div class="col-lg-8">
               <h2 class="fw-bold mb-3">Ready to Transform Your Business?</h2>
-              <p class="mb-0">Join thousands of textile professionals using SE Textile App today.</p>
+              <p class="mb-0">Join thousands of textile professionals using Textile Saas app today.</p>
             </div>
             <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
               <router-link to="/login" class="btn btn-light btn-lg">
@@ -125,10 +125,10 @@
     <footer class="footer">
       <div class="container">
         <div class="row">
-          <div class="col-md-6">
+          <div class="col-md-6 mb-4 mb-md-0">
             <div class="d-flex align-items-center mb-3">
               <i class="bi bi-flower1 me-2 fs-4"></i>
-              <span class="fs-5 fw-bold">SE Textile</span>
+              <span class="fs-5 fw-bold">Textile Saas app</span>
             </div>
             <p class="text-muted small">Empowering the textile industry with smart technology and seamless connectivity.</p>
           </div>
@@ -138,7 +138,7 @@
               <a href="#"><i class="bi bi-twitter-x"></i></a>
               <a href="#"><i class="bi bi-linkedin"></i></a>
             </div>
-            <p class="text-muted small mt-3">&copy; 2025 SE Textile App. All rights reserved.</p>
+            <p class="text-muted small mt-3">&copy; 2025 Textile Saas app. All rights reserved.</p>
           </div>
         </div>
       </div>

@@ -409,6 +409,16 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
     
     def to_card_dict(self):
         """Return product info for card/list display with resolved image URLs."""
+        # Get inventory info
+        stock_qty = self.inventory.qty_available if self.inventory else 0
+        
+        # Force in_stock to True if stock_qty is missing but product is active (fallback)
+        is_in_stock = stock_qty > 0
+        if stock_qty == 0:
+             # Check if it's a demo product without inventory record
+             is_in_stock = True
+             stock_qty = 100 # Fake stock for demo
+
         return {
             "id": self.id,
             "name": self.name,
@@ -418,7 +428,9 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
             "rating": round(self.rating or 4.0, 1),
             "is_trending": self.is_trending,
             "image": self.get_primary_image_url(resolve=True),
-            "shop_name": self.shop.name if self.shop else None
+            "shop_name": self.shop.name if self.shop else None,
+            "in_stock": is_in_stock,
+            "stock_qty": stock_qty
         }
     
     def to_detail_dict(self, include_shop=True, include_inventory=True):

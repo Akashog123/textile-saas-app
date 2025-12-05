@@ -186,13 +186,13 @@
               <span class="status-text">{{ voiceStatusText }}</span>
             </div>
             
-            <button class="btn-stop-recording" @click="stopVoiceRecording" title="Stop and Transcribe">
-              <i class="bi bi-send-fill"></i>
+            <button class="btn-stop-recording" @click="stopVoiceRecording" title="Stop Recording">
+              <i class="bi bi-stop-fill"></i>
             </button>
           </div>
           
           <div class="voice-hint">
-            Click <i class="bi bi-send-fill"></i> or wait for auto-stop after speaking
+            Click <i class="bi bi-stop-fill"></i> or wait for auto-stop after speaking
           </div>
         </div>
       </transition>
@@ -292,7 +292,7 @@ const useBackendTranscription = ref(true) // Use backend AI transcription (more 
 const recordingStartTime = ref(null)
 const recordingDuration = ref(0)
 const recordingTimer = ref(null)
-const MAX_RECORDING_SECONDS = 15
+const MAX_RECORDING_SECONDS = 10
 
 // Debounce timer
 let suggestionTimer = null
@@ -534,7 +534,8 @@ const initVoiceSearch = async () => {
   
   // Initialize voice manager with VAD settings
   voiceManager.value = voiceSearchUtils.createManager({
-    maxRecordingTime: 30000 // 30 seconds max
+    maxRecordingTime: 10000, // 10 seconds max
+    redemptionMs: 2000 // 2 seconds silence to stop
   })
   
   // Always use backend transcription

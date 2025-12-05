@@ -43,14 +43,6 @@
               {{ shop.address || shop.city }}
             </p>
           </div>
-          <div class="shop-actions">
-            <button class="btn btn-outline-gradient" @click="showOnMap">
-              <i class="bi bi-map me-1"></i> View on Map
-            </button>
-            <button class="btn btn-gradient" @click="getDirections">
-              <i class="bi bi-signpost-split me-1"></i> Directions
-            </button>
-          </div>
         </div>
       </div>
       
@@ -762,13 +754,6 @@ const showQuickView = (product) => {
 
 const closeQuickView = () => {
   quickViewProduct.value = null
-}
-
-const showOnMap = () => {
-  if (shop.value?.lat && shop.value?.lon) {
-    // Scroll to map section or open modal
-    document.querySelector('.sidebar-card .shop-locator-map')?.scrollIntoView({ behavior: 'smooth' })
-  }
 }
 
 const getDirections = () => {

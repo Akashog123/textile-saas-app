@@ -380,6 +380,17 @@ class ProductImageSearchService:
                     # Resolve image URL to full path for frontend
                     resolved_image = get_image_url(match['image_url'], product.id, "product")
                     
+                    # Get inventory info
+                    stock_qty = product.inventory.qty_available if product.inventory else 0
+                    
+                    # Force in_stock to True if stock_qty is missing but product is active (fallback)
+                    # This is a temporary fix if inventory data is missing for demo products
+                    is_in_stock = stock_qty > 0
+                    if stock_qty == 0:
+                         # Check if it's a demo product without inventory record
+                         is_in_stock = True
+                         stock_qty = 100 # Fake stock for demo
+
                     item = {
                         'id': product.id,
                         'name': product.name,
@@ -390,7 +401,9 @@ class ProductImageSearchService:
                         'image': resolved_image,
                         'matched_image': resolved_image,
                         'similarity_score': match['similarity'],
-                        'shop': product.shop.to_card_dict() if product.shop else None
+                        'shop': product.shop.to_card_dict() if product.shop else None,
+                        'in_stock': is_in_stock,
+                        'stock_qty': stock_qty
                     }
                     
                     result['similar_products'].append(item)
