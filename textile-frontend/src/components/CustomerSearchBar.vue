@@ -76,7 +76,7 @@
       <!-- Nearby button (optional) -->
       <button 
         v-if="showNearbyButton"
-        class="btn-nearby" 
+        class="btn btn-gradient d-flex align-items-center gap-2" 
         @click="handleNearbySearch"
         :disabled="isSearchingNearby"
       >
@@ -159,12 +159,41 @@
         </div>
       </transition>
       
-      <!-- Voice Recording Indicator -->
+      <!-- Voice Recording Indicator - Enhanced with audio level visualization -->
       <transition name="fade">
-        <div v-if="isVoiceRecording" class="voice-indicator">
-          <div class="pulse-ring"></div>
-          <i class="bi bi-mic-fill"></i>
-          <span>Listening... {{ voiceTranscript }}</span>
+        <div v-if="isVoiceRecording" class="voice-indicator" :class="{ 'speech-detected': isSpeechDetected }">
+          <!-- Recording timer progress bar -->
+          <div class="recording-progress">
+            <div 
+              class="progress-bar" 
+              :style="{ width: `${(recordingDuration / MAX_RECORDING_SECONDS) * 100}%` }"
+              :class="{ 'warning': recordingDuration > MAX_RECORDING_SECONDS - 3 }"
+            ></div>
+          </div>
+          
+          <div class="voice-content">
+            <div class="audio-visualizer">
+              <div 
+                class="audio-bar" 
+                v-for="n in 5" 
+                :key="n"
+                :style="{ height: `${Math.max(4, audioLevel * 100 * (0.6 + Math.sin(Date.now() / 100 + n) * 0.4))}px` }"
+              ></div>
+            </div>
+            
+            <div class="voice-status">
+              <i class="bi bi-mic-fill recording-icon" :class="{ 'active': isSpeechDetected }"></i>
+              <span class="status-text">{{ voiceStatusText }}</span>
+            </div>
+            
+            <button class="btn-stop-recording" @click="stopVoiceRecording" title="Stop and Transcribe">
+              <i class="bi bi-send-fill"></i>
+            </button>
+          </div>
+          
+          <div class="voice-hint">
+            Click <i class="bi bi-send-fill"></i> or wait for auto-stop after speaking
+          </div>
         </div>
       </transition>
     </div>
@@ -253,11 +282,17 @@ const isSearchingNearby = ref(false)
 const isVoiceRecording = ref(false)
 const isImageSearching = ref(false)
 
-// Voice search
+// Voice search - enhanced with VAD
 const voiceSupported = ref(false)
 const voiceManager = ref(null)
+const audioLevel = ref(0)
+const isSpeechDetected = ref(false)
 const voiceTranscript = ref('')
-const useBackendTranscription = ref(false) // Fallback to backend AI when browser SpeechRecognition fails
+const useBackendTranscription = ref(true) // Use backend AI transcription (more reliable than browser SpeechRecognition)
+const recordingStartTime = ref(null)
+const recordingDuration = ref(0)
+const recordingTimer = ref(null)
+const MAX_RECORDING_SECONDS = 15
 
 // Debounce timer
 let suggestionTimer = null
@@ -267,6 +302,17 @@ const totalSuggestions = computed(() => {
   return suggestions.value.categories.length + 
          suggestions.value.shops.length + 
          suggestions.value.products.length
+})
+
+// Voice status text based on current state
+const voiceStatusText = computed(() => {
+  if (voiceTranscript.value) {
+    return voiceTranscript.value
+  }
+  if (isSpeechDetected.value) {
+    return `Listening... (${MAX_RECORDING_SECONDS - recordingDuration.value}s)`
+  }
+  return `Speak now (${MAX_RECORDING_SECONDS - recordingDuration.value}s)`
 })
 
 const getCategoryIndex = (idx) => idx
@@ -465,62 +511,69 @@ const handleNearbySearch = async () => {
 }
 
 // Voice search
-const initVoiceSearch = () => {
-  const compatibility = voiceSearchUtils.getCompatibilityInfo()
+const microphoneError = ref('')
+
+const initVoiceSearch = async () => {
+  // Check if voice search is supported
+  const isSupported = voiceSearchUtils.isSupported()
+  voiceSupported.value = isSupported
   
-  // Check if browser supports speech recognition
-  const browserSupported = compatibility.features?.speechRecognition && compatibility.features?.secureContext
-  
-  // Voice is supported if either browser SpeechRecognition OR audio recording works
-  voiceSupported.value = browserSupported || compatibility.features?.mediaRecorder
-  
-  if (!voiceSupported.value) {
-    console.warn('Voice search not supported: No speech recognition or audio recording available')
+  if (!isSupported) {
+    console.warn('Voice search not supported in this browser')
     return
   }
   
-  voiceManager.value = voiceSearchUtils.createManager({
-    language: 'en-US',
-    continuous: false,
-    interimResults: true,
-    maxRecordingTime: 15000
-  })
-  
-  // Use backend transcription if browser SpeechRecognition is not available
-  useBackendTranscription.value = !browserSupported
-  
-  if (!useBackendTranscription.value) {
-    // Browser SpeechRecognition callbacks
-    voiceManager.value.onRecognitionResult = (text, isFinal) => {
-      voiceTranscript.value = text
-      if (isFinal) {
-        searchQuery.value = text
-        isVoiceRecording.value = false
-        voiceTranscript.value = ''
-        handleSearch()
-      }
-    }
-    
-    voiceManager.value.onRecognitionError = async (error) => {
-      console.warn('Browser voice recognition failed, trying backend:', error)
-      // Try backend fallback
-      await startBackendVoiceSearch()
-    }
-    
-    voiceManager.value.onRecognitionEnd = () => {
-      isVoiceRecording.value = false
-    }
+  // Check if microphone is available
+  const micCheck = await voiceSearchUtils.checkMicrophone()
+  if (!micCheck.available) {
+    console.warn('No microphone detected:', micCheck.error)
+    microphoneError.value = micCheck.error || 'No microphone detected'
+  } else {
+    microphoneError.value = ''
   }
   
-  // Audio recording callbacks (for backend transcription)
+  // Initialize voice manager with VAD settings
+  voiceManager.value = voiceSearchUtils.createManager({
+    maxRecordingTime: 30000 // 30 seconds max
+  })
+  
+  // Always use backend transcription
+  useBackendTranscription.value = true
+  
+  // Audio recording callbacks
   voiceManager.value.onRecordingComplete = async (audioFile) => {
+    stopRecordingTimer()
+    voiceTranscript.value = 'Transcribing...'
     await transcribeWithBackend(audioFile)
   }
   
   voiceManager.value.onRecordingError = (error) => {
     console.error('Audio recording error:', error)
+    stopRecordingTimer()
     isVoiceRecording.value = false
+    audioLevel.value = 0
+    isSpeechDetected.value = false
     emit('error', { message: 'Voice recording failed', type: 'voice' })
+  }
+  
+  // VAD callbacks for real-time audio feedback
+  voiceManager.value.onAudioLevel = (level) => {
+    audioLevel.value = level
+  }
+  
+  voiceManager.value.onSpeechStart = () => {
+    isSpeechDetected.value = true
+    voiceTranscript.value = 'Listening...'
+  }
+  
+  voiceManager.value.onSpeechEnd = () => {
+    isSpeechDetected.value = false
+  }
+  
+  voiceManager.value.onAutoStop = () => {
+    console.log('[Voice] Auto-stopped due to silence')
+    stopRecordingTimer()
+    voiceTranscript.value = 'Transcribing...'
   }
 }
 
@@ -529,12 +582,46 @@ const initVoiceSearch = () => {
  */
 const startBackendVoiceSearch = async () => {
   try {
-    voiceTranscript.value = 'Recording...'
-    await voiceManager.value.startAudioRecording()
+    voiceTranscript.value = ''
+    audioLevel.value = 0
+    isSpeechDetected.value = false
+    recordingDuration.value = 0
+    recordingStartTime.value = Date.now()
+    
+    // Start recording timer
+    recordingTimer.value = setInterval(() => {
+      recordingDuration.value = Math.floor((Date.now() - recordingStartTime.value) / 1000)
+    }, 1000)
+    
+    // Use VAD-enabled recording for better audio capture
+    await voiceManager.value.startRecording()
   } catch (err) {
     console.error('Failed to start audio recording:', err)
     isVoiceRecording.value = false
+    audioLevel.value = 0
+    stopRecordingTimer()
     emit('error', { message: 'Microphone access failed', type: 'voice' })
+  }
+}
+
+/**
+ * Stop recording timer
+ */
+const stopRecordingTimer = () => {
+  if (recordingTimer.value) {
+    clearInterval(recordingTimer.value)
+    recordingTimer.value = null
+  }
+}
+
+/**
+ * Stop voice recording manually
+ */
+const stopVoiceRecording = () => {
+  if (voiceManager.value && isVoiceRecording.value) {
+    stopRecordingTimer()
+    voiceManager.value.stopRecording()
+    voiceTranscript.value = 'Processing...'
   }
 }
 
@@ -551,24 +638,58 @@ const transcribeWithBackend = async (audioFile) => {
   
   try {
     const response = await findStoresWithAI({ voiceFile: audioFile })
+    console.log('[Voice Search Response]', JSON.stringify(response.data, null, 2))
     
-    if (response.data?.transcript) {
-      searchQuery.value = response.data.transcript
+    // Backend returns: { status, transcript, products, filters, ... }
+    const data = response.data
+    const transcript = data?.transcript || data?.prompt || ''
+    const products = data?.products || []
+    const filters = data?.filters || {}
+    
+    console.log('[Voice] Transcript:', transcript)
+    console.log('[Voice] Products found:', products.length)
+    console.log('[Voice] Filters:', filters)
+    
+    if (transcript) {
+      searchQuery.value = transcript
       voiceTranscript.value = ''
-      handleSearch()
-    } else if (response.data?.prompt) {
-      // Some backends return the transcribed text as 'prompt'
-      searchQuery.value = response.data.prompt
-      voiceTranscript.value = ''
-      handleSearch()
+      
+      // If we have matching products, store them and navigate with results
+      if (products.length > 0) {
+        // Store results in sessionStorage for the products page
+        sessionStorage.setItem('voiceSearchResults', JSON.stringify({
+          transcript: transcript,
+          products: products,
+          filters: filters,
+          timestamp: Date.now()
+        }))
+        
+        console.log('[Voice] Navigating to products page with', products.length, 'results')
+        
+        // Navigate to products page with voice search flag
+        router.push({
+          name: 'CustomerProducts',
+          query: { 
+            search: transcript,
+            voiceSearch: 'true'
+          }
+        })
+      } else {
+        // No products found, do regular search
+        console.log('[Voice] No products found, doing regular search')
+        handleSearch()
+      }
     } else {
-      emit('error', { message: 'Could not transcribe audio', type: 'voice' })
+      console.error('[Voice] No transcript in response:', data)
+      emit('error', { message: 'Could not transcribe audio. Please try again.', type: 'voice' })
     }
   } catch (err) {
-    console.error('Backend transcription failed:', err)
-    emit('error', { message: 'Voice transcription failed', type: 'voice' })
+    console.error('[Voice] Backend transcription failed:', err)
+    emit('error', { message: 'Voice transcription failed. Please try again.', type: 'voice' })
   } finally {
     isVoiceRecording.value = false
+    audioLevel.value = 0
+    isSpeechDetected.value = false
   }
 }
 
@@ -580,13 +701,30 @@ const handleVoiceSearch = async () => {
   
   if (isVoiceRecording.value) {
     // Stop current recording
-    if (useBackendTranscription.value) {
-      const audioFile = await voiceManager.value.stopAudioRecording()
-      // transcribeWithBackend will be called by onRecordingComplete
-    } else {
-      voiceManager.value.stopSpeechRecognition()
-    }
-    isVoiceRecording.value = false
+    stopRecordingTimer()
+    voiceManager.value.stopRecording()
+    voiceTranscript.value = 'Transcribing...'
+    // transcribeWithBackend will be called by onRecordingComplete
+    return
+  }
+  
+  // Check microphone availability first
+  const micCheck = await voiceSearchUtils.checkMicrophone()
+  if (!micCheck.available) {
+    emit('error', { 
+      message: micCheck.error || 'No microphone found. Please connect a microphone and try again.', 
+      type: 'voice' 
+    })
+    return
+  }
+  
+  // Request permission if not already granted
+  const permCheck = await voiceSearchUtils.requestPermission()
+  if (!permCheck.granted) {
+    emit('error', { 
+      message: permCheck.error || 'Microphone permission denied. Please allow access in browser settings.', 
+      type: 'voice' 
+    })
     return
   }
   
@@ -594,17 +732,12 @@ const handleVoiceSearch = async () => {
   voiceTranscript.value = ''
   
   try {
-    if (useBackendTranscription.value) {
-      // Use audio recording + backend AI transcription
-      await startBackendVoiceSearch()
-    } else {
-      // Try browser SpeechRecognition first
-      await voiceManager.value.startSpeechRecognition()
-    }
+    // Always use backend AI transcription (more reliable than browser SpeechRecognition)
+    await startBackendVoiceSearch()
   } catch (err) {
     console.error('Voice search failed:', err)
     isVoiceRecording.value = false
-    emit('error', { message: 'Voice search failed to start', type: 'voice' })
+    emit('error', { message: err.message || 'Voice search failed to start', type: 'voice' })
   }
 }
 
@@ -630,33 +763,26 @@ const handleImageFile = async (event) => {
   isImageSearching.value = true
   
   try {
-    // Get user location for nearby filtering (optional)
-    let locationParams = {}
-    try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
-      })
-      locationParams = {
-        lat: position.coords.latitude,
-        lon: position.coords.longitude,
-        radius: 10
-      }
-    } catch {
-      // Location not available, proceed without it
-      console.log('Location not available for image search')
-    }
+    const response = await searchByImage(file, 20)
     
-    const response = await searchByImage(file, locationParams)
+    const results = response.data?.data?.similar_products || response.data?.similar_products || []
     
-    emit('image-search-results', response.data)
-    
-    // Navigate to results page
-    if (response.data?.similar_products?.length > 0) {
+    if (results.length > 0) {
+      // Store results in sessionStorage for the products page
+      sessionStorage.setItem('imageSearchResults', JSON.stringify(results))
+      sessionStorage.setItem('imageSearchTimestamp', Date.now().toString())
+      
+      // Navigate to results page
       router.push({
         name: 'CustomerProducts',
         query: { imageSearch: 'true' }
       })
+    } else {
+      emit('error', { message: 'No similar products found. Try a different image.', type: 'image' })
     }
+    
+    // Also emit for any parent that wants to handle it directly
+    emit('image-search-results', response.data)
     
   } catch (err) {
     console.error('Image search failed:', err)
@@ -676,6 +802,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (suggestionTimer) clearTimeout(suggestionTimer)
+  stopRecordingTimer()
   if (voiceManager.value) voiceManager.value.cleanup()
   document.removeEventListener('click', handleClickOutside)
 })
@@ -803,31 +930,6 @@ defineExpose({
   cursor: not-allowed;
 }
 
-.btn-nearby {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: linear-gradient(135deg, var(--color-primary, #6366f1) 0%, var(--color-accent, #8b5cf6) 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  padding: 0.75rem 1.5rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.btn-nearby:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-}
-
-.btn-nearby:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
 /* Suggestions Dropdown */
 .suggestions-dropdown {
   position: absolute;
@@ -915,19 +1017,137 @@ defineExpose({
   left: 0;
   right: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0;
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   z-index: 1000;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  border: 2px solid transparent;
+  overflow: hidden;
+}
+
+.voice-indicator.speech-detected {
+  border-color: #10b981;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);
 }
 
 .voice-indicator i {
   color: #ef4444;
   font-size: 1.25rem;
+}
+
+/* Recording Progress Bar */
+.recording-progress {
+  height: 4px;
+  background: #e5e7eb;
+  width: 100%;
+}
+
+.recording-progress .progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  transition: width 0.3s linear;
+}
+
+.recording-progress .progress-bar.warning {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+/* Voice Content Area */
+.voice-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+/* Audio Visualizer Bars */
+.audio-visualizer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 40px;
+  padding: 4px;
+}
+
+.audio-bar {
+  width: 4px;
+  min-height: 4px;
+  max-height: 36px;
+  background: linear-gradient(to top, #10b981, #34d399, #6ee7b7);
+  border-radius: 2px;
+  transition: height 0.08s ease-out;
+}
+
+/* Voice Status Section */
+.voice-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.recording-icon {
+  color: #ef4444;
+  font-size: 1.5rem;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.recording-icon.active {
+  color: #10b981;
+}
+
+.status-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Voice Hint */
+.voice-hint {
+  font-size: 0.65rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 0.25rem 0.5rem 0.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.voice-hint i {
+  font-size: 0.65rem;
+  color: #9ca3af;
+}
+
+/* Stop Recording Button */
+.btn-stop-recording {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #ef4444;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-stop-recording:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.btn-stop-recording i {
+  color: white;
+  font-size: 1rem;
 }
 
 .pulse-ring {
@@ -961,6 +1181,53 @@ defineExpose({
   50% {
     opacity: 0.5;
   }
+}
+
+/* Audio Level Visualizer */
+.audio-level-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 0 4px;
+}
+
+.audio-level-bar {
+  width: 3px;
+  background: linear-gradient(to top, #10b981, #34d399, #6ee7b7);
+  border-radius: 2px;
+  transition: height 0.05s ease-out;
+  min-height: 2px;
+}
+
+.audio-level-bar:nth-child(1) { animation-delay: 0ms; }
+.audio-level-bar:nth-child(2) { animation-delay: 50ms; }
+.audio-level-bar:nth-child(3) { animation-delay: 100ms; }
+.audio-level-bar:nth-child(4) { animation-delay: 150ms; }
+.audio-level-bar:nth-child(5) { animation-delay: 200ms; }
+
+/* Voice status text */
+.voice-status-text {
+  font-size: 0.65rem;
+  color: #6b7280;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.voice-status-text.listening {
+  color: #f59e0b;
+}
+
+.voice-status-text.speaking {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.voice-status-text.processing {
+  color: #6366f1;
 }
 
 /* Transitions */

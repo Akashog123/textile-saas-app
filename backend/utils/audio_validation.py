@@ -81,13 +81,22 @@ class AudioValidator:
         file_ext = os.path.splitext(filename)[1]
         expected_mime = self.SUPPORTED_FORMATS.get(file_ext, 'unknown')
         
+        # Get actual file size by seeking to end
+        current_pos = file.tell()
+        file.seek(0, 2)  # Seek to end
+        actual_size = file.tell()
+        file.seek(current_pos)  # Seek back to original position
+        
+        # Fall back to content_length if available
+        content_length = actual_size or getattr(file, 'content_length', 0)
+        
         metadata = {
             'filename': file.filename,
             'file_extension': file_ext,
             'expected_mime_type': expected_mime,
             'content_type': file.content_type or 'unknown',
-            'content_length': getattr(file, 'content_length', 0),
-            'size_mb': getattr(file, 'content_length', 0) / (1024 * 1024)
+            'content_length': content_length,
+            'size_mb': content_length / (1024 * 1024) if content_length else 0
         }
         
         return metadata
