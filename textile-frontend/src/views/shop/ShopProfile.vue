@@ -840,6 +840,11 @@ async function initMapFrontendOnly() {
     _reverseGeocodeFrontend(clickedLat, clickedLng).catch(()=>{});
   });
 
+  // Force map resize calculation after modal animation
+  setTimeout(() => {
+    mapRef.value?.invalidateSize();
+  }, 300);
+
   mapInitialized.value = true;
 }
 
