@@ -353,7 +353,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(180), nullable=False, index=True)
     slug = db.Column(db.String(200), unique=True, index=True)
-    sku = db.Column(db.String(80), unique=True, index=True)
+    sku = db.Column(db.String(80), index=True)
     category = db.Column(db.String(120), index=True)
     description = db.Column(db.Text)
     price = db.Column(db.Numeric(10, 2), nullable=False)
@@ -380,6 +380,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
         Index('idx_product_shop_active', 'shop_id', 'is_active'),
         Index('idx_product_category_trending', 'category', 'is_trending'),
         Index('idx_product_shop_category', 'shop_id', 'category'),
+        db.UniqueConstraint('shop_id', 'sku', name='uq_product_shop_sku'),
     )
 
     def __repr__(self):
@@ -559,6 +560,7 @@ class Inventory(db.Model, SerializerMixin):
     total_purchased = db.Column(db.Integer, default=0)
     total_sold = db.Column(db.Integer, default=0)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_sales_data_at = db.Column(db.DateTime, nullable=True)
     
     def __repr__(self):
         return f"<Inventory product={self.product_id} qty={self.qty_available}>"
@@ -623,6 +625,7 @@ class SalesData(db.Model, SerializerMixin):
         Index('idx_sales_date_product', 'date', 'product_id'),
         Index('idx_sales_shop_product', 'shop_id', 'product_id'),
         Index('idx_sales_region_date', 'region', 'date'),
+        db.UniqueConstraint('shop_id', 'product_id', 'date', name='uq_sales_shop_product_date'),
     )
 
     def __repr__(self):

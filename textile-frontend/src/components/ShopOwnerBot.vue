@@ -3,13 +3,22 @@ import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios'; 
 import { marked } from 'marked'; 
 
+const props = defineProps({
+  hideTrigger: {
+    type: Boolean,
+    default: false
+  },
+  hasData: {
+    type: Boolean,
+    default: true
+  }
+});
+
 // State
 const isOpen = ref(false);
 const isLoggedIn = ref(false);
 const userMessage = ref('');
-const messages = ref([
-  { id: 1, text: "Hi! I'm your Sales Graph Analyst. I can provide a detailed statistical analysis of your sales graph. Ask me about your growth, volatility, or best-performing days.", sender: 'bot' }
-]);
+const messages = ref([]);
 const loading = ref(false);
 const chatBodyRef = ref(null);
 const showWidget = ref(false);
@@ -92,10 +101,27 @@ const triggerTooltip = () => {
   }, 1500);
 };
 
+const updateInitialMessage = () => {
+  // Only update if it's the initial state (empty or just welcome message)
+  if (messages.value.length <= 1) {
+    if (props.hasData) {
+      messages.value = [{ id: 1, text: "Hi! I'm your Sales Graph Analyst. I can provide a detailed statistical analysis of your sales graph. Ask me about your growth, volatility, or best-performing days.", sender: 'bot' }];
+    } else {
+      messages.value = [{ id: 1, text: "Hi! I'm your Sales Graph Analyst. It looks like you haven't uploaded any sales data yet. Please upload your sales data so I can help you analyze your business performance.", sender: 'bot' }];
+    }
+  }
+};
+
+// Watch for data availability to update initial message
+watch(() => props.hasData, (newVal) => {
+  updateInitialMessage();
+}, { immediate: true });
+
 // Lifecycle hooks
 onMounted(() => {
   checkLoginStatus();
   loginCheckInterval = setInterval(checkLoginStatus, 1000);
+  updateInitialMessage();
 });
 
 onUnmounted(() => {
@@ -251,7 +277,8 @@ const initializeForShop = (newShopId) => {
 };
 
 defineExpose({
-  initializeForShop
+  initializeForShop,
+  toggleChat
 });
 </script>
 
@@ -259,13 +286,14 @@ defineExpose({
   <div v-if="showWidget" class="shop-owner-bot">
     
     <transition name="fade">
-      <div v-if="showTooltip && !isOpen" class="bot-tooltip">
+      <div v-if="showTooltip && !isOpen && !hideTrigger" class="bot-tooltip">
         <span class="tooltip-text">Click here for a detailed graph analysis!</span>
         <div class="tooltip-arrow"></div>
       </div>
     </transition>
 
     <button 
+      v-if="!hideTrigger"
       class="chat-btn shop-owner-btn" 
       @click="toggleChat"
       title="Shop Analytics Assistant"
@@ -282,7 +310,7 @@ defineExpose({
           <div class="header-icon">
             <i class="bi bi-flower1"></i>
           </div>
-          <h5 class="mb-0 fw-bold brand-text-white">SE Assistant</h5>
+          <span class="mb-0 fw-bold brand-text-white text-white">SE Assistant</span>
         </div>
         <button class="close-btn" @click="toggleChat" aria-label="Close chat">
           <i class="bi bi-dash-lg"></i>
@@ -490,6 +518,7 @@ defineExpose({
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.5px;
+  color: white !important;
 }
 
 .close-btn {

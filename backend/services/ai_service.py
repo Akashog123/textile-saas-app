@@ -19,11 +19,11 @@ from services.prophet_service import prophet_manager
 
 # Default Fallback Responses
 DEFAULT_CAPTION = "Elegant design for every occasion!"
-DEFAULT_SUMMARY = "Steady growth observed across key regions with strong fabric demand."
-DEFAULT_RECOMMENDATION = "Maintain higher silk stock in northern regions; expand cotton offerings in the east."
+DEFAULT_SUMMARY = "Sales trends are being analyzed. Check back later for detailed insights."
+DEFAULT_RECOMMENDATION = "Monitor your top-selling products and adjust inventory levels accordingly."
 DEFAULT_PRIORITIES = [
-    {"title": "Scale up high-demand fabrics", "detail": "Increase production for top performers.", "level": "increase"},
-    {"title": "Maintain stable cotton blends", "detail": "Keep inventory consistent for steady sellers.", "level": "maintain"},
+    {"title": "Scale up high-demand items", "detail": "Increase production for top performers.", "level": "increase"},
+    {"title": "Maintain stable inventory", "detail": "Keep inventory consistent for steady sellers.", "level": "maintain"},
     {"title": "Reduce low-selling SKUs", "detail": "Optimize resources by limiting underperformers.", "level": "reduce"},
 ]
 

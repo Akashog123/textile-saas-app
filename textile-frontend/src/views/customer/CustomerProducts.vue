@@ -10,6 +10,7 @@
       @search="handleSearch"
       @nearby-search="handleNearbySearch"
       @image-search="handleImageSearch"
+      @image-search-results="handleImageSearchResults"
       @suggestion-select="handleSuggestionSelect"
     />
 
@@ -96,15 +97,25 @@
     </div>
 
     <!-- Empty State -->
-    <EmptyState
-      v-else-if="products.length === 0"
-      icon="bi-search"
-      title="No products found"
-      message="Try adjusting your filters or search terms"
-      action-text="Clear Filters"
-      action-icon="bi-x-lg"
-      @action="clearFilters"
-    />
+    <div v-else-if="products.length === 0" class="empty-state-wrapper">
+      <div class="not-found-content">
+        <div class="error-icon">
+          <i :class="['bi', emptyStateProps.icon]" style="font-size: 3rem;"></i>
+        </div>
+        
+        <h2 class="error-title">{{ emptyStateProps.title }}</h2>
+        <p class="error-message">
+          {{ emptyStateProps.message }}
+        </p>
+        
+        <div class="action-buttons justify-content-center">
+          <button @click="clearFilters" class="btn btn-primary">
+            <i class="bi bi-arrow-clockwise me-2"></i>
+            Clear Filters & Search
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Products Grid -->
     <div v-else class="products-grid">
@@ -174,7 +185,6 @@ import { browseProducts, getCategories, searchShopsAndProducts, searchByImage, g
 import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ProductCard from '@/components/cards/ProductCard.vue';
-import EmptyState from '@/components/EmptyState.vue';
 
 const router = useRouter();
 
@@ -208,6 +218,34 @@ const pagination = reactive({
 // Computed
 const hasActiveFilters = computed(() => {
   return filters.category || filters.priceRange || filters.inStockOnly || searchQuery.value;
+});
+
+const emptyStateProps = computed(() => {
+  if (searchQuery.value === 'Visual Search Results') {
+    return {
+      icon: 'bi-camera',
+      title: 'No Visual Matches Found',
+      message: 'We couldn\'t find any products visually similar to your image. Try a different image or angle.'
+    };
+  } else if (searchQuery.value) {
+    return {
+      icon: 'bi-search',
+      title: 'No Search Results',
+      message: `We couldn't find any products matching "${searchQuery.value}".`
+    };
+  } else if (filters.category || filters.priceRange || filters.inStockOnly) {
+    return {
+      icon: 'bi-funnel',
+      title: 'No Products Found',
+      message: 'Try adjusting your filters to see more results.'
+    };
+  } else {
+    return {
+      icon: 'bi-box-seam',
+      title: 'No Products Available',
+      message: 'There are currently no products available in the catalog.'
+    };
+  }
 });
 
 const visiblePages = computed(() => {
@@ -455,6 +493,27 @@ const handleNearbySearch = async (location) => {
 };
 
 /**
+ * Handle image search results from search bar
+ */
+const handleImageSearchResults = (data) => {
+  if (data?.data?.similar_products) {
+    products.value = normalizeProducts(data.data.similar_products);
+    totalProducts.value = products.value.length;
+    searchQuery.value = 'Visual Search Results';
+    showSuccessNotification(`Found ${products.value.length} similar products`);
+  } else if (data?.similar_products) {
+    products.value = normalizeProducts(data.similar_products);
+    totalProducts.value = products.value.length;
+    searchQuery.value = 'Visual Search Results';
+    showSuccessNotification(`Found ${products.value.length} similar products`);
+  } else {
+    products.value = [];
+    showSuccessNotification('No similar products found');
+  }
+  hasMoreProducts.value = false;
+};
+
+/**
  * Handle image search
  */
 const handleImageSearch = async (imageData) => {
@@ -699,7 +758,7 @@ onMounted(async () => {
 
 <style scoped>
 .customer-products-page {
-  background: transparent;
+  background: var(--gradient-bg);
   min-height: calc(100vh - 80px);
   padding: 2rem;
   padding-bottom: 4rem;
@@ -1047,5 +1106,59 @@ onMounted(async () => {
   .products-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Empty State / Not Found Styles */
+.empty-state-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.not-found-content {
+  text-align: center;
+  max-width: 500px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  padding: 3rem 2rem;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.error-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 2rem;
+  color: var(--color-primary, #4A90E2);
+  background: var(--color-bg-alt, #f8f9fa);
+  border-radius: 50%;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--color-text, #2c3e50);
+}
+
+.error-message {
+  color: var(--color-text-light, #6c757d);
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
 }
 </style>

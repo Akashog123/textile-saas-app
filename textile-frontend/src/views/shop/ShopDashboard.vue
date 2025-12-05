@@ -98,9 +98,6 @@
                 <p class="text-muted small mb-3" style="max-width: 250px;">
                   Upload your sales data to see revenue insights, trends, and category performance.
                 </p>
-                <button class="btn btn-primary btn-sm" @click="openSalesUploadModal">
-                  <i class="bi bi-upload me-1"></i> Upload Sales Data
-                </button>
               </div>
             </div>
             
@@ -172,30 +169,40 @@
                 <span class="bg-info-soft text-info rounded p-1 me-2"><i class="bi bi-activity"></i></span>
                 Sales Growth Trend
               </h6>
-              <div class="btn-group btn-group-sm" role="group">
+              <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button 
+                    type="button" 
+                    class="btn"
+                    :class="chartPeriod === 'weekly' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="changeChartPeriod('weekly')"
+                  >
+                    Week
+                  </button>
+                  <button 
+                    type="button" 
+                    class="btn"
+                    :class="chartPeriod === 'monthly' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="changeChartPeriod('monthly')"
+                  >
+                    Month
+                  </button>
+                  <button 
+                    type="button" 
+                    class="btn"
+                    :class="chartPeriod === 'yearly' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="changeChartPeriod('yearly')"
+                  >
+                    Year
+                  </button>
+                </div>
                 <button 
-                  type="button" 
-                  class="btn"
-                  :class="chartPeriod === 'weekly' ? 'btn-primary' : 'btn-outline-secondary'"
-                  @click="changeChartPeriod('weekly')"
+                  class="btn btn-sm btn-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center" 
+                  style="width: 32px; height: 32px;"
+                  @click="shopBot?.toggleChat()"
+                  title="Ask AI Analyst"
                 >
-                  Week
-                </button>
-                <button 
-                  type="button" 
-                  class="btn"
-                  :class="chartPeriod === 'monthly' ? 'btn-primary' : 'btn-outline-secondary'"
-                  @click="changeChartPeriod('monthly')"
-                >
-                  Month
-                </button>
-                <button 
-                  type="button" 
-                  class="btn"
-                  :class="chartPeriod === 'yearly' ? 'btn-primary' : 'btn-outline-secondary'"
-                  @click="changeChartPeriod('yearly')"
-                >
-                  Year
+                  <i class="bi bi-chat-dots-fill" style="font-size: 0.8rem;"></i>
                 </button>
               </div>
             </div>
@@ -223,8 +230,13 @@
             <!-- No Data State -->
             <div v-else-if="!salesTrendData || salesTrendData.status === 'no_data'" class="flex-grow-1 d-flex align-items-center justify-content-center bg-light rounded-3">
               <div class="text-center p-4">
-                <i class="bi bi-bar-chart-line fs-2 text-muted mb-2"></i>
-                <p class="text-muted small mb-0">Upload sales data to see trends</p>
+                <div class="mb-3 text-muted opacity-50">
+                  <i class="bi bi-graph-up" style="font-size: 2.5rem;"></i>
+                </div>
+                <h6 class="text-muted fw-semibold mb-2">No Trend Data</h6>
+                <p class="text-muted small mb-3">
+                  Upload sales data to visualize your growth trends over time.
+                </p>
               </div>
             </div>
             
@@ -292,10 +304,10 @@
           <div class="card-body p-4 d-flex flex-column">
             <div class="d-flex align-items-center justify-content-between mb-4">
               <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
-                <span class="bg-warning-soft text-warning rounded p-1 me-2"><i class="bi bi-graph-up-arrow"></i></span>
+                <span class="text-warning rounded p-1 me-2"><i class="bi bi-graph-up-arrow"></i></span>
                 Next Quarter Demand Forecast
               </h6>
-              <span v-if="quarterlyForecastData?.summary?.confidence_level" class="badge" :class="{
+              <span v-if="quarterlyForecastData?.summary?.confidence_level && !quarterlyForecastLoading && !quarterlyForecastError && quarterlyForecastData?.status !== 'no_data' && quarterlyForecastData?.status !== 'insufficient_data'" class="badge" :class="{
                 'bg-success-soft text-success': quarterlyForecastData.summary.confidence_level === 'High',
                 'bg-warning-soft text-warning': quarterlyForecastData.summary.confidence_level === 'Medium',
                 'bg-danger-soft text-danger': quarterlyForecastData.summary.confidence_level === 'Low' || quarterlyForecastData.summary.confidence_level === 'Very Low'
@@ -411,13 +423,28 @@
                 <span class="bg-primary-soft text-primary rounded p-1 me-2"><i class="bi bi-stars"></i></span>
                 AI-Powered Insights
               </h6>
-              <button class="btn btn-gradient btn-sm rounded" @click="generateInsightsPDF" :disabled="generatingPDF">
+              <button v-if="aiInsights.length > 0" class="btn btn-gradient btn-sm rounded" @click="generateInsightsPDF" :disabled="generatingPDF">
                 <span v-if="generatingPDF"><span class="spinner-border spinner-border-sm me-1"></span>Generating...</span>
                 <span v-else><i class="bi bi-download me-1"></i>Export Report</span>
               </button>
             </div>
             <div class="insights-container flex-grow-1 custom-scrollbar pe-2">
+              <!-- Empty State -->
+              <div v-if="aiInsights.length === 0" class="h-100 d-flex align-items-center justify-content-center text-center">
+                 <div class="p-4">
+                    <div class="mb-3 text-muted opacity-50">
+                       <i class="bi bi-stars" style="font-size: 3rem;"></i>
+                    </div>
+                    <h6 class="text-muted fw-semibold mb-2">No Insights Yet</h6>
+                    <p class="text-muted small mb-3">
+                       Upload inventory and sales data to unlock AI-powered insights about trends, pricing, and inventory.
+                    </p>
+                 </div>
+              </div>
+
+              <!-- Insights List -->
               <div
+                v-else
                 class="insight-item mb-3 p-3 rounded-3"
                 :class="[
                   insight.type === 'success' ? 'insight-success' : 
@@ -765,8 +792,18 @@
                         Upload
                     </button>
                 </div>
-                <div v-if="salesUploadStatus" class="mt-2 small" :class="salesUploadStatus.type === 'success' ? 'text-success' : 'text-danger'">
-                    <i :class="salesUploadStatus.type === 'success' ? 'bi bi-check-circle' : 'bi bi-exclamation-circle'"></i>
+                <div v-if="salesUploadStatus" class="mt-2 small" :class="{
+                    'text-success': salesUploadStatus.type === 'success',
+                    'text-danger': salesUploadStatus.type === 'error',
+                    'text-warning': salesUploadStatus.type === 'warning',
+                    'text-info': salesUploadStatus.type === 'info'
+                }">
+                    <i :class="{
+                        'bi bi-check-circle': salesUploadStatus.type === 'success',
+                        'bi bi-exclamation-circle': salesUploadStatus.type === 'error',
+                        'bi bi-exclamation-triangle': salesUploadStatus.type === 'warning',
+                        'bi bi-info-circle': salesUploadStatus.type === 'info'
+                    }"></i>
                     {{ salesUploadStatus.message }}
                 </div>
             </div>
@@ -782,6 +819,9 @@
         {{ toastMessage }}
       </div>
     </transition>
+
+    <!-- Shop Owner Bot (Hidden Trigger) -->
+    <ShopOwnerBot ref="shopBot" :hide-trigger="true" :has-data="hasSalesData" />
   </div>
 </template>
 
@@ -798,6 +838,7 @@ import {
   getSalesGrowthTrend,
   downloadSalesTemplate
 } from '@/api/apiShop';
+import ShopOwnerBot from '@/components/ShopOwnerBot.vue';
 
 // Loading and error states
 const loading = ref(false);
@@ -850,6 +891,9 @@ const selectedSalesFile = ref(null);
 const salesUploading = ref(false);
 const salesUploadStatus = ref(null);
 
+// Shop Bot Ref
+const shopBot = ref(null);
+
 // PDF generation state
 const generatingPDF = ref(false);
 
@@ -862,7 +906,7 @@ const hasSalesData = computed(() => {
     dashboardData.value.weekly_sales && 
     dashboardData.value.weekly_sales !== '₹0' &&
     dashboardData.value.weekly_sales !== '₹0.00';
-  return hasSummaryData || hasDashboardData;
+  return !!(hasSummaryData || hasDashboardData);
 });
 
 // Sales summary computed properties
@@ -882,7 +926,7 @@ const salesGrowth = computed(() => {
   return dashboardData.value.growth || null;
 });
 
-// NEW: Computed properties for sales summary display
+// Computed properties for sales summary display
 const salesSummaryMetrics = computed(() => {
   if (!salesSummaryData.value?.metrics) {
     return {
@@ -1422,16 +1466,8 @@ const updateInsightsFromData = (data) => {
       };
     });
   } else {
-    // Default insights only if no data available
-    aiInsights.value = [
-      {
-        icon: 'bi bi-lightbulb-fill',
-        title: 'Upload Sales Data',
-        description: limitSentences('Upload your sales data to get AI-powered insights and forecasts.', 4),
-        type: 'info',
-        category: 'Getting Started'
-      }
-    ];
+    // No insights available
+    aiInsights.value = [];
   }
 };
 
@@ -1523,13 +1559,19 @@ const uploadSalesFile = async () => {
     }
 
     const timingMessage = formatUploadTiming(response.data?.upload_log);
-    salesUploadStatus.value = { type: 'success', message: timingMessage || 'Upload successful!' };
     
-    // Show toast as well
-    toastMessage.value = 'Sales data uploaded successfully!';
-    toastIcon.value = 'bi bi-check-circle-fill';
+    if (response.data?.warning) {
+      salesUploadStatus.value = { type: 'warning', message: response.data.warning };
+      toastMessage.value = response.data.warning;
+      toastIcon.value = 'bi bi-exclamation-triangle';
+    } else {
+      salesUploadStatus.value = { type: 'success', message: timingMessage || 'Upload successful!' };
+      toastMessage.value = 'Sales data uploaded successfully!';
+      toastIcon.value = 'bi bi-check-circle-fill';
+    }
+    
     showToast.value = true;
-    setTimeout(() => (showToast.value = false), 3000);
+    setTimeout(() => (showToast.value = false), 5000);
 
   } catch (err) {
     console.error('[Upload Error]', err);
@@ -1577,14 +1619,6 @@ const handleDownloadSalesTemplate = async () => {
 };
 
 /**
- * Upload sales data file - Production grade implementation
- * Shows rotating progress messages until processing completes
- */
-const handleUploadSalesData = async () => {
-  openSalesUploadModal();
-};
-
-/**
  * Generate PDF report for AI insights and dashboard summary
  */
 const generateInsightsPDF = async () => {
@@ -1598,10 +1632,86 @@ const generateInsightsPDF = async () => {
 
   generatingPDF.value = true;
   try {
+    // Construct PDF content from current dashboard state
+    const sections = [];
+
+    // 1. Sales Summary
+    if (salesSummaryData.value && salesSummaryData.value.metrics) {
+      const metrics = salesSummaryData.value.metrics;
+      const comparison = salesSummaryData.value.comparison || {};
+      
+      let summaryBody = `Total Revenue: ${metrics.total_revenue}\n`;
+      summaryBody += `Total Quantity: ${metrics.total_quantity}\n`;
+      summaryBody += `Avg Order Value: ${metrics.average_order_value_formatted}\n`;
+      
+      if (comparison.trend) {
+        summaryBody += `\nTrend: ${comparison.trend.toUpperCase()} (${comparison.revenue_change_percent}%)\n`;
+        summaryBody += `${comparison.message || ''}\n`;
+      }
+      
+      sections.push({
+        heading: 'Sales Summary (Last 7 Days)',
+        body: summaryBody
+      });
+    }
+
+    // 2. AI Insights
+    if (aiInsights.value && aiInsights.value.length > 0) {
+      let insightsBody = '';
+      aiInsights.value.forEach(insight => {
+        insightsBody += `• ${insight.title} [${insight.category}]\n`;
+        insightsBody += `  ${insight.description}\n\n`;
+      });
+      
+      sections.push({
+        heading: 'AI-Powered Insights',
+        body: insightsBody
+      });
+    }
+
+    // 3. Forecast
+    if (quarterlyForecastData.value && quarterlyForecastData.value.summary) {
+       const summary = quarterlyForecastData.value.summary;
+       let forecastBody = `Predicted Revenue: ${summary.total_predicted_revenue_formatted}\n`;
+       forecastBody += `Confidence Level: ${summary.confidence_level}\n\n`;
+       
+       if (quarterlyForecastData.value.category_forecast) {
+         forecastBody += 'Top Category Forecasts:\n';
+         quarterlyForecastData.value.category_forecast.slice(0, 5).forEach(cat => {
+           forecastBody += `- ${cat.name}: ${cat.predicted} (${cat.growth_rate > 0 ? '+' : ''}${cat.growth_rate}%)\n`;
+         });
+       }
+       
+       sections.push({
+         heading: 'Next Quarter Forecast',
+         body: forecastBody
+       });
+    }
+
+    // 4. Reorder Suggestions
+    if (reorderProducts.value && reorderProducts.value.length > 0) {
+      let reorderBody = '';
+      reorderProducts.value.slice(0, 5).forEach(prod => {
+        reorderBody += `• ${prod.name} [${prod.category || 'General'}]\n`;
+        reorderBody += `  Supplier: ${prod.supplier}\n`;
+        reorderBody += `  Price: ${prod.price} | Reorder Qty: ${prod.quantity}\n\n`;
+      });
+      
+      if (reorderProducts.value.length > 5) {
+        reorderBody += `...and ${reorderProducts.value.length - 5} more items.`;
+      }
+      
+      sections.push({
+        heading: 'Recommended Reorders',
+        body: reorderBody
+      });
+    }
+
     const payload = {
-      shop_id: shopId.value,
-      report_type: 'dashboard_insights',
-      include_sections: ['sales_summary', 'ai_insights', 'forecast', 'reorder_suggestions']
+      title: 'Shop Insights Report',
+      subtitle: `Generated on ${new Date().toLocaleDateString()}`,
+      summary: 'This report contains AI-generated insights, sales summaries, and demand forecasts for your shop.',
+      sections: sections
     };
 
     const response = await generateSalesReportPdf(payload);
@@ -1792,12 +1902,17 @@ const fetchSalesSummary = async () => {
       // Update AI insights from sales summary
       if (salesSummaryData.value?.insights?.length > 0) {
         // Merge with existing AI insights
-        const summaryInsights = salesSummaryData.value.insights.map(i => ({
-          title: i.title,
-          icon: i.icon || 'bi bi-lightbulb',
-          description: i.message
-        }));
-        aiInsights.value = [...summaryInsights, ...aiInsights.value.slice(0, 2)];
+        const summaryInsights = salesSummaryData.value.insights
+          .filter(i => i.title !== 'No Sales Data')
+          .map(i => ({
+            title: i.title,
+            icon: i.icon || 'bi bi-lightbulb',
+            description: i.message
+          }));
+        
+        if (summaryInsights.length > 0) {
+          aiInsights.value = [...summaryInsights, ...aiInsights.value.slice(0, 2)];
+        }
       }
       
       // Update avg order value metric
