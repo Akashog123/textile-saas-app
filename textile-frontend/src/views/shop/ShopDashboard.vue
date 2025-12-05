@@ -162,8 +162,8 @@
 
       <!-- Sales Growth Trend -->
       <div class="col-lg-6 d-flex">
-        <div class="card modern-card w-100 border-0 shadow-sm">
-          <div class="card-body p-4 d-flex flex-column">
+        <div class="card modern-card w-100 border-0 shadow-sm overflow-visible">
+          <div class="card-body p-4 d-flex flex-column" style="padding-bottom: 12px !important;">
             <div class="d-flex align-items-center justify-content-between mb-4">
               <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
                 <span class="bg-info-soft text-info rounded p-1 me-2"><i class="bi bi-activity"></i></span>
@@ -294,6 +294,8 @@
                 >{{ label }}</small>
               </div>
             </div>
+
+            <ShopOwnerBot />
           </div>
         </div>
       </div>
