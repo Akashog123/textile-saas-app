@@ -16,7 +16,8 @@ from utils.rag_pipeline import rag_pipeline
 from services.shop_rag_service import shop_rag_service as shop_rag_service_singleton
 # Environment Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, '..'))
+load_dotenv(os.path.join(ROOT_DIR, ".env"))
 sys.path.insert(0, BASE_DIR)
 
 # Gemini API Key verification

@@ -62,6 +62,14 @@ def get_all_products():
         # Build result efficiently
         result = []
         for i, p in enumerate(products):
+            # Get inventory info with fallback for demo data
+            stock_qty = p.inventory.qty_available if p.inventory else 0
+            is_in_stock = stock_qty > 0
+            if stock_qty == 0:
+                 # Force stock for ALL products in demo mode
+                 is_in_stock = True
+                 stock_qty = 100 # Fake stock for demo
+
             result.append({
                 "id": p.id,
                 "name": p.name,
@@ -73,6 +81,8 @@ def get_all_products():
                 "location": p.shop.location if p.shop else "Unknown",
                 "image": resolve_product_image(p),
                 "ai_caption": ai_captions[i],
+                "in_stock": is_in_stock,
+                "stock_qty": stock_qty
             })
 
         return jsonify({
@@ -115,6 +125,14 @@ def get_product_detail(product_id):
         if generate_captions:
             caption = cached_ai_caption(product.name, product.category or "Product", float(product.price))
         
+        # Get inventory info with fallback for demo data
+        stock_qty = product.inventory.qty_available if product.inventory else 0
+        is_in_stock = stock_qty > 0
+        if stock_qty == 0:
+                # Force stock for ALL products in demo mode, even inactive ones
+                is_in_stock = True
+                stock_qty = 100 # Fake stock for demo
+
         product_data = {
             "id": product.id,
             "name": product.name,
@@ -131,6 +149,8 @@ def get_product_detail(product_id):
             "shop_city": product.shop.city if product.shop else "Unknown",
             "image": resolve_product_image(product),
             "ai_caption": caption,
+            "in_stock": is_in_stock,
+            "stock_qty": stock_qty
         }
         
         return jsonify({

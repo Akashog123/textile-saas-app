@@ -1,4 +1,4 @@
-# SE-Textile App
+# Textile Saas app
 
 A **Vue 3 + Vite + Bootstrap 5** frontend application for textile supply chain management with role-based authentication supporting **Customers**, **Distributors**, and **Shop Owners/Managers**.
 

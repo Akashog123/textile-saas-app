@@ -2104,7 +2104,7 @@ def ai_demand_forecast(current_user):
             
             # Determine action needed
             if current_stock < predicted_demand_14d * 0.5:
-                action = "ORDER NOW"
+                action = "CRITICAL"
                 action_class = "critical"
             elif current_stock < predicted_demand_14d:
                 action = "RESTOCK SOON"
@@ -2128,11 +2128,11 @@ def ai_demand_forecast(current_user):
             })
         
         # Sort by urgency (critical first)
-        action_priority = {"ORDER NOW": 0, "RESTOCK SOON": 1, "ADEQUATE": 2}
+        action_priority = {"CRITICAL": 0, "RESTOCK SOON": 1, "ADEQUATE": 2}
         forecasts.sort(key=lambda x: (action_priority.get(x["action"], 3), -x["predictedDemand14d"]))
         
         # Count categories
-        critical_products = [f for f in forecasts if f["action"] == "ORDER NOW"]
+        critical_products = [f for f in forecasts if f["action"] == "CRITICAL"]
         warning_products = [f for f in forecasts if f["action"] == "RESTOCK SOON"]
         
         # Generate smart summary WITHOUT calling AI (instant response)
@@ -2412,16 +2412,16 @@ STOCK PLANNING SUMMARY:
         if df.get('summary'):
             context_parts.append(f"\nDEMAND FORECAST SUMMARY:")
             context_parts.append(f"- Total Products Analyzed: {df['summary'].get('totalProducts', 0)}")
-            context_parts.append(f"- Products needing immediate order (ORDER NOW): {df['summary'].get('criticalCount', 0)}")
+            context_parts.append(f"- Products needing immediate order (CRITICAL): {df['summary'].get('criticalCount', 0)}")
             context_parts.append(f"- Products to restock soon: {df['summary'].get('warningCount', 0)}")
             context_parts.append(f"- Products with adequate stock: {df['summary'].get('healthyCount', 0)}")
         
         if df.get('forecasts'):
-            # Include ALL ORDER NOW items
-            order_now_items = [f for f in df['forecasts'] if f.get('action') == 'ORDER NOW']
-            if order_now_items:
-                context_parts.append(f"\nALL PRODUCTS NEEDING IMMEDIATE ORDER ({len(order_now_items)} items):")
-                for item in order_now_items:
+            # Include ALL Critical items
+            critical_items = [f for f in df['forecasts'] if f.get('action') == 'CRITICAL']
+            if critical_items:
+                context_parts.append(f"\nALL CRITICAL PRODUCTS ({len(critical_items)} items):")
+                for item in critical_items:
                     context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('currentStock', 0)} in stock, predicted demand {item.get('predictedDemand14d', 0)} units, stockout in {item.get('daysUntilStockout', 'N/A')} days, avg {item.get('avgDailySales', 0)}/day")
             
             # Include ALL RESTOCK SOON items

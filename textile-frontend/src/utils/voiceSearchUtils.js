@@ -86,6 +86,7 @@ export class VoiceSearchManager {
       // Initialize VAD recorder with optimized defaults
       this.vadRecorder = new VADRecorder({
         maxRecordingMs: this.options.maxRecordingTime,
+        redemptionMs: this.options.redemptionMs, // Pass redemptionMs from options
         model: 'v5'
         // Using defaults from vadRecorder.js which match official docs:
         // positiveSpeechThreshold: 0.3

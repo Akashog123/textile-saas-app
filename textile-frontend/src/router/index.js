@@ -16,18 +16,18 @@ const routes = [
     name: "LandingPage",
     component: LandingPage,
     meta: {
-      title: "SE Textile App - Smart Supply Chain",
-      requiresAuth: false
-    }
+      title: "Textile Saas app - Smart Supply Chain",
+      requiresAuth: false,
+    },
   },
   {
     path: "/login",
     name: "Login",
     component: Login,
     meta: {
-      title: "Login - SE Textile App",
-      requiresAuth: false
-    }
+      title: "Login - Textile Saas app",
+      requiresAuth: false,
+    },
   },
   {
     path: "/shop",
@@ -199,7 +199,7 @@ router.beforeEach((to, from, next) => {
   const userRole = localStorage.getItem("role");
 
   // Set document title
-  document.title = to.meta.title || "SE Textile App";
+  document.title = to.meta.title || "Textile Saas app";
 
   // Check if route requires authentication
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);

@@ -4,6 +4,7 @@ Provides secure access to MapmyIndia Places API for nearby shop searches
 """
 
 from flask import Blueprint, request, jsonify
+from flask_cors import cross_origin
 import requests
 import os
 from functools import wraps
@@ -219,3 +220,31 @@ def get_nearby_shops():
             'success': False,
             'error': 'Internal server error'
         }), 500
+
+@nearby_bp.route('/api/v1/reverse-geocode', methods=['GET'])
+@cross_origin(supports_credentials=True)
+def reverse_geocode():
+    """
+    Reverse geocoding proxy for Nominatim (OpenStreetMap)
+    """
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')
+    
+    if not lat or not lon:
+        return jsonify({'error': 'Missing lat or lon parameters'}), 400
+        
+    try:
+        # Nominatim requires a User-Agent
+        headers = {
+            'User-Agent': 'SE-Textile-App/1.0'
+        }
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        return jsonify(response.json())
+    except Exception as e:
+        print(f"[Reverse Geocode Error] {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
