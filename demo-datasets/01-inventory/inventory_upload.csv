@@ -1,20 +1,21 @@
-﻿name,sku,category,price,purchase_qty,minimum_stock,description,
-Premium Cotton Fabric Roll,COT-001,Cotton,1500,100,20,"High-quality 100% cotton fabric, ideal for summer wear. Width: 44 inches"
-Tussar Silk Fabric,SLK-001,Silk,3500,50,10,"Natural tussar silk with golden sheen, perfect for sarees and kurtas"
-Pure Linen Fabric,LIN-001,Linen,2200,75,15,"Breathable pure linen fabric, great for formal shirts and dresses"
-Wool Blend Fabric,WOL-001,Wool,2800,40,10,"Soft wool blend fabric for winter garments. 60% wool 40% polyester"
-Chanderi Silk Cotton,SLK-002,Silk,2800,60,12,"Traditional Chanderi fabric with silk-cotton blend"
-Handloom Cotton,COT-002,Cotton,1800,80,18,"Handwoven cotton fabric with natural texture"
-Banarasi Brocade,BRO-001,Brocade,5500,30,8,"Rich Banarasi brocade with gold zari work"
-Georgette Fabric,GEO-001,Georgette,1200,90,20,"Lightweight georgette fabric for flowing garments"
-Chiffon Silk,CHF-001,Chiffon,1600,70,15,"Sheer chiffon silk fabric, perfect for dupattas"
-Khadi Cotton,KHD-001,Khadi,900,120,25,"Authentic handspun khadi fabric, eco-friendly option"
-Velvet Fabric,VEL-001,Velvet,3200,35,8,"Premium velvet fabric for festive and winter wear"
-Net Fabric Embroidered,NET-001,Net,1400,55,12,"Embroidered net fabric for overlays and dupattas"
-Rayon Printed,RAY-001,Rayon,800,100,22,"Soft printed rayon fabric for casual wear"
-Crepe Fabric,CRP-001,Crepe,1100,85,18,"Textured crepe fabric with slight stretch"
-Jacquard Woven,JAC-001,Jacquard,2400,45,10,"Self-design jacquard woven fabric"
-Organza Silk,ORG-001,Organza,1900,50,12,"Crisp organza silk for structured garments"
-Kota Doria,KOT-001,Cotton,1300,65,15,"Traditional Kota Doria fabric with square patterns"
-Art Silk,ART-001,Silk,950,95,20,"Affordable art silk fabric with silk-like finish"
-Bamboo Fabric,BAM-001,Bamboo,1700,40,10,"Sustainable bamboo fabric, antibacterial properties"
+﻿name,sku,category,price,purchase_qty,minimum_stock,description,distributor_username
+Premium Cotton Fabric Roll,COT-001,Cotton,1500,100,20,"High-quality 100% cotton fabric, ideal for summer wear. Width: 44 inches",distributor1
+Tussar Silk Fabric,SLK-001,Silk,3500,50,10,"Natural tussar silk with golden sheen, perfect for sarees and kurtas",distributor2
+Pure Linen Fabric,LIN-001,Linen,2200,75,15,"Breathable pure linen fabric, great for formal shirts and dresses",distributor1
+Wool Blend Fabric,WOL-001,Wool,2800,40,10,"Soft wool blend fabric for winter garments. 60% wool 40% polyester",distributor1
+Chanderi Silk Cotton,SLK-002,Silk,2800,60,12,"Traditional Chanderi fabric with silk-cotton blend",
+Handloom Cotton,COT-002,Cotton,1800,80,18,"Handwoven cotton fabric with natural texture",distributor1
+Banarasi Brocade,BRO-001,Brocade,5500,30,8,"Rich Banarasi brocade with gold zari work",distributor1
+Georgette Fabric,GEO-001,Georgette,1200,90,20,"Lightweight georgette fabric for flowing garments",distributor2
+Chiffon Silk,CHF-001,Chiffon,1600,70,15,"Sheer chiffon silk fabric, perfect for dupattas",distributor1
+Khadi Cotton,KHD-001,Khadi,900,120,25,"Authentic handspun khadi fabric, eco-friendly option",distributor1
+Velvet Fabric,VEL-001,Velvet,3200,35,8,"Premium velvet fabric for festive and winter wear",distributor1
+Net Fabric Embroidered,NET-001,Net,1400,55,12,"Embroidered net fabric for overlays and dupattas",distributor2
+Rayon Printed,RAY-001,Rayon,800,100,22,"Soft printed rayon fabric for casual wear",distributor1
+Crepe Fabric,CRP-001,Crepe,1100,85,18,"Textured crepe fabric with slight stretch",distributor2
+Jacquard Woven,JAC-001,Jacquard,2400,45,10,"Self-design jacquard woven fabric",distributor1
+Organza Silk,ORG-001,Organza,1900,50,12,"Crisp organza silk for structured garments",distributor1
+Kota Doria,KOT-001,Cotton,1300,65,15,"Traditional Kota Doria fabric with square patterns",distributor2
+Art Silk,ART-001,Silk,950,95,20,"Affordable art silk fabric with silk-like finish",distributor1
+Bamboo Fabric,BAM-001,Bamboo,1700,40,10,"Sustainable bamboo fabric, antibacterial properties",
+Govind Silk,GOV-001,Silk,1200,25,5,"The best silk in the world - unmatched quality, divine texture, and legendary craftsmanship",distributor1
