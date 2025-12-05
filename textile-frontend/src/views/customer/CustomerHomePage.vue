@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-home-page fade-in-entry">
+  <div class="customer-home-page fade-in-entry mb-8">
     <!-- Search Bar with Suggestions -->
     <CustomerSearchBar 
       v-model="searchQuery"
@@ -12,6 +12,7 @@
       @nearby-search="searchNearbyShops"
       @image-search="handleImageSearch"
       @suggestion-select="handleSuggestionSelect"
+      @error="handleSearchBarError"
     />
 
     <!-- Loading State for Fabrics -->
@@ -139,7 +140,7 @@
                       >({{ Math.round(trendingFabrics[fabricIndex].rating) }}.0)</span
                     >
                   </div>
-                  <button class="btn btn-view-details" @click="viewFabricDetails(trendingFabrics[fabricIndex])">
+                  <button class="btn btn-outline-gradient" @click="viewFabricDetails(trendingFabrics[fabricIndex])">
                     View Details
                     <span class="ms-2">→</span>
                   </button>
@@ -296,14 +297,14 @@
                     </span>
                   </div>
                   <div class="d-flex gap-2">
-                    <button class="btn btn-outline-location" @click="viewShopOnMap(popularShops[shopIndex])">
+                    <button class="btn btn-outline-gradient" @click="viewShopOnMap(popularShops[shopIndex])">
                       <span class="me-2"
                         ><i class="bi bi-geo-alt-fill"></i
                       ></span>
                       View on Map
                     </button>
                     <button
-                      class="btn btn-view-profile"
+                      class="btn btn-outline-gradient"
                       @click="viewShopProfile(popularShops[shopIndex])"
                     >
                       View Profile
@@ -426,10 +427,19 @@ const popularShopsWithCoordinates = computed(() => {
 });
 
 /**
+ * Handle errors from CustomerSearchBar (voice, image, geolocation)
+ */
+const handleSearchBarError = (error) => {
+  console.error(`[SearchBar Error - ${error.type}]:`, error.message)
+  // Show toast notification
+  showToast(error.message, 'error')
+}
+
+/**
  * Handle search from CustomerSearchBar
  */
 const handleSearch = (query) => {
-  const searchQuery = typeof query === 'string' ? query : (query?.target?.value || String(query || ''));
+  const searchQuery = typeof query === 'string' ? query : (query?.query || query?.target?.value || String(query || ''));
   if (searchQuery.trim()) {
     router.push({ name: 'CustomerProducts', query: { search: searchQuery } });
   }
@@ -498,8 +508,12 @@ const fetchPopularShops = async () => {
   errorShops.value = '';
   try {
     const response = await getPopularShops();
+    console.log('[Popular Shops Response]', response.data);
     if (response.data && response.data.shops) {
       popularShops.value = response.data.shops.map(shop => validateShopData(shop));
+      console.log('[Processed Popular Shops]', popularShops.value);
+    } else {
+      console.warn('[Popular Shops] No shops in response:', response.data);
     }
   } catch (err) {
     console.error('[Popular Shops Error]', err);
@@ -773,30 +787,6 @@ onMounted(() => {
   color: var(--color-primary);
 }
 
-.btn-nearby {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  padding: 0.75rem 2rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.btn-nearby:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
-  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
-}
-
-.nearby-icon {
-  font-size: 1.2rem;
-}
-
 /* Section Styling */
 .section {
   background: var(--glass-bg);
@@ -1066,29 +1056,6 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
-.btn-view-details,
-.btn-view-profile {
-  background: transparent;
-  color: var(--color-primary);
-  border: 2px solid var(--color-primary);
-  padding: 0.75rem 1.5rem;
-  border-radius: 50px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-}
-
-.btn-view-details:hover,
-.btn-view-profile:hover {
-  background: var(--color-primary);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.25);
-}
-
 .shop-location {
   display: flex;
   align-items: center;
@@ -1099,22 +1066,6 @@ onMounted(() => {
 
 .location-icon {
   color: var(--color-primary);
-}
-
-.btn-outline-location {
-  background: transparent;
-  color: var(--color-text-dark);
-  border: 1px solid #e2e8f0;
-  padding: 0.75rem 1.5rem;
-  border-radius: 50px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.btn-outline-location:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-bg-alt);
 }
 
 /* Carousel Indicators */

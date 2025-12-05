@@ -5,6 +5,10 @@
   --color-accent: #B3D9FF;     /* Updated to blue theme */
   --color-primary: #4A90E2;    /* Updated to blue theme */
   
+  --color-text-dark: #1e293b;
+  --color-text-muted: #64748b;
+  --gradient-primary: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+
   --bg-card: #ffffff;
   --muted: #7a6f64;
   --bg: var(--color-bg-light);
@@ -186,3 +190,55 @@ body,
   border: none;
   border-radius: 10px;
 }
+
+/* ===== Shared Button Styles ===== */
+.btn-gradient {
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.6rem 1.2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-gradient:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+.btn-gradient:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  color: white;
+}
+
+.btn-outline-gradient {
+  border: 2px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+              var(--gradient-primary) border-box;
+  color: var(--color-primary);
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-gradient:hover:not(:disabled) {
+  background: var(--gradient-primary) padding-box,
+              var(--gradient-primary) border-box;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
+}
+
+.btn-outline-gradient:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+

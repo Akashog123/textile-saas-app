@@ -149,9 +149,18 @@ export const searchNearbyWithProducts = (data) => {
  * @param {number} [limit=20] - Max results
  * @returns {Promise} Response with similar products
  */
-export const searchByImage = async (imageFile, limit = 20) => {
+export const searchByImage = async (imageFile, optionsOrLimit = 20) => {
     const formData = new FormData();
     formData.append('image', imageFile);
+    
+    let limit = 20;
+
+    if (typeof optionsOrLimit === 'number') {
+        limit = optionsOrLimit;
+    } else if (typeof optionsOrLimit === 'object') {
+        limit = optionsOrLimit.limit || 20;
+    }
+    
     formData.append('limit', limit);
     
     return api.post('/image-search/similar', formData, {
