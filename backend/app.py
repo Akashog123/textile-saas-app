@@ -11,7 +11,9 @@ import numpy as np # Ensure numpy is installed
 from routes.chatbot_routes import chatbot_bp
 from services.rag_service import rag_service
 from utils.rag_pipeline import rag_pipeline
+# Shop-owner RAG chatbot (shop-manager)
 
+from services.shop_rag_service import shop_rag_service as shop_rag_service_singleton
 # Environment Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -49,6 +51,10 @@ from routes.customer_routes import customer_bp
 from routes.image_search_routes import image_search_bp
 from routes.supply_chain_routes import supply_chain_bp
 from utils.export_data import fetch_rag_data
+# from utils.shop_exportdata import export_sales_for_shop 
+from routes.shop_chatbot import shop_bp as shop_owner_bp
+
+
 # Flask Application Setup
 app = Flask(
     __name__,
@@ -88,6 +94,16 @@ def handle_error(error):
     else:
         return jsonify({"status": "error", "message": "An internal error occurred"}), 500
 
+# Handle 413 Request Entity Too Large
+@app.errorhandler(413)
+def handle_request_entity_too_large(error):
+    """Handle file upload size exceeded"""
+    return jsonify({
+        "status": "error", 
+        "message": "File too large. Maximum upload size is 100MB.",
+        "max_size_mb": 100
+    }), 413
+
 # Register Blueprints
 app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
 app.register_blueprint(profile_bp, url_prefix="/api/v1/profile")
@@ -115,7 +131,7 @@ app.register_blueprint(chatbot_bp, url_prefix="/api/v1/chatbot")
 app.register_blueprint(customer_bp, url_prefix="/api/v1/customer")
 app.register_blueprint(image_search_bp, url_prefix="/api/v1/image-search")
 app.register_blueprint(supply_chain_bp, url_prefix="/api/v1/supply-chain")
-
+app.register_blueprint(shop_owner_bp, url_prefix="/api/v1/shop_owner")
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
@@ -284,7 +300,10 @@ if __name__ == "__main__":
             from utils.export_data import fetch_rag_data
             data = fetch_rag_data()
             rag_service.load_from_memory(data, BASE_DIR)
-
+        try:
+            print(f"[ShopRAG] base_dir: {shop_rag_service_singleton.base_dir}")
+        except Exception as e:
+            print(f"[ShopRAG] init failed: {e}")
         rag_pipeline.init_app(app)
     
     with app.app_context():

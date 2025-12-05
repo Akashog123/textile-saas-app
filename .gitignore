@@ -49,8 +49,14 @@ ENV/
 
 # SQLite database files
 *.db
+*.db-shm
+*.db-wal
 backend/instance/*.db
 backend/se_textile.db
+
+# RAG / ML files
+*.bin
+*.pkl
 
 # Cypress
 /cypress/videos/

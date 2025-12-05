@@ -76,8 +76,8 @@ class Config:
     PASSWORD_REQUIRE_NUMBER = os.getenv("PASSWORD_REQUIRE_NUMBER", "True").lower() == "true"
 
     # FILE LIMITS & FORMATS
-    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH_MB", 16)) * 1024 * 1024
-    ALLOWED_EXTENSIONS = {"csv", "xlsx", "png", "jpg", "jpeg", "pdf"}
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH_MB", 100)) * 1024 * 1024  # 100MB for ZIP uploads
+    ALLOWED_EXTENSIONS = {"csv", "xlsx", "png", "jpg", "jpeg", "pdf", "zip"}
 
     # FLASK ENVIRONMENT SETTINGS
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
