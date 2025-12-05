@@ -22,7 +22,7 @@
         <div v-if="!editMode">
           <div class="d-flex justify-content-between align-items-center mb-4">
             <h6 class="mb-0">Profile Information</h6>
-            <button class="btn btn-primary" @click="enableEditMode">
+            <button class="btn btn-gradient" @click="enableEditMode">
               <i class="bi bi-pencil me-1"></i>Edit Profile
             </button>
           </div>
@@ -78,7 +78,7 @@
         <div v-else>
           <div class="d-flex justify-content-between align-items-center mb-4">
             <h6 class="mb-0">Edit Profile</h6>
-            <button class="btn btn-outline-secondary" @click="cancelEdit">
+            <button class="btn btn-outline-gradient" @click="cancelEdit">
               <i class="bi bi-x me-1"></i>Cancel
             </button>
           </div>
@@ -138,7 +138,7 @@
 
             <div class="col-12">
               <button
-                class="btn btn-primary me-2"
+                class="btn btn-gradient me-2"
                 @click="saveProfile"
                 :disabled="saving"
               >

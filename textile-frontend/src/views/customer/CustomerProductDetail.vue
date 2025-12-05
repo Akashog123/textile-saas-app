@@ -10,7 +10,7 @@
     <div v-else-if="error" class="error-container">
       <i class="bi bi-exclamation-triangle fs-1 text-warning"></i>
       <h4 class="mt-3">{{ error }}</h4>
-      <button class="btn btn-primary mt-3" @click="fetchProductDetails">
+      <button class="btn btn-gradient mt-3" @click="fetchProductDetails">
         <i class="bi bi-arrow-clockwise me-2"></i> Try Again
       </button>
     </div>
@@ -155,11 +155,11 @@
             
             <!-- Actions -->
             <div class="product-actions">
-              <button class="btn btn-lg btn-outline-primary" @click="toggleWishlist">
+              <button class="btn btn-lg btn-outline-gradient" @click="toggleWishlist">
                 <i class="bi" :class="isWishlisted ? 'bi-heart-fill' : 'bi-heart'"></i>
                 {{ isWishlisted ? 'Saved' : 'Save' }}
               </button>
-              <button class="btn btn-lg btn-primary flex-1" @click="contactShop">
+              <button class="btn btn-lg btn-gradient flex-1" @click="contactShop">
                 <i class="bi bi-chat-dots me-2"></i>
                 Contact Shop
               </button>
@@ -687,22 +687,6 @@ onMounted(() => {
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   border-radius: 12px;
-}
-
-.product-actions .btn-outline-primary {
-  border: 2px solid var(--color-border, #e2e8f0);
-  color: var(--text-primary, #1e293b);
-}
-
-.product-actions .btn-outline-primary:hover,
-.product-actions .btn-outline-primary .bi-heart-fill {
-  color: #ef4444;
-  border-color: #ef4444;
-}
-
-.product-actions .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary, #6366f1), var(--color-accent, #8b5cf6));
-  border: none;
 }
 
 .flex-1 {

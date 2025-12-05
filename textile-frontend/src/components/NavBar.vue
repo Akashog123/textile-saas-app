@@ -376,33 +376,6 @@ const userRole = computed(() => props.user?.role || '')
 }
 
 /* Buttons */
-.btn-animate {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  padding: 0.6rem 1.5rem;
-  border-radius: 50px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  background: var(--gradient-primary);
-  border: none;
-  color: white;
-}
-
-.btn-animate:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
-}
-
-.btn-animate i {
-  transition: transform 0.3s ease;
-}
-
-.btn-animate:hover i {
-  transform: translateX(4px);
-}
-
 /* Mobile Toggler */
 .navbar-toggler {
   border: none;

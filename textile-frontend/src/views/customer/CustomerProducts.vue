@@ -47,6 +47,7 @@
             <option value="500-1000">₹500 - ₹1,000</option>
             <option value="1000-2000">₹1,000 - ₹2,000</option>
             <option value="2000+">₹2,000+</option>
+            <option v-if="filters.priceRange === 'custom'" value="custom">Custom Range</option>
           </select>
         </div>
         
@@ -91,16 +92,19 @@
     <div v-else-if="error" class="error-container">
       <i class="bi bi-exclamation-triangle"></i>
       <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="fetchProducts">Try Again</button>
+      <button class="btn btn-gradient" @click="fetchProducts">Try Again</button>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="products.length === 0" class="empty-state">
-      <i class="bi bi-search"></i>
-      <h4>No products found</h4>
-      <p>Try adjusting your filters or search terms</p>
-      <button class="btn btn-primary" @click="clearFilters">Clear Filters</button>
-    </div>
+    <EmptyState
+      v-else-if="products.length === 0"
+      icon="bi-search"
+      title="No products found"
+      message="Try adjusting your filters or search terms"
+      action-text="Clear Filters"
+      action-icon="bi-x-lg"
+      @action="clearFilters"
+    />
 
     <!-- Products Grid -->
     <div v-else class="products-grid">
@@ -118,7 +122,7 @@
     <!-- Pagination -->
     <div v-if="products.length > 0 && pagination.totalPages > 1" class="pagination-container">
       <button 
-        class="btn btn-outline-primary"
+        class="btn btn-outline-gradient"
         :disabled="pagination.page <= 1"
         @click="goToPage(pagination.page - 1)"
       >
@@ -138,7 +142,7 @@
       </div>
       
       <button 
-        class="btn btn-outline-primary"
+        class="btn btn-outline-gradient"
         :disabled="pagination.page >= pagination.totalPages"
         @click="goToPage(pagination.page + 1)"
       >
@@ -149,7 +153,7 @@
     <!-- Load More Button (Alternative) -->
     <div v-if="products.length > 0 && hasMoreProducts && !pagination.totalPages" class="text-center mt-4">
       <button 
-        class="btn btn-outline-primary btn-load-more" 
+        class="btn btn-outline-gradient btn-load-more" 
         @click="loadMore"
         :disabled="loadingMore"
       >
@@ -170,6 +174,7 @@ import { browseProducts, getCategories, searchShopsAndProducts, searchByImage, g
 import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ProductCard from '@/components/cards/ProductCard.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const router = useRouter();
 
@@ -243,6 +248,9 @@ const applyPriceFilter = () => {
     case '2000+':
       filters.min_price = 2000;
       filters.max_price = null;
+      break;
+    case 'custom':
+      // Do not reset values if custom is selected (it's set programmatically)
       break;
     default:
       filters.min_price = null;
@@ -351,7 +359,8 @@ const goToPage = (page) => {
 /**
  * Handle search from search bar
  */
-const handleSearch = async (query) => {
+const handleSearch = async (queryInput) => {
+  const query = typeof queryInput === 'string' ? queryInput : (queryInput?.query || '');
   searchQuery.value = query;
   pagination.page = 1;
   
@@ -496,8 +505,19 @@ const viewShopDetails = (shop) => {
  * Add to wishlist
  */
 const addToWishlist = (product) => {
-  // TODO: Implement wishlist functionality
-  showSuccessNotification(`${product.name} added to wishlist`);
+  try {
+    const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+    if (!wishlist.find(p => p.id === product.id)) {
+      wishlist.push(product);
+      localStorage.setItem('wishlist', JSON.stringify(wishlist));
+      showSuccessNotification(`${product.name} added to wishlist`);
+    } else {
+      showSuccessNotification(`${product.name} is already in your wishlist`);
+    }
+  } catch (e) {
+    console.error('Error adding to wishlist', e);
+    showErrorNotification('Could not add to wishlist');
+  }
 };
 
 /**
@@ -517,7 +537,7 @@ const normalizeProducts = (rawProducts) => {
     in_stock: p.in_stock ?? (p.stock_qty > 0),
     stock_qty: p.stock_qty || p.quantity || 0,
     is_trending: p.is_trending || false,
-    similarity_score: p.similarity_score || null,
+    similarity_score: p.similarity_score || p.relevance_score || null,
     distance: p.distance || null
   }));
 };
@@ -556,10 +576,124 @@ watch(searchQuery, (newVal) => {
   }
 });
 
+// Check for image search results from sessionStorage
+const checkImageSearchResults = () => {
+  const imageSearchQuery = router.currentRoute.value.query.imageSearch;
+  
+  if (imageSearchQuery === 'true') {
+    const storedResults = sessionStorage.getItem('imageSearchResults');
+    const timestamp = sessionStorage.getItem('imageSearchTimestamp');
+    
+    // Only use results if they're recent (within 60 seconds)
+    if (storedResults && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
+      if (age < 60000) {
+        try {
+          const results = JSON.parse(storedResults);
+          products.value = normalizeProducts(results);
+          totalProducts.value = products.value.length;
+          searchQuery.value = 'Visual Search Results';
+          hasMoreProducts.value = false;
+          showSuccessNotification(`Found ${products.value.length} similar products`);
+          
+          // Clean up
+          sessionStorage.removeItem('imageSearchResults');
+          sessionStorage.removeItem('imageSearchTimestamp');
+          return true;
+        } catch (e) {
+          console.error('Failed to parse image search results:', e);
+        }
+      }
+    }
+    
+    // Clean up stale data
+    sessionStorage.removeItem('imageSearchResults');
+    sessionStorage.removeItem('imageSearchTimestamp');
+  }
+  return false;
+};
+
+// Check for voice search results from sessionStorage
+const checkVoiceSearchResults = () => {
+  const voiceSearchQuery = router.currentRoute.value.query.voiceSearch;
+  
+  if (voiceSearchQuery === 'true') {
+    const storedResults = sessionStorage.getItem('voiceSearchResults');
+    
+    if (storedResults) {
+      try {
+        const { transcript, products: voiceProducts, filters: voiceFilters, timestamp } = JSON.parse(storedResults);
+        
+        // Only use results if they're recent (within 60 seconds)
+        const age = Date.now() - timestamp;
+        if (age < 60000 && voiceProducts && voiceProducts.length > 0) {
+          products.value = normalizeProducts(voiceProducts);
+          totalProducts.value = products.value.length;
+          searchQuery.value = transcript || 'Voice Search Results';
+          
+          // Apply extracted filters
+          if (voiceFilters) {
+            if (voiceFilters.min_price !== undefined) filters.min_price = voiceFilters.min_price;
+            if (voiceFilters.max_price !== undefined) filters.max_price = voiceFilters.max_price;
+            
+            // Try to match price range dropdown
+            // Treat null min_price as 0 for comparison
+            const minP = filters.min_price || 0;
+            const maxP = filters.max_price;
+            
+            if (minP === 0 && maxP === 500) filters.priceRange = '0-500';
+            else if (minP === 500 && maxP === 1000) filters.priceRange = '500-1000';
+            else if (minP === 1000 && maxP === 2000) filters.priceRange = '1000-2000';
+            else if (minP === 2000 && maxP === null) filters.priceRange = '2000+';
+            else if (maxP === 1000 && minP === 0) filters.priceRange = '0-1000'; 
+            else filters.priceRange = 'custom'; // Custom range
+
+            // Try to extract category from transcript if not provided
+            if (categories.value.length > 0) {
+              const lowerTranscript = (transcript || '').toLowerCase();
+              // Get category names, handling both string and object formats
+              const categoryNames = categories.value.map(cat => 
+                typeof cat === 'string' ? cat : (cat.name || '')
+              ).filter(name => name);
+              // Sort categories by length (descending) to match longest phrases first
+              const sortedCats = [...categoryNames].sort((a, b) => b.length - a.length);
+              
+              const matchedCategory = sortedCats.find(cat => 
+                lowerTranscript.includes(cat.toLowerCase())
+              );
+              
+              if (matchedCategory) {
+                filters.category = matchedCategory;
+              }
+            }
+          }
+
+          hasMoreProducts.value = false;
+          showSuccessNotification(`Found ${products.value.length} products for "${transcript}"`);
+          
+          // Clean up
+          sessionStorage.removeItem('voiceSearchResults');
+          return true;
+        }
+      } catch (e) {
+        console.error('Failed to parse voice search results:', e);
+      }
+    }
+    
+    // Clean up stale data
+    sessionStorage.removeItem('voiceSearchResults');
+  }
+  return false;
+};
+
 // Initialize on mount
-onMounted(() => {
-  fetchCategories();
-  fetchProducts();
+onMounted(async () => {
+  await fetchCategories();
+  
+  // Check for image search results first, then voice search
+  if (!checkImageSearchResults() && !checkVoiceSearchResults()) {
+    fetchProducts();
+  }
 });
 </script>
 
@@ -871,34 +1005,6 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--color-primary, #4A90E2) 0%, var(--color-accent, #63B3ED) 100%);
-  border: none;
-  color: white;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
-}
-
-.btn-outline-primary {
-  border: 2px solid var(--color-primary, #4A90E2);
-  color: var(--color-primary, #4A90E2);
-  background: white;
-}
-
-.btn-outline-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--color-primary, #4A90E2) 0%, var(--color-accent, #63B3ED) 100%);
-  color: white;
-  border-color: transparent;
-}
-
-.btn-outline-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .btn-load-more {

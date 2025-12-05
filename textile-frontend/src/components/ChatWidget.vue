@@ -188,7 +188,7 @@ const sendMessage = async () => {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: var(--gradient-primary);
   color: white;
   border: none;
   font-size: 24px;
@@ -232,7 +232,7 @@ const sendMessage = async () => {
 
 /* Header */
 .chat-header {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: var(--gradient-primary);
   color: white;
   padding: 16px 20px;
   display: flex;
@@ -284,7 +284,7 @@ const sendMessage = async () => {
 
 /* User Bubble - Matches Gradient */
 .user .message-bubble {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: var(--gradient-primary);
   color: white;
   border-bottom-right-radius: 4px;
 }
@@ -292,17 +292,23 @@ const sendMessage = async () => {
 /* Bot Bubble - Clean White */
 .bot .message-bubble {
   background: white;
-  color: #333;
+  color: #333333;
   border: 1px solid rgba(0,0,0,0.05);
   border-bottom-left-radius: 4px;
 }
 
 /* Markdown Styling */
-.message-bubble :deep(p) { margin-bottom: 6px; }
+.message-bubble :deep(p),
+.message-bubble :deep(span),
+.message-bubble :deep(li),
+.message-bubble :deep(div) { 
+  margin-bottom: 6px; 
+  color: inherit;
+}
 .message-bubble :deep(p:last-child) { margin-bottom: 0; }
-.message-bubble :deep(strong) { font-weight: 700; }
-.message-bubble :deep(ul) { margin: 5px 0; padding-left: 20px; }
-.message-bubble :deep(a) { color: inherit; text-decoration: underline; }
+.message-bubble :deep(strong) { font-weight: 700; color: inherit; }
+.message-bubble :deep(ul) { margin: 5px 0; padding-left: 20px; color: inherit; }
+.message-bubble :deep(a) { color: var(--color-primary); text-decoration: underline; }
 
 /* Footer & Input (Matches search-input-group) */
 .chat-footer {

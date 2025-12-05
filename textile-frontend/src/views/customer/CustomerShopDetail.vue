@@ -10,7 +10,7 @@
     <div v-else-if="error" class="error-container">
       <i class="bi bi-exclamation-triangle fs-1 text-warning"></i>
       <h4 class="mt-3">{{ error }}</h4>
-      <button class="btn btn-primary mt-3" @click="fetchShopDetails">
+      <button class="btn btn-gradient mt-3" @click="fetchShopDetails">
         <i class="bi bi-arrow-clockwise me-2"></i> Try Again
       </button>
     </div>
@@ -44,10 +44,10 @@
             </p>
           </div>
           <div class="shop-actions">
-            <button class="btn btn-outline-light" @click="showOnMap">
+            <button class="btn btn-outline-gradient" @click="showOnMap">
               <i class="bi bi-map me-1"></i> View on Map
             </button>
-            <button class="btn btn-light" @click="getDirections">
+            <button class="btn btn-gradient" @click="getDirections">
               <i class="bi bi-signpost-split me-1"></i> Directions
             </button>
           </div>
@@ -127,7 +127,7 @@
                 </h3>
                 <button 
                   v-if="isAuthenticated"
-                  class="btn btn-outline-primary btn-sm" 
+                  class="btn btn-outline-gradient btn-sm" 
                   @click="openReviewModal()"
                 >
                   <i class="bi bi-star me-1"></i> Write Review
@@ -206,9 +206,9 @@
             <div class="sidebar-card">
               <h4 class="sidebar-title">Contact Information</h4>
               <div class="contact-info">
-                <div class="contact-item" v-if="shop.phone">
+                <div class="contact-item" v-if="shop.contact">
                   <i class="bi bi-telephone-fill"></i>
-                  <a :href="'tel:' + shop.phone">{{ shop.phone }}</a>
+                  <a :href="'tel:' + shop.contact">{{ shop.contact }}</a>
                 </div>
                 <div class="contact-item" v-if="shop.email">
                   <i class="bi bi-envelope-fill"></i>
@@ -218,6 +218,13 @@
                   <i class="bi bi-globe"></i>
                   <a :href="shop.website" target="_blank">Visit Website</a>
                 </div>
+                <div class="contact-item" v-if="shop.address">
+                  <i class="bi bi-geo-alt-fill"></i>
+                  <span>{{ shop.address }}<span v-if="shop.city">, {{ shop.city }}</span></span>
+                </div>
+                <p v-if="!shop.contact && !shop.email && !shop.website && !shop.address" class="text-muted mb-0">
+                  No contact information available
+                </p>
               </div>
             </div>
             
@@ -233,7 +240,7 @@
                 :show-legend="false"
                 @shop-selected="() => {}"
               />
-              <button class="btn btn-outline-primary btn-sm w-100 mt-2" @click="getDirections">
+              <button class="btn btn-outline-gradient btn-sm w-100 mt-2" @click="getDirections">
                 <i class="bi bi-signpost-split me-1"></i> Get Directions
               </button>
             </div>
@@ -275,7 +282,7 @@
                 <h3 class="product-name">{{ quickViewProduct.name }}</h3>
                 <p class="product-price">{{ formatPrice(quickViewProduct.price) }}</p>
                 <p class="product-description">{{ quickViewProduct.description }}</p>
-                <button class="btn btn-primary w-100" @click="viewProduct(quickViewProduct)">
+                <button class="btn btn-gradient w-100" @click="viewProduct(quickViewProduct)">
                   View Full Details
                 </button>
               </div>
@@ -353,7 +360,7 @@
                   <button type="button" class="btn btn-outline-secondary" @click="closeReviewModal">
                     Cancel
                   </button>
-                  <button type="submit" class="btn btn-primary" :disabled="reviewSubmitting">
+                  <button type="submit" class="btn btn-gradient" :disabled="reviewSubmitting">
                     <span v-if="reviewSubmitting">
                       <span class="spinner-border spinner-border-sm me-1"></span>
                       {{ isEditingReview ? 'Updating...' : 'Submitting...' }}
@@ -538,8 +545,13 @@ const fetchShopDetails = async () => {
   
   try {
     const response = await getShopDetails(props.shopId || route.params.shopId)
-    if (response.data?.shop) {
-      shop.value = response.data.shop
+    console.log('Shop API response:', response)
+    console.log('response.data:', response.data)
+    // API returns { status, data: { shop } } structure
+    const shopData = response.data?.data?.shop || response.data?.shop
+    console.log('Extracted shopData:', shopData)
+    if (shopData) {
+      shop.value = shopData
     } else {
       throw new Error('Shop not found')
     }
@@ -561,10 +573,12 @@ const fetchReviews = async () => {
   reviewsLoading.value = true
   try {
     const response = await getShopReviews(shopId)
-    if (response.data) {
-      reviews.value = response.data.reviews || []
-      avgRating.value = response.data.avgRating || 0
-      reviewCount.value = response.data.reviewCount || reviews.value.length
+    // API returns { status, reviews, avgRating, reviewCount } directly
+    const data = response.data?.data || response.data
+    if (data) {
+      reviews.value = data.reviews || []
+      avgRating.value = data.avgRating || 0
+      reviewCount.value = data.reviewCount || reviews.value.length
     }
   } catch (err) {
     console.error('Failed to fetch reviews:', err)
@@ -813,7 +827,6 @@ onMounted(async () => {
   align-items: flex-end;
   gap: 1.5rem;
   padding: 0 2rem;
-  margin-top: -80px;
 }
 
 .shop-avatar {
@@ -823,6 +836,9 @@ onMounted(async () => {
   overflow: hidden;
   border: 4px solid white;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  margin-top: -70px; /* Pull avatar up to overlap cover */
+  z-index: 2;
+  background: white;
 }
 
 .shop-avatar img {

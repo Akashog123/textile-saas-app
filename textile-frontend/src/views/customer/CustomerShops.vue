@@ -112,7 +112,7 @@
     <div v-else-if="error" class="error-container">
       <i class="bi bi-exclamation-triangle"></i>
       <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="fetchShops">Try Again</button>
+      <button class="btn btn-gradient" @click="fetchShops">Try Again</button>
     </div>
 
     <!-- Content Area -->
@@ -132,12 +132,15 @@
 
       <!-- Shops List -->
       <div v-if="viewMode !== 'map'" class="shops-list-section" :class="{ 'full-width': viewMode === 'list' }">
-        <div v-if="shops.length === 0" class="empty-state">
-          <i class="bi bi-shop"></i>
-          <h4>No shops found</h4>
-          <p>Try adjusting your filters or search terms</p>
-          <button class="btn btn-primary" @click="clearFilters">Clear Filters</button>
-        </div>
+        <EmptyState
+          v-if="shops.length === 0"
+          icon="bi-shop"
+          title="No shops found"
+          message="Try adjusting your filters or search terms"
+          action-text="Clear Filters"
+          action-icon="bi-x-lg"
+          @action="clearFilters"
+        />
         
         <div v-else class="shops-grid">
           <ShopCard
@@ -153,7 +156,7 @@
         <!-- Pagination -->
         <div v-if="pagination.totalPages > 1" class="pagination-container">
           <button 
-            class="btn btn-outline-primary"
+            class="btn btn-outline-gradient"
             :disabled="pagination.page <= 1"
             @click="goToPage(pagination.page - 1)"
           >
@@ -165,7 +168,7 @@
           </span>
           
           <button 
-            class="btn btn-outline-primary"
+            class="btn btn-outline-gradient"
             :disabled="pagination.page >= pagination.totalPages"
             @click="goToPage(pagination.page + 1)"
           >
@@ -185,6 +188,7 @@ import { handleApiError, showErrorNotification, showSuccessNotification } from '
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ShopCard from '@/components/cards/ShopCard.vue';
 import ShopLocatorMap from '@/components/ShopLocatorMap.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const router = useRouter();
 
@@ -253,11 +257,12 @@ const fetchShops = async () => {
     if (searchQuery.value) params.search = searchQuery.value;
     
     const response = await getAllShops(params);
+    const responseData = response.data?.data || response.data;
     
-    if (response.data && response.data.shops) {
-      shops.value = normalizeShops(response.data.shops);
-      totalShops.value = response.data.total || shops.value.length;
-      pagination.totalPages = response.data.pages || 0;
+    if (responseData && responseData.shops) {
+      shops.value = normalizeShops(responseData.shops);
+      totalShops.value = responseData.total || shops.value.length;
+      pagination.totalPages = responseData.pages || 0;
       
       // Update map center based on first shop with coordinates
       const firstShopWithCoords = shops.value.find(s => s.lat && s.lng);
@@ -278,7 +283,8 @@ const fetchShops = async () => {
 /**
  * Handle search from search bar
  */
-const handleSearch = async (query) => {
+const handleSearch = async (queryInput) => {
+  const query = typeof queryInput === 'string' ? queryInput : (queryInput?.query || '');
   searchQuery.value = query;
   pagination.page = 1;
   
@@ -298,10 +304,11 @@ const handleSearch = async (query) => {
       min_rating: filters.minRating || undefined,
       limit: pagination.perPage
     });
+    const searchData = response.data?.data || response.data;
     
-    if (response.data && response.data.shops) {
-      shops.value = normalizeShops(response.data.shops);
-      totalShops.value = response.data.total_shops || shops.value.length;
+    if (searchData && searchData.shops) {
+      shops.value = normalizeShops(searchData.shops);
+      totalShops.value = searchData.total_shops || shops.value.length;
     }
   } catch (err) {
     const errorMessage = handleApiError(err, 'Search');
@@ -344,9 +351,10 @@ const handleNearbySearch = async (location) => {
       radius: 10, // 10km radius
       limit: 50
     });
+    const nearbyData = response.data?.data || response.data;
     
-    if (response.data && response.data.shops) {
-      shops.value = normalizeShops(response.data.shops);
+    if (nearbyData && nearbyData.shops) {
+      shops.value = normalizeShops(nearbyData.shops);
       totalShops.value = shops.value.length;
       
       // Sort by distance
@@ -436,8 +444,8 @@ const normalizeShops = (rawShops) => {
     rating: s.rating ?? s.average_rating ?? 4,
     review_count: s.review_count || 0,
     image: s.image_url || s.logo || getPlaceholderImage(s.name),
-    lat: parseFloat(s.latitude) || s.lat || null,
-    lng: parseFloat(s.longitude) || s.lng || null,
+    lat: s.lat || parseFloat(s.latitude) || null,
+    lng: s.lon || s.lng || parseFloat(s.longitude) || null,
     distance: s.distance || null,
     product_count: s.product_count || 0,
     is_verified: s.is_verified || false,
@@ -790,34 +798,6 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--color-primary, #4A90E2) 0%, var(--color-accent, #63B3ED) 100%);
-  border: none;
-  color: white;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.35);
-}
-
-.btn-outline-primary {
-  border: 2px solid var(--color-primary, #4A90E2);
-  color: var(--color-primary, #4A90E2);
-  background: white;
-}
-
-.btn-outline-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--color-primary, #4A90E2) 0%, var(--color-accent, #63B3ED) 100%);
-  color: white;
-  border-color: transparent;
-}
-
-.btn-outline-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Responsive Design */
