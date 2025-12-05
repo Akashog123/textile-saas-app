@@ -506,13 +506,6 @@
                         <small class="text-muted">{{ products.length }} item(s) to reorder</small>
                       </div>
                     </div>
-                    <button 
-                      class="btn btn-sm btn-primary d-flex align-items-center"
-                      @click="reorderFromDistributor(distributorName, products)"
-                    >
-                      <i class="bi bi-cart-plus me-2"></i>
-                      Order All
-                    </button>
                   </div>
                 </div>
                 
@@ -1653,13 +1646,6 @@ const viewForecastDetails = (forecast) => {
 const viewAllSuggestions = () => {
   toastMessage.value = 'Loading all suggestions...';
   toastIcon.value = 'bi bi-grid-3x3-gap';
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
-};
-
-const reorderFromDistributor = (distributorName, products) => {
-  toastMessage.value = `Reordering ${products.length} items from ${distributorName}`;
-  toastIcon.value = 'bi bi-cart-check-fill';
   showToast.value = true;
   setTimeout(() => (showToast.value = false), 3000);
 };
