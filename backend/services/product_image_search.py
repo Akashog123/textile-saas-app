@@ -9,18 +9,23 @@ This service:
 """
 
 import os
-import io
 import json
 import time
+import math
 import numpy as np
-import requests
 from PIL import Image
-from typing import Dict, List, Optional, Any, Tuple
-from flask import current_app
+from typing import Dict, Optional, Any
+
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
 
 from config import Config
-from models.model import db, Product, ProductImage, Shop
+from models.model import Product, ProductImage, db
 from utils.image_utils import get_image_url
+from services.nvidia_embedding_service import create_image_embedding_service
 
 # Paths
 EMBEDDINGS_DIR = os.path.join(Config.BASE_DIR, "instance", "embeddings")
@@ -30,8 +35,23 @@ METADATA_FILE = os.path.join(EMBEDDINGS_DIR, "product_metadata.json")
 os.makedirs(EMBEDDINGS_DIR, exist_ok=True)
 
 # Feature extraction settings
-IMAGE_SIZE = (64, 64)  # Resize to this for feature extraction
-EMBEDDING_DIM = IMAGE_SIZE[0] * IMAGE_SIZE[1] * 3  # 12288 for 64x64 RGB
+# NVIDIA NVCLIP uses 1024 dimensions
+EMBEDDING_DIM = 1024 
+
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in km."""
+    try:
+        R = 6371  # Earth radius in km
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat / 2) * math.sin(dlat / 2) + \
+            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
+            math.sin(dlon / 2) * math.sin(dlon / 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return R * c
+    except Exception:
+        return float('inf')
 
 
 class ProductImageSearchService:
@@ -53,6 +73,11 @@ class ProductImageSearchService:
         self.product_ids = []   # List of product IDs
         self.image_ids = []     # List of ProductImage IDs  
         self.image_urls = []    # List of image URLs
+        self.index = None       # FAISS index
+        
+        # Initialize NVIDIA/Hybrid Embedding Service
+        self.embedding_service = create_image_embedding_service(use_cloud=True)
+        
         self._initialized = True
         
         # Try to load existing embeddings
@@ -60,59 +85,41 @@ class ProductImageSearchService:
     
     def _extract_features(self, image: Image.Image) -> np.ndarray:
         """
-        Extract feature vector from PIL Image.
-        Uses color histogram features for lightweight processing.
+        Extract feature vector from PIL Image using NVIDIA/Hybrid service.
         """
-        # Convert to RGB and resize
-        image = image.convert("RGB").resize(IMAGE_SIZE)
-        
-        # Method 1: Flattened pixel values (simple but effective)
-        pixels = np.array(image, dtype=np.float32).flatten()
-        
-        # Normalize to [0, 1]
-        pixels = pixels / 255.0
-        
-        # L2 normalize for cosine similarity
-        norm = np.linalg.norm(pixels)
-        if norm > 0:
-            pixels = pixels / norm
-        
-        return pixels.astype(np.float32)
+        embedding = self.embedding_service.encode_image(image)
+        if embedding is None:
+            # Fallback to zero vector if extraction fails
+            return np.zeros(EMBEDDING_DIM, dtype=np.float32)
+        return embedding
     
     def _extract_features_from_bytes(self, img_bytes: bytes) -> Optional[np.ndarray]:
         """Extract features from image bytes."""
-        try:
-            image = Image.open(io.BytesIO(img_bytes))
-            return self._extract_features(image)
-        except Exception as e:
-            print(f"[ProductImageSearch] Failed to extract features: {e}")
-            return None
+        return self.embedding_service.encode_image_bytes(img_bytes)
     
     def _extract_features_from_url(self, url: str) -> Optional[np.ndarray]:
         """Extract features from image URL."""
-        try:
-            # Handle local URLs
-            if url.startswith('/uploads/') or url.startswith('uploads/'):
-                local_path = os.path.join(Config.BASE_DIR, url.lstrip('/'))
-                if os.path.exists(local_path):
+        # Handle local file paths (e.g., 'uploads/product_images/...')
+        if not url.startswith(('http://', 'https://')):
+            # Remove leading slash if present
+            clean_path = url.lstrip('/')
+            
+            # Construct absolute path
+            local_path = os.path.join(Config.BASE_DIR, clean_path)
+            
+            if os.path.exists(local_path):
+                try:
                     with open(local_path, 'rb') as f:
-                        return self._extract_features_from_bytes(f.read())
-            
-            # Handle full URLs
-            if url.startswith('http'):
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                return self._extract_features_from_bytes(response.content)
-            
-            # Try as local path
-            if os.path.exists(url):
-                with open(url, 'rb') as f:
-                    return self._extract_features_from_bytes(f.read())
-            
-            return None
-        except Exception as e:
-            print(f"[ProductImageSearch] Failed to fetch image from {url}: {e}")
-            return None
+                        return self.embedding_service.encode_image_bytes(f.read())
+                except Exception as e:
+                    print(f"[ProductImageSearch] Failed to read local file {local_path}: {e}")
+                    return None
+            else:
+                print(f"[ProductImageSearch] Local file not found: {local_path}")
+                return None
+
+        # Handle actual URLs
+        return self.embedding_service.encode_image_url(url)
     
     def _load_embeddings(self) -> bool:
         """Load embeddings from file."""
@@ -123,7 +130,14 @@ class ProductImageSearchService:
         try:
             # Load embeddings
             data = np.load(EMBEDDINGS_FILE)
-            self.embeddings = data['embeddings']
+            loaded_embeddings = data['embeddings']
+            
+            # Check dimension compatibility
+            if loaded_embeddings.shape[1] != EMBEDDING_DIM:
+                print(f"[ProductImageSearch] Dimension mismatch (File: {loaded_embeddings.shape[1]}, Model: {EMBEDDING_DIM}). Rebuilding index...")
+                return False
+
+            self.embeddings = loaded_embeddings
             
             # Load metadata
             with open(METADATA_FILE, 'r') as f:
@@ -133,95 +147,122 @@ class ProductImageSearchService:
             self.image_ids = meta.get('image_ids', [])
             self.image_urls = meta.get('image_urls', [])
             
+            # Build FAISS index if available
+            if FAISS_AVAILABLE and self.embeddings is not None:
+                try:
+                    print(f"[ProductImageSearch] Building FAISS index for {len(self.embeddings)} images...")
+                    self.index = faiss.IndexFlatIP(EMBEDDING_DIM)
+                    # Ensure embeddings are normalized for cosine similarity
+                    # Note: self.embeddings is already a numpy array, but we need to make sure it's float32
+                    if self.embeddings.dtype != np.float32:
+                        self.embeddings = self.embeddings.astype(np.float32)
+                    
+                    # Normalize in place if possible, or copy
+                    faiss.normalize_L2(self.embeddings)
+                    self.index.add(self.embeddings)
+                    print("[ProductImageSearch] FAISS index built successfully")
+                except Exception as e:
+                    print(f"[ProductImageSearch] Failed to build FAISS index: {e}")
+                    self.index = None
+            
             print(f"[ProductImageSearch] Loaded {len(self.product_ids)} product embeddings")
             return True
         except Exception as e:
             print(f"[ProductImageSearch] Failed to load embeddings: {e}")
             return False
     
-    def _save_embeddings(self):
-        """Save embeddings to file."""
-        try:
-            np.savez_compressed(EMBEDDINGS_FILE, embeddings=self.embeddings)
-            
-            meta = {
-                'product_ids': self.product_ids,
-                'image_ids': self.image_ids,
-                'image_urls': self.image_urls,
-                'embedding_dim': EMBEDDING_DIM,
-                'updated_at': time.time()
-            }
-            with open(METADATA_FILE, 'w') as f:
-                json.dump(meta, f)
-            
-            print(f"[ProductImageSearch] Saved {len(self.product_ids)} embeddings")
-        except Exception as e:
-            print(f"[ProductImageSearch] Failed to save embeddings: {e}")
-    
     def build_index(self, force_rebuild: bool = False) -> Dict[str, Any]:
         """
-        Build embeddings index from ProductImage records.
-        
-        Returns:
-            Dict with build status and statistics
+        Build search index from database images.
         """
+        if not force_rebuild and self.embeddings is not None:
+            return {'success': True, 'message': 'Index already exists'}
+            
+        print("[ProductImageSearch] Building index from database...")
+        start_time = time.time()
+        
         result = {
             'success': False,
-            'products_processed': 0,
             'images_processed': 0,
+            'products_processed': 0,
             'errors': []
         }
         
-        # Check if rebuild needed
-        if not force_rebuild and self.embeddings is not None and len(self.product_ids) > 0:
-            result['success'] = True
-            result['message'] = 'Index already exists'
-            result['products_processed'] = len(set(self.product_ids))
-            result['images_processed'] = len(self.image_ids)
-            return result
-        
         try:
-            # Get all product images for active products
-            product_images = ProductImage.query.join(Product).filter(
+            # Fetch all product images
+            # Join with Product to ensure product is active
+            images = db.session.query(ProductImage).join(Product).filter(
                 Product.is_active == True
-            ).order_by(ProductImage.product_id, ProductImage.ordering).all()
+            ).all()
             
-            if not product_images:
-                result['message'] = 'No product images found'
+            if not images:
+                result['message'] = 'No product images found in database'
                 return result
             
-            print(f"[ProductImageSearch] Processing {len(product_images)} images...")
+            new_embeddings = []
+            new_product_ids = []
+            new_image_ids = []
+            new_image_urls = []
             
-            embeddings_list = []
-            self.product_ids = []
-            self.image_ids = []
-            self.image_urls = []
+            processed_count = 0
             
-            for i, img in enumerate(product_images):
-                if not img.url:
-                    continue
-                
-                # Extract features
-                features = self._extract_features_from_url(img.url)
-                if features is not None:
-                    embeddings_list.append(features)
-                    self.product_ids.append(img.product_id)
-                    self.image_ids.append(img.id)
-                    self.image_urls.append(img.url)
-                else:
-                    result['errors'].append(f"Failed to process image {img.id}")
-                
-                # Progress
-                if (i + 1) % 10 == 0:
-                    print(f"[ProductImageSearch] Processed {i + 1}/{len(product_images)}")
+            for img in images:
+                try:
+                    # Get image URL - handle both 'url' and 'image_url' attributes
+                    image_url = getattr(img, 'url', None) or getattr(img, 'image_url', None)
+                    
+                    if not image_url:
+                        continue
+                        
+                    # Extract features
+                    features = self._extract_features_from_url(image_url)
+                    
+                    if features is not None:
+                        new_embeddings.append(features)
+                        new_product_ids.append(img.product_id)
+                        new_image_ids.append(img.id)
+                        new_image_urls.append(image_url)
+                        processed_count += 1
+                        
+                        if processed_count % 10 == 0:
+                            print(f"[ProductImageSearch] Processed {processed_count} images...")
+                            
+                except Exception as e:
+                    print(f"[ProductImageSearch] Error processing image {img.id}: {e}")
             
-            if embeddings_list:
-                self.embeddings = np.vstack(embeddings_list).astype(np.float32)
-                self._save_embeddings()
+            if new_embeddings:
+                # Convert to numpy array
+                self.embeddings = np.array(new_embeddings, dtype=np.float32)
+                self.product_ids = new_product_ids
+                self.image_ids = new_image_ids
+                self.image_urls = new_image_urls
                 
+                # Save to disk
+                np.savez_compressed(EMBEDDINGS_FILE, embeddings=self.embeddings)
+                
+                with open(METADATA_FILE, 'w') as f:
+                    json.dump({
+                        'product_ids': self.product_ids,
+                        'image_ids': self.image_ids,
+                        'image_urls': self.image_urls
+                    }, f)
+                
+                # Rebuild FAISS index
+                if FAISS_AVAILABLE:
+                    try:
+                        self.index = faiss.IndexFlatIP(EMBEDDING_DIM)
+                        # Normalize in place if possible
+                        if self.embeddings.dtype != np.float32:
+                            self.embeddings = self.embeddings.astype(np.float32)
+                        faiss.normalize_L2(self.embeddings)
+                        self.index.add(self.embeddings)
+                    except Exception as e:
+                        print(f"[ProductImageSearch] Failed to rebuild FAISS index: {e}")
+                        self.index = None
+
                 result['success'] = True
-                result['products_processed'] = len(set(self.product_ids))
-                result['images_processed'] = len(self.image_ids)
+                result['products_processed'] = len(set(new_product_ids))
+                result['images_processed'] = len(new_image_ids)
                 result['message'] = f"Built index with {result['images_processed']} images from {result['products_processed']} products"
             else:
                 result['message'] = 'No valid embeddings generated'
@@ -277,21 +318,41 @@ class ProductImageSearchService:
             result['error'] = f'Image processing error: {str(e)}'
             return result
         
-        # Compute similarities (dot product of normalized vectors = cosine similarity)
-        similarities = self.embeddings @ query_features
-        
-        # Get top matches
-        top_indices = np.argsort(similarities)[::-1]
+        # Use FAISS if available
+        if self.index is not None:
+            # Normalize query
+            query_features = query_features.reshape(1, -1).astype(np.float32)
+            faiss.normalize_L2(query_features)
+            
+            # Search
+            # Fetch more to handle duplicate products
+            k = limit * 3
+            similarities, indices = self.index.search(query_features, k)
+            
+            top_indices = indices[0]
+            similarities = similarities[0]
+        else:
+            # Fallback to numpy
+            similarities = self.embeddings @ query_features
+            top_indices = np.argsort(similarities)[::-1]
         
         # Collect unique products
         seen_products = set()
         matches = []
         
-        for idx in top_indices:
+        for i, idx in enumerate(top_indices):
+            if idx < 0 or idx >= len(self.product_ids):
+                continue
+                
             if len(matches) >= limit:
                 break
             
-            similarity = float(similarities[idx])
+            # Handle FAISS vs Numpy similarity access
+            if self.index is not None:
+                similarity = float(similarities[i])
+            else:
+                similarity = float(similarities[idx])
+                
             if similarity < min_similarity:
                 continue
             
@@ -318,7 +379,8 @@ class ProductImageSearchService:
                 if product:
                     # Resolve image URL to full path for frontend
                     resolved_image = get_image_url(match['image_url'], product.id, "product")
-                    result['similar_products'].append({
+                    
+                    item = {
                         'id': product.id,
                         'name': product.name,
                         'category': product.category,
@@ -329,7 +391,9 @@ class ProductImageSearchService:
                         'matched_image': resolved_image,
                         'similarity_score': match['similarity'],
                         'shop': product.shop.to_card_dict() if product.shop else None
-                    })
+                    }
+                    
+                    result['similar_products'].append(item)
         
         result['search_time_ms'] = round((time.time() - start_time) * 1000, 2)
         return result
@@ -351,9 +415,9 @@ product_image_search = ProductImageSearchService()
 
 
 # Public API functions
-def search_products_by_image(image_file, limit: int = 20) -> Dict[str, Any]:
-    """Search for similar products by image."""
-    return product_image_search.search(image_file, limit=limit)
+def search_products_by_image(image_file, limit: int = 20, min_similarity: float = 0.85) -> Dict[str, Any]:
+    """Search for similar products by image with at least 75% similarity."""
+    return product_image_search.search(image_file, limit=limit, min_similarity=min_similarity)
 
 
 def rebuild_product_image_index() -> Dict[str, Any]:

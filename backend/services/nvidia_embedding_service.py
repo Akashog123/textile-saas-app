@@ -649,6 +649,15 @@ class HybridImageEmbeddingService:
             print(f"[Hybrid Image Embedding] File read error: {e}")
             return None
     
+    def encode_image_bytes(self, image_bytes: bytes) -> Optional[np.ndarray]:
+        """Encode image from bytes."""
+        try:
+            image = Image.open(io.BytesIO(image_bytes))
+            return self.encode_image(image)
+        except Exception as e:
+            print(f"[Hybrid Image Embedding] Bytes read error: {e}")
+            return None
+    
     def encode_image_url(self, url: str) -> Optional[np.ndarray]:
         """Encode image from URL."""
         try:
