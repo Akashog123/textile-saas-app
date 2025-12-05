@@ -62,15 +62,16 @@ def unified_search():
     
     # Search products
     if search_type in ['all', 'products']:
-        products = semantic_search_products(
+        search_result = semantic_search_products(
             query=query,
             category=category,
             min_price=min_price,
             max_price=max_price,
             limit=limit
         )
-        results['products'] = products
-        results['total_products'] = len(products)
+        results['products'] = search_result.get('products', [])
+        results['filters'] = search_result.get('filters', {})
+        results['total_products'] = len(results['products'])
     
     # Search shops
     if search_type in ['all', 'shops']:
