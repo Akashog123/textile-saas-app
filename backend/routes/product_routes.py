@@ -13,7 +13,7 @@ import pandas as pd
 product_bp = Blueprint("product", __name__)
 
 # GET: All Products (Dynamic + Filtered)
-@product_bp.route("/", methods=["GET"])
+@product_bp.route("", methods=["GET"])
 @performance_monitor
 def get_all_products():
     """

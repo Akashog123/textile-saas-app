@@ -572,9 +572,16 @@ const initVoiceSearch = async () => {
   }
   
   voiceManager.value.onAutoStop = () => {
-    console.log('[Voice] Auto-stopped due to silence')
+    console.log('[Voice] Auto-stopped due to timeout')
     stopRecordingTimer()
-    voiceTranscript.value = 'Transcribing...'
+    
+    if (isSpeechDetected.value) {
+      voiceTranscript.value = 'Transcribing...'
+    } else {
+      isVoiceRecording.value = false
+      voiceTranscript.value = ''
+      emit('error', { message: 'No speech detected', type: 'voice' })
+    }
   }
 }
 
@@ -621,8 +628,25 @@ const stopRecordingTimer = () => {
 const stopVoiceRecording = () => {
   if (voiceManager.value && isVoiceRecording.value) {
     stopRecordingTimer()
+    
+    // If already transcribing or processing, just close the UI (Cancel)
+    if (voiceTranscript.value === 'Transcribing...' || voiceTranscript.value === 'Processing...') {
+      isVoiceRecording.value = false
+      return
+    }
+    
+    // Check if we were speaking (VAD will trigger submission)
+    // If not speaking, we need to manually close as VAD won't trigger onSpeechEnd
+    const wasSpeaking = isSpeechDetected.value
+    
     voiceManager.value.stopRecording()
-    voiceTranscript.value = 'Processing...'
+    
+    if (wasSpeaking) {
+      voiceTranscript.value = 'Processing...'
+    } else {
+      isVoiceRecording.value = false
+      voiceTranscript.value = ''
+    }
   }
 }
 
@@ -639,6 +663,13 @@ const transcribeWithBackend = async (audioFile) => {
   
   try {
     const response = await findStoresWithAI({ voiceFile: audioFile })
+    
+    // Check if user cancelled (UI closed)
+    if (!isVoiceRecording.value) {
+      console.log('[Voice] Search cancelled by user')
+      return
+    }
+
     console.log('[Voice Search Response]', JSON.stringify(response.data, null, 2))
     
     // Backend returns: { status, transcript, products, filters, ... }
@@ -702,10 +733,7 @@ const handleVoiceSearch = async () => {
   
   if (isVoiceRecording.value) {
     // Stop current recording
-    stopRecordingTimer()
-    voiceManager.value.stopRecording()
-    voiceTranscript.value = 'Transcribing...'
-    // transcribeWithBackend will be called by onRecordingComplete
+    stopVoiceRecording()
     return
   }
   
