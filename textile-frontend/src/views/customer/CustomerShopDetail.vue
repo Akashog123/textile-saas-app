@@ -300,7 +300,7 @@
             <button class="btn-close-modal" @click="closeReviewModal">
               <i class="bi bi-x-lg"></i>
             </button>
-            <div class="modal-content">
+            <div class="review-form-container">
               <h4 class="modal-title mb-4">
                 {{ isEditingReview ? 'Edit Review' : 'Write a Review' }}
                 <small class="d-block text-muted mt-1">for {{ shop?.name }}</small>
@@ -787,6 +787,7 @@ onMounted(async () => {
 
 <style scoped>
 .shop-detail-page {
+  background: var(--gradient-bg);
   min-height: calc(100vh - 80px);
 }
 
@@ -1091,12 +1092,14 @@ onMounted(async () => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   padding: 1rem;
+  transition: all 0.3s ease;
 }
 
 .quick-view-modal {
@@ -1342,47 +1345,120 @@ onMounted(async () => {
 /* Review Modal Styles */
 .review-modal {
   background: white;
-  border-radius: 16px;
-  max-width: 500px;
-  width: 90%;
-  padding: 2rem;
+  border-radius: 24px;
+  max-width: 550px;
+  width: 95%;
+  padding: 2.5rem;
   position: relative;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalSlideUp 0.3s ease-out;
+}
+
+.review-modal .btn-close-modal {
+  background: var(--color-bg-alt, #f8fafc);
+  color: var(--color-text-muted, #64748b);
+  transition: all 0.2s ease;
+  top: 1.5rem;
+  right: 1.5rem;
+}
+
+.review-modal .btn-close-modal:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  transform: rotate(90deg);
 }
 
 .modal-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #333;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #1e293b);
+  letter-spacing: -0.025em;
+}
+
+.modal-title small {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 0.5rem;
 }
 
 .rating-select {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--color-bg-alt, #f8fafc);
+  border-radius: 16px;
+  margin-top: 0.5rem;
+  border: 1px solid var(--color-border, #e2e8f0);
 }
 
 .btn-rating {
   background: none;
   border: none;
-  padding: 0.5rem;
+  padding: 0;
   cursor: pointer;
-  font-size: 1.75rem;
-  color: #ddd;
-  transition: transform 0.2s ease, color 0.2s ease;
+  font-size: 2.5rem;
+  color: #cbd5e1;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .btn-rating:hover {
-  transform: scale(1.1);
+  transform: scale(1.2) rotate(5deg);
+  color: #fbbf24;
 }
 
-.btn-rating.active,
-.btn-rating.active i {
-  color: #ffc107;
+.btn-rating.active {
+  color: #fbbf24;
+  transform: scale(1.1);
+  filter: drop-shadow(0 4px 6px rgba(251, 191, 36, 0.3));
 }
 
 .btn-rating i {
   transition: color 0.2s ease;
+}
+
+.form-label {
+  font-weight: 600;
+  color: var(--color-text-dark, #1e293b);
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.form-control {
+  border: 2px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+  background-color: #fff;
+}
+
+.form-control:focus {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.form-control::placeholder {
+  color: #94a3b8;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ============================================================================

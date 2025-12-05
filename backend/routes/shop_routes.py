@@ -103,17 +103,17 @@ def shop_dashboard(current_user):
     actual_rating = round(shop.rating or 0.0, 1) if shop else 0.0
 
     sales_path = os.path.join(INSTANCE_FOLDER, f"sales_shop_{shop_id}.csv")
-
     df = _load_sales_dataframe(sales_path)
-    if df is None:
-        # Check if shop has any products in inventory
-        # Note: Product is already imported at the top of the file
-        product_count = Product.query.filter_by(shop_id=shop_id, is_active=True).count()
-        
+    
+    # Check if shop has any products in inventory
+    product_count = Product.query.filter_by(shop_id=shop_id, is_active=True).count()
+    has_inventory = product_count > 0
+
+    if df is None or not has_inventory:
         default_data = _default_dashboard_data()
         default_data["customer_rating"] = actual_rating
         
-        if product_count == 0:
+        if not has_inventory:
             info_message = "Welcome! Start by adding products to your inventory. Once you have products and sales, your dashboard analytics will appear here."
         else:
             info_message = f"You have {product_count} products in inventory. Upload sales data to see analytics, forecasts, and AI-powered recommendations."
@@ -142,7 +142,6 @@ def shop_dashboard(current_user):
         prev_sales = prev_week["revenue"].sum()
         growth = ((weekly_sales - prev_sales) / prev_sales * 100) if prev_sales > 0 else 0
         total_orders = len(df)
-        avg_order_value = weekly_sales / total_orders if total_orders else 0
 
         # Weekly Trend Chart
         trend_chart = (
@@ -246,7 +245,7 @@ def shop_dashboard(current_user):
         )
 
         # Generate Insights using helper
-        insights_data = _generate_insights(df, shop_id=shop_id)
+        insights_data = _generate_insights(df, shop_id=shop_id, has_inventory=True)
         
         return jsonify({
             "status": "success",
@@ -301,13 +300,22 @@ def shop_dashboard(current_user):
             # No warning - don't show error to user for unexpected issues
         }), 200
 
-def _generate_insights(df, shop_id=None, force_refresh=False):
+def _generate_insights(df, shop_id=None, force_refresh=False, has_inventory=True):
     """Helper to generate AI insights from sales dataframe.
     
     Caches insights in DB to avoid redundant AI API calls.
     Invalidated when new sales data is uploaded (force_refresh=True).
     """
     try:
+        # Check if inventory exists
+        if not has_inventory:
+            logging.info("[Insights] Skipping AI generation - no inventory data")
+            return {
+                "ai_insights": [],
+                "demand_summary": "Inventory data missing. Please add products to your inventory to enable AI insights.",
+                "recommendation": "Add products to your inventory to unlock AI-powered recommendations."
+            }
+
         # Check for cached insights first (unless force refresh requested)
         if shop_id and not force_refresh:
             try:
@@ -550,6 +558,7 @@ def upload_sales_data(current_user):
 
         # Process each row and update inventory
         stock_updates = []
+        matched_products_count = 0
         for _, row in df.iterrows():
             try:
                 sku = row.get("sku", "")
@@ -564,6 +573,8 @@ def upload_sales_data(current_user):
                 product = Product.query.filter_by(sku=sku, shop_id=shop_id).first()
                 if not product:
                     continue
+                
+                matched_products_count += 1
                 
                 # Get inventory record
                 inventory = Inventory.query.filter_by(product_id=product.id).first()
@@ -592,6 +603,10 @@ def upload_sales_data(current_user):
                         region=row.get("region")
                     )
                     db.session.add(sales_entry)
+
+                if inventory:
+                    # Track that we received sales data for this product
+                    inventory.last_sales_data_at = datetime.utcnow()
 
                 if not inventory or delta_qty == 0:
                     continue
@@ -624,8 +639,12 @@ def upload_sales_data(current_user):
         invalidate_shop_cache(shop_id)
         _invalidate_db_cache(shop_id)
         
+        # Check if shop has any products in inventory
+        product_count = Product.query.filter_by(shop_id=shop_id, is_active=True).count()
+        has_inventory = product_count > 0
+
         # Generate fresh AI Insights (force_refresh=True to bypass cache)
-        insights_data = _generate_insights(df, shop_id=shop_id, force_refresh=True)
+        insights_data = _generate_insights(df, shop_id=shop_id, force_refresh=True, has_inventory=has_inventory)
 
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         log_entry.rows_processed = len(df)
@@ -639,9 +658,14 @@ def upload_sales_data(current_user):
         
         print(f"[Sales Upload] Processed {len(stock_updates)} stock updates for shop {shop_id}")
         
+        warning_msg = None
+        if matched_products_count == 0 and len(df) > 0:
+            warning_msg = "Sales data uploaded, but no matching products found in inventory. Please upload inventory with matching SKUs to track stock and sales history."
+
         return jsonify({
             "status": "success", 
             "message": f"Sales data uploaded successfully! Updated stock for {len(stock_updates)} products.",
+            "warning": warning_msg,
             "stock_updates": stock_updates,
             "ai_insights": insights_data["ai_insights"],
             "demand_summary": insights_data["demand_summary"],

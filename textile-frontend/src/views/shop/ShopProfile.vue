@@ -360,24 +360,18 @@
                   <div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div>
-                        <small class="text-muted">Click map to set location or drag marker. You can also use 'Current location'.</small>
+                        <label class="form-label mb-0">Shop Location</label>
+                        <small class="text-muted d-block">Click on map to pin location</small>
                       </div>
-                      <div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" @click="useCurrentLocation">Current location</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" @click="clearShopCoords">Clear coords</button>
-                      </div>
+                      <button type="button" class="btn btn-sm btn-gradient d-flex align-items-center gap-2" @click="useCurrentLocation">
+                        <i class="bi bi-geo-alt-fill"></i> Use Current Location
+                      </button>
                     </div>
 
-                    <div id="shop-map" style="height:320px;border:1px solid #e9ecef;border-radius:8px;"></div>
-
-                    <div class="row mt-2">
-                      <div class="col-md-6">
-                        <label class="form-label">Latitude</label>
-                        <input v-model="editingShop.latitude" class="form-control" />
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label">Longitude</label>
-                        <input v-model="editingShop.longitude" class="form-control" />
+                    <div class="map-container-wrapper">
+                      <div id="shop-map" class="shop-map-container"></div>
+                      <div class="map-overlay-hint" v-if="!editingShop.latitude">
+                        <span><i class="bi bi-geo-alt"></i> Click to set location</span>
                       </div>
                     </div>
                   </div>
@@ -860,7 +854,7 @@ async function initMapFrontendOnly() {
 
   mapRef.value.on('click', (e) => {
     const { lat: clickedLat, lng: clickedLng } = e.latlng;
-    markerRef.value.setLatLng([clickedLat, clickedLng]);
+    setMapMarker(clickedLat, clickedLng, false);
     editingShop.value.latitude = clickedLat;
     editingShop.value.longitude = clickedLng;
     _reverseGeocodeFrontend(clickedLat, clickedLng).catch(()=>{});
@@ -1550,6 +1544,71 @@ onMounted(() => {
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   background: #f8fafc;
   flex-shrink: 0;
+}
+
+/* Map Styles */
+.map-container-wrapper {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  transition: border-color 0.2s ease;
+}
+
+.map-container-wrapper:hover {
+  border-color: var(--color-primary);
+}
+
+.shop-map-container {
+  height: 350px;
+  width: 100%;
+  background: #f1f5f9;
+}
+
+.map-overlay-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  pointer-events: none;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Form Improvements */
+.form-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.shop-image-card {
+  transition: transform 0.2s ease;
+}
+
+.shop-image-card:hover {
+  transform: translateY(-2px);
 }
 
 /* ===== Toast Notification ===== */

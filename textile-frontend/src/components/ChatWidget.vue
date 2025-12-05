@@ -53,8 +53,30 @@ const checkLoginStatus = () => {
   }
 };
 
+const checkSystemData = async () => {
+  // Only check for customers (or guests)
+  if (userRole.value !== 'customer' && userRole.value !== null) return;
+
+  try {
+    // Check for products to see if the marketplace has data
+    // We use a small limit if possible, but the API returns all currently.
+    // The API is /products (mapped to /api/v1/products)
+    const response = await axios.get('/products');
+    const hasProducts = response.data.products && response.data.products.length > 0;
+    
+    if (!hasProducts) {
+      messages.value = [
+        { id: 1, text: "Hi! I'm the Textile Assistant. It looks like there are no products listed in the marketplace yet. Please check back later!", sender: 'bot' }
+      ];
+    }
+  } catch (error) {
+    console.error("Failed to check system data:", error);
+  }
+};
+
 onMounted(() => {
   checkLoginStatus();
+  checkSystemData();
   loginCheckInterval = setInterval(checkLoginStatus, 1000);
 });
 
@@ -129,7 +151,7 @@ const sendMessage = async () => {
     <div v-if="isOpen" class="chat-window">
       <div class="chat-header">
         <div class="d-flex align-items-center gap-2">
-          <h5 class="mb-0 fw-bold">Assistant</h5>
+          <span class="mb-0 fw-bold text-white fs-5">Assistant</span>
         </div>
         <button class="close-btn" @click="toggleChat">
           <i class="bi bi-dash-lg"></i>
@@ -239,6 +261,10 @@ const sendMessage = async () => {
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.chat-header h5 {
+  color: white !important;
 }
 
 .close-btn {
