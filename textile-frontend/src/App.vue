@@ -5,7 +5,6 @@ import NavBar from "@/components/NavBar.vue"
 import { getCurrentSession, logout } from '@/api/apiAuth'
 import { applyTheme } from '@/styles/theme-config'
 import ChatWidget from './components/ChatWidget.vue'
-import ShopOwnerBot from './components/ShopOwnerBot.vue'
 
 // Apply theme on app initialization
 onMounted(() => {
@@ -118,7 +117,6 @@ const handleStorageEvent = (event) => {
       <router-view :key="$route.fullPath" />
     </main>
     <ChatWidget/>
-    <ShopOwnerBot />
   </div>
 </template>
 

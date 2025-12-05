@@ -284,7 +284,7 @@ onMounted(() => {
 
 <style scoped>
 .customer-profile-tab {
-  background: transparent;
+  background: var(--gradient-bg);
   min-height: calc(100vh - 60px);
   padding: 2rem;
   padding-bottom: 4rem;

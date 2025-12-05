@@ -215,6 +215,9 @@ const userIcon = L.divIcon({
   iconAnchor: [20, 20]
 })
 
+// Resize observer
+let resizeObserver = null
+
 // Initialize map
 const initMap = async () => {
   // Wait for next tick to ensure DOM is ready
@@ -248,6 +251,16 @@ const initMap = async () => {
       zoomControl: false,
       attributionControl: true
     })
+
+    // Setup resize observer
+    if (mapContainer.value) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapInstance.value) {
+          mapInstance.value.invalidateSize()
+        }
+      })
+      resizeObserver.observe(mapContainer.value)
+    }
     
     // Add tile layer (OpenStreetMap)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -276,6 +289,11 @@ const initMap = async () => {
 
 // Destroy map (cleanup)
 const destroyMap = () => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+
   if (mapInstance.value) {
     mapInstance.value.remove()
     mapInstance.value = null

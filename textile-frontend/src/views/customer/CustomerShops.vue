@@ -77,14 +77,6 @@
           >
             <i class="bi bi-map"></i>
           </button>
-          <button 
-            class="toggle-btn" 
-            :class="{ active: viewMode === 'list' }"
-            @click="viewMode = 'list'"
-            title="List View"
-          >
-            <i class="bi bi-list-ul"></i>
-          </button>
         </div>
       </div>
     </div>
@@ -118,7 +110,7 @@
     <!-- Content Area -->
     <div v-else class="content-area" :class="viewMode">
       <!-- Map Section -->
-      <div v-if="viewMode !== 'list'" class="map-section" :class="{ 'full-width': viewMode === 'map' }">
+      <div class="map-section" :class="{ 'full-width': viewMode === 'map' }">
         <ShopLocatorMap
           :shops="shopsWithCoordinates"
           :center="mapCenter"
@@ -131,7 +123,7 @@
       </div>
 
       <!-- Shops List -->
-      <div v-if="viewMode !== 'map'" class="shops-list-section" :class="{ 'full-width': viewMode === 'list' }">
+      <div v-if="viewMode !== 'map'" class="shops-list-section">
         <EmptyState
           v-if="shops.length === 0"
           icon="bi-shop"
@@ -403,7 +395,6 @@ const centerMapOnShop = (shop) => {
   if (shop.lat && shop.lng) {
     mapCenter.value = { lat: shop.lat, lng: shop.lng };
     mapZoom.value = 15;
-    viewMode.value = viewMode.value === 'list' ? 'split' : viewMode.value;
   }
 };
 
@@ -482,7 +473,7 @@ onMounted(() => {
 
 <style scoped>
 .customer-shops-page {
-  background: transparent;
+  background: var(--gradient-bg);
   min-height: calc(100vh - 80px);
   padding: 2rem;
   padding-bottom: 4rem;

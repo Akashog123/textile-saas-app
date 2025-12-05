@@ -16,7 +16,7 @@
     />
 
     <!-- Loading State for Fabrics -->
-    <div class="section trending-section mb-4" v-if="loadingFabrics">
+    <div class="section trending-section mb-4 mt-5" v-if="loadingFabrics">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -32,7 +32,7 @@
     </div>
 
     <!-- Empty State for Fabrics -->
-    <div class="section trending-section mb-4" v-else-if="trendingFabrics.length === 0 && !errorFabrics">
+    <div class="section trending-section mb-4 mt-5" v-else-if="trendingFabrics.length === 0 && !errorFabrics">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -50,7 +50,7 @@
     </div>
 
     <!-- Error State for Fabrics -->
-    <div class="section trending-section mb-4" v-else-if="errorFabrics">
+    <div class="section trending-section mb-4 mt-5" v-else-if="errorFabrics">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -69,7 +69,7 @@
     </div>
 
     <!-- Trending Fabric Patterns Section -->
-    <div class="section trending-section mb-4" v-else-if="trendingFabrics.length > 0">
+    <div class="section trending-section mb-4 mt-5" v-else-if="trendingFabrics.length > 0">
       <div class="section-header mb-4">
         <h5 class="section-title">
           <span class="title-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -700,7 +700,7 @@ onMounted(() => {
 
 <style scoped>
 .customer-home-page {
-  background: transparent;
+  background: var(--gradient-bg);
   min-height: calc(100vh - 80px);
   padding: 2rem;
   padding-bottom: 4rem;

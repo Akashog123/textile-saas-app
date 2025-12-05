@@ -370,6 +370,7 @@ onMounted(() => {
 
 <style scoped>
 .product-detail-page {
+  background: var(--gradient-bg);
   padding: 1.5rem;
   min-height: calc(100vh - 80px);
 }
