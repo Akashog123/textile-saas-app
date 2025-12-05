@@ -59,7 +59,7 @@ app.config.from_object(Config)
 # CORS Configuration
 CORS(
     app,
-    resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000","http://127.0.0.1:8000" ]}},
+    resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5001","http://127.0.0.1:5001", "http://se-textile-frontend.local", "https://se-textile-frontend.local"]}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -100,8 +100,8 @@ app.register_blueprint(trending_shops_bp, url_prefix="/api/v1/trending-shops")
 app.register_blueprint(stores_bp, url_prefix="/api/v1/stores")
 app.register_blueprint(product_bp, url_prefix="/api/v1/products")
 app.register_blueprint(inquiry_bp, url_prefix="/api/v1/inquiry")
-app.register_blueprint(discovery_portal_bp, url_prefix="/api/v1/customer")
-app.register_blueprint(shop_explorer_bp, url_prefix="/api/v1/customer/shops")
+# app.register_blueprint(discovery_portal_bp, url_prefix="/api/v1/customer")
+# app.register_blueprint(shop_explorer_bp, url_prefix="/api/v1/customer/shops")
 # app.register_blueprint(shop_bp, url_prefix="/api/v1/shop/my-shops")
 app.register_blueprint(marketing_bp, url_prefix="/api/v1/marketing")
 app.register_blueprint(distributor_bp, url_prefix="/api/v1/distributor")
@@ -112,7 +112,7 @@ app.register_blueprint(nearby_bp)
 app.register_blueprint(performance_bp, url_prefix="/api/v1/performance")
 app.register_blueprint(reviews_bp, url_prefix="/api/v1")
 app.register_blueprint(chatbot_bp, url_prefix="/api/v1/chatbot")
-app.register_blueprint(customer_bp)
+app.register_blueprint(customer_bp, url_prefix="/api/v1/customer")
 app.register_blueprint(image_search_bp, url_prefix="/api/v1/image-search")
 app.register_blueprint(supply_chain_bp, url_prefix="/api/v1/supply-chain")
 
