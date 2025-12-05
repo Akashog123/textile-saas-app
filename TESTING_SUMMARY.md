@@ -105,7 +105,6 @@
 |------|--------|-------|
 | Page loads | ✅ PASS | Shows shop info |
 | Shop info display | ✅ PASS | Name, rating, address |
-| View on Map button | ✅ PASS | |
 | Directions button | ✅ PASS | |
 
 #### Customer Profile Page (/customer/profile)

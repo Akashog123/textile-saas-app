@@ -185,7 +185,7 @@
               <div class="col-md-3">
                 <div class="mini-stat-card critical">
                   <div class="stat-value">{{ demandForecast.summary?.criticalCount || 0 }}</div>
-                  <div class="stat-label">Order Now</div>
+                  <div class="stat-label">Critical</div>
                 </div>
               </div>
               <div class="col-md-3">
@@ -419,7 +419,7 @@
               <h6>Action Status</h6>
               <p>The recommended action is determined by comparing your current stock against the predicted 14-day demand:</p>
               <ul class="action-list">
-                <li><span class="action-badge critical">Order Now</span> Current stock is less than 50% of 14-day demand (covers &lt; 7 days)</li>
+                <li><span class="action-badge critical">Critical</span> Current stock is less than 50% of 14-day demand (covers &lt; 7 days)</li>
                 <li><span class="action-badge warning">Restock Soon</span> Current stock is less than 14-day demand (covers 7-14 days)</li>
                 <li><span class="action-badge healthy">Adequate</span> Current stock meets or exceeds 14-day demand</li>
               </ul>
@@ -533,7 +533,7 @@
           <div class="modal-summary-row">
             <div class="modal-stat critical">
               <span class="stat-num">{{ demandForecast?.summary?.criticalCount || 0 }}</span>
-              <span class="stat-txt">Order Now</span>
+              <span class="stat-txt">Critical</span>
             </div>
             <div class="modal-stat warning">
               <span class="stat-num">{{ demandForecast?.summary?.warningCount || 0 }}</span>

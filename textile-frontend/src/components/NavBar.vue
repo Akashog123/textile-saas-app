@@ -9,7 +9,7 @@
               <i class="bi bi-flower1"></i>
             </div>
           </div>
-          <span class="brand-text">SE Textile</span>
+          <span class="brand-text">Textile Saas app</span>
         </router-link>
 
         <!-- Mobile Toggle Button -->
@@ -104,12 +104,6 @@
                   </router-link>
                 </li>
                 <li class="nav-item">
-                  <router-link to="/distributor/inquiries" class="nav-link">
-                    <span class="nav-icon"><i class="bi bi-chat-dots"></i></span>
-                    <span class="nav-text">Inquiries</span>
-                  </router-link>
-                </li>
-                <li class="nav-item">
                   <router-link to="/distributor/planning" class="nav-link">
                     <span class="nav-icon"><i class="bi bi-graph-up"></i></span>
                     <span class="nav-text">Planning</span>
@@ -119,6 +113,12 @@
                   <router-link to="/distributor/regional-demand" class="nav-link">
                     <span class="nav-icon"><i class="bi bi-geo-alt"></i></span>
                     <span class="nav-text">Regional Demand</span>
+                  </router-link>
+                </li>
+                <li class="nav-item">
+                  <router-link to="/distributor/inquiries" class="nav-link">
+                    <span class="nav-icon"><i class="bi bi-chat-dots"></i></span>
+                    <span class="nav-text">Inquiries</span>
                   </router-link>
                 </li>
               </template>

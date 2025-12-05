@@ -84,8 +84,10 @@
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
       <div class="loading-spinner">
-        <div class="spinner"></div>
-        <p>Finding products...</p>
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3">Finding products...</p>
       </div>
     </div>
 
@@ -593,7 +595,7 @@ const normalizeProducts = (rawProducts) => {
     rating: p.rating ?? p.average_rating ?? 4,
     image: p.image_url || p.image || p.link || getPlaceholderImage(p.name),
     shop: p.shop || { id: p.shop_id, name: p.shop_name || 'Unknown Shop' },
-    in_stock: p.in_stock ?? (p.stock_qty > 0),
+    in_stock: (p.in_stock !== undefined && p.in_stock !== null) ? p.in_stock : (p.stock_qty > 0 || p.quantity > 0),
     stock_qty: p.stock_qty || p.quantity || 0,
     is_trending: p.is_trending || false,
     similarity_score: p.similarity_score || p.relevance_score || null,
@@ -943,20 +945,6 @@ onMounted(async () => {
 
 .loading-spinner {
   text-align: center;
-}
-
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e2e8f0;
-  border-top-color: var(--color-primary, #4A90E2);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .loading-spinner p {

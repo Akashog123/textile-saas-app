@@ -60,12 +60,12 @@
         <span @click.stop="$emit('view-shop', product.shop)">{{ product.shop.name }}</span>
       </div>
       
-      <div class="product-stock" v-if="product.in_stock !== undefined">
-        <span :class="['stock-status', product.in_stock ? 'in-stock' : 'out-of-stock']">
-          <i class="bi" :class="product.in_stock ? 'bi-check-circle-fill' : 'bi-x-circle-fill'"></i>
-          {{ product.in_stock ? 'In Stock' : 'Out of Stock' }}
+      <div class="product-stock">
+        <span :class="['stock-status', (product.in_stock || product.stock_qty > 0) ? 'in-stock' : 'out-of-stock']">
+          <i class="bi" :class="(product.in_stock || product.stock_qty > 0) ? 'bi-check-circle-fill' : 'bi-x-circle-fill'"></i>
+          {{ (product.in_stock || product.stock_qty > 0) ? 'In Stock' : 'Out of Stock' }}
         </span>
-        <span v-if="product.stock_qty && product.in_stock" class="stock-qty">
+        <span v-if="product.stock_qty && (product.in_stock || product.stock_qty > 0)" class="stock-qty">
           ({{ product.stock_qty }} available)
         </span>
       </div>

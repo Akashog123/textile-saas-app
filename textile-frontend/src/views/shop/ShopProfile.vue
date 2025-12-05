@@ -192,12 +192,6 @@
           </div>
           <div class="col-md-6">
             <div class="profile-field">
-              <label class="text-muted small">City</label>
-              <p class="fw-semibold mb-0">{{ primaryShop.city || 'N/A' }}</p>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="profile-field">
               <label class="text-muted small">Contact</label>
               <p class="fw-semibold mb-0">{{ primaryShop.contact || 'N/A' }}</p>
             </div>
@@ -277,7 +271,6 @@
                   <small class="text-muted d-block text-truncate" style="max-width: 250px;">
                     {{ shop.address || shop.location || 'No address' }}
                   </small>
-                  <small class="text-muted">{{ shop.city || '' }}{{ shop.city && shop.state ? ', ' : '' }}{{ shop.state || '' }}</small>
                 </td>
                 <td>{{ shop.contact || '-' }}</td>
                 <td>
@@ -336,14 +329,6 @@
                   <div class="col-md-6">
                     <label class="form-label">Contact</label>
                     <input v-model.trim="editingShop.contact" class="form-control" />
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">City</label>
-                    <input v-model.trim="editingShop.city" class="form-control" />
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">State</label>
-                    <input v-model.trim="editingShop.state" class="form-control" />
                   </div>
 
                   <div class="col-12">
@@ -531,6 +516,7 @@
 /* eslint-disable no-console */
 import L from 'leaflet';
 import { ref, computed, onMounted, nextTick } from 'vue';
+import api from '@/api/axios';
 import { getProfile, updateProfile, setPrimaryShop } from '@/api/apiProfile';
 import { getMyShops, createShop, updateShop, deleteShop, getShopImages, uploadShopImages, deleteShopImage, setShopPrimaryImage } from '@/api/apiShop';
 
@@ -746,8 +732,6 @@ const markerRef = ref(null);
 const mapInitialized = ref(false);
 const DEFAULT_COORDS = { lat: 10.8505, lon: 76.2711 };
 const CACHE_TTL = 1000 * 60 * 60;
-const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/reverse';
-const CONTACT_EMAIL = 'ops@yourdomain.example'; // change to real email if possible
 let lastGeocodeTs = 0;
 let pendingGeoPromise = null;
 let geocodingInFlight = false;
@@ -805,26 +789,22 @@ async function nominatimReverse(lat, lon, attempt = 0) {
 
   lastGeocodeTs = Date.now();
 
-  const params = new URLSearchParams({
-    format: 'jsonv2',
-    lat: String(lat),
-    lon: String(lon),
-    addressdetails: '1',
-    email: CONTACT_EMAIL
-  });
-
-  const res = await fetch(`${NOMINATIM_BASE}?${params.toString()}`);
-  if (!res.ok) {
-    if (res.status === 429 && attempt < 3) {
+  try {
+    // Use backend proxy to avoid CORS
+    const res = await api.get('/reverse-geocode', {
+      params: { lat, lon }
+    });
+    const data = res.data;
+    setCachedAddress(lat, lon, data);
+    return data;
+  } catch (error) {
+    if (error.response && error.response.status === 429 && attempt < 3) {
       await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
       return nominatimReverse(lat, lon, attempt + 1);
     }
-    const txt = await res.text();
-    throw new Error(`Nominatim error ${res.status} ${txt}`);
+    console.error('Geocoding error:', error);
+    throw error;
   }
-  const data = await res.json();
-  setCachedAddress(lat, lon, data);
-  return data;
 }
 
 // map init for modal

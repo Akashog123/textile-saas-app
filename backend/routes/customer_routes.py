@@ -317,8 +317,8 @@ def get_shop_details(shop_id):
         {
             'id': r.id,
             'rating': r.rating,
-            'comment': r.comment,
-            'user_name': r.user.full_name if r.user else 'Anonymous',
+            'comment': r.body,
+            'user_name': r.reviewer.full_name if r.reviewer else (r.user_name or 'Anonymous'),
             'created_at': r.created_at.isoformat() if r.created_at else None
         }
         for r in reviews

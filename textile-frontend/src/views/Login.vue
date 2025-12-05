@@ -12,7 +12,7 @@
                 />
               </svg>
             </div>
-            <h1 class="brand-title">SE Textile App</h1>
+            <h1 class="brand-title">Textile Saas app</h1>
           </div>
           <p class="brand-subtitle">Smart Textile Supply Chain Management</p>
 
