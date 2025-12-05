@@ -1,4 +1,4 @@
-﻿name,sku,category,price,purchase_qty,minimum_stock,description
+﻿name,sku,category,price,purchase_qty,minimum_stock,description,
 Premium Cotton Fabric Roll,COT-001,Cotton,1500,100,20,"High-quality 100% cotton fabric, ideal for summer wear. Width: 44 inches"
 Tussar Silk Fabric,SLK-001,Silk,3500,50,10,"Natural tussar silk with golden sheen, perfect for sarees and kurtas"
 Pure Linen Fabric,LIN-001,Linen,2200,75,15,"Breathable pure linen fabric, great for formal shirts and dresses"
