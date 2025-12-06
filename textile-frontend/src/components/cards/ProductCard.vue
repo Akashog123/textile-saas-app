@@ -18,11 +18,6 @@
           <i class="bi bi-check-lg"></i> {{ product.similarity_score }}% match
         </span>
       </div>
-      <div class="card-overlay">
-        <button class="btn-quick-view" @click.stop="$emit('quick-view', product)">
-          <i class="bi bi-eye"></i> Quick View
-        </button>
-      </div>
     </div>
     
     <div class="card-content">
@@ -64,9 +59,6 @@
         <span :class="['stock-status', (product.in_stock || product.stock_qty > 0) ? 'in-stock' : 'out-of-stock']">
           <i class="bi" :class="(product.in_stock || product.stock_qty > 0) ? 'bi-check-circle-fill' : 'bi-x-circle-fill'"></i>
           {{ (product.in_stock || product.stock_qty > 0) ? 'In Stock' : 'Out of Stock' }}
-        </span>
-        <span v-if="product.stock_qty && (product.in_stock || product.stock_qty > 0)" class="stock-qty">
-          ({{ product.stock_qty }} available)
         </span>
       </div>
       

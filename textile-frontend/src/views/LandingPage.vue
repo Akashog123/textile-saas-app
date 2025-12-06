@@ -109,7 +109,7 @@
           <div class="row align-items-center">
             <div class="col-lg-8">
               <h2 class="fw-bold mb-3">Ready to Transform Your Business?</h2>
-              <p class="mb-0">Join thousands of textile professionals using Textile Saas app today.</p>
+              <p class="mb-0">Join thousands of textile professionals using Textile Saas App today.</p>
             </div>
             <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
               <router-link to="/login" class="btn btn-light btn-lg">
@@ -127,7 +127,7 @@
         <div class="row">
           <div class="col-md-6 mb-4 mb-md-0">
             <div class="d-flex align-items-center mb-3">
-              <i class="bi bi-flower1 me-2 fs-4"></i>
+              <img src="@/assets/icon.png" alt="Logo" class="me-2" style="width: 80px; height: 80px; object-fit: contain;" />
               <span class="fs-5 fw-bold">Textile Saas app</span>
             </div>
             <p class="text-muted small">Empowering the textile industry with smart technology and seamless connectivity.</p>

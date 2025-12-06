@@ -1,0 +1,39 @@
+date,sku,product_name,category,quantity_sold,selling_price,region
+2025-11-18,COT-001,Premium Cotton Fabric Roll,Cotton,18,1850,West
+2025-11-18,ART-001,Art Silk,Silk,8,1150,North
+2025-11-18,LIN-001,Pure Linen Fabric,Linen,5,2450,North
+2025-11-18,ORG-001,Organza Silk,Organza,17,2300,Central
+2025-11-18,BAM-001,Bamboo Fabric,Bamboo,4,2200,Central
+2025-11-18,SLK-001,Tussar Silk Fabric,Silk,11,4350,South
+2025-11-18,NET-001,Net Fabric Embroidered,Net,13,1700,Central
+2025-11-18,WOL-001,Wool Blend Fabric,Wool,20,3250,West
+2025-11-19,CHF-001,Chiffon Silk,Chiffon,18,1800,South
+2025-11-19,CRP-001,Crepe Fabric,Crepe,7,1250,Central
+2025-11-19,SLK-002,Chanderi Silk Cotton,Silk,10,3350,North
+2025-11-19,VEL-001,Velvet Fabric,Velvet,2,4100,Central
+2025-11-19,NET-001,Net Fabric Embroidered,Net,5,1650,North
+2025-11-20,CRP-001,Crepe Fabric,Crepe,19,1350,South
+2025-11-20,VEL-001,Velvet Fabric,Velvet,16,3600,Central
+2025-11-20,COT-001,Premium Cotton Fabric Roll,Cotton,14,1850,North
+2025-11-20,SLK-001,Tussar Silk Fabric,Silk,15,4300,North
+2025-11-20,LIN-001,Pure Linen Fabric,Linen,11,2750,North
+2025-11-20,WOL-001,Wool Blend Fabric,Wool,18,3250,South
+2025-11-20,GOV-001,Govind Silk,Silk,20,1400,West
+2025-11-21,WOL-001,Wool Blend Fabric,Wool,6,3150,West
+2025-11-21,GEO-001,Georgette Fabric,Georgette,13,1500,North
+2025-11-21,KHD-001,Khadi Cotton,Khadi,20,1150,East
+2025-11-22,NET-001,Net Fabric Embroidered,Net,10,1750,East
+2025-11-22,SLK-001,Tussar Silk Fabric,Silk,17,4250,North
+2025-11-22,COT-001,Premium Cotton Fabric Roll,Cotton,7,1900,North
+2025-11-23,ART-001,Art Silk,Silk,11,1050,West
+2025-11-23,SLK-001,Tussar Silk Fabric,Silk,1,3900,West
+2025-11-23,ORG-001,Organza Silk,Organza,1,2350,West
+2025-11-23,SLK-002,Chanderi Silk Cotton,Silk,2,3450,East
+2025-11-24,KOT-001,Kota Doria,Cotton,11,1600,South
+2025-11-24,WOL-001,Wool Blend Fabric,Wool,18,3250,West
+2025-11-24,ART-001,Art Silk,Silk,13,1250,West
+2025-11-24,COT-002,Handloom Cotton,Cotton,10,2100,South
+2025-11-24,GOV-001,Govind Silk,Silk,20,1350,West
+2025-11-24,CRP-001,Crepe Fabric,Crepe,8,1350,South
+2025-11-24,LIN-001,Pure Linen Fabric,Linen,20,2450,South
+2025-11-24,CHF-001,Chiffon Silk,Chiffon,18,1900,North

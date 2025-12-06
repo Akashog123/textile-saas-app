@@ -397,7 +397,7 @@ class ProductImageSearchService:
                         'category': product.category,
                         'price': float(product.price) if product.price else 0,
                         'price_formatted': f"₹{product.price:,.0f}" if product.price else "₹0",
-                        'rating': round(product.rating or 4.0, 1),
+                        'rating': round(product.rating or 0.0, 1),
                         'image': resolved_image,
                         'matched_image': resolved_image,
                         'similarity_score': match['similarity'],

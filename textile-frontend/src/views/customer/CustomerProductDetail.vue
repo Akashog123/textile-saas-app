@@ -76,8 +76,8 @@
                 ></i>
               </div>
               <span class="rating-value">{{ formatRating(product.rating) }}</span>
-              <span class="review-count" v-if="product.reviews">
-                ({{ product.reviews.length }} reviews)
+              <span class="review-count" v-if="reviews && reviews.length">
+                ({{ reviews.length }} reviews)
               </span>
             </div>
             
@@ -91,9 +91,6 @@
               <span :class="['status-badge', (product.in_stock || product.stock_qty > 0) ? 'in-stock' : 'out-of-stock']">
                 <i class="bi" :class="(product.in_stock || product.stock_qty > 0) ? 'bi-check-circle-fill' : 'bi-x-circle-fill'"></i>
                 {{ (product.in_stock || product.stock_qty > 0) ? 'In Stock' : 'Out of Stock' }}
-              </span>
-              <span v-if="product.stock_qty && (product.in_stock || product.stock_qty > 0)" class="stock-qty">
-                {{ product.stock_qty }} units available
               </span>
             </div>
             
@@ -169,11 +166,28 @@
       </div>
       
       <!-- Reviews Section -->
-      <div class="reviews-section" v-if="product.reviews && product.reviews.length">
-        <h3 class="section-title">Customer Reviews</h3>
-        <div class="reviews-list">
+      <div class="reviews-section" id="reviews">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h3 class="section-title mb-0">Customer Reviews</h3>
+          <div v-if="hasUserReviewed" class="text-success small fw-medium">
+             <i class="bi bi-check-circle-fill"></i> You reviewed this product
+          </div>
+        </div>
+
+        <div v-if="loadingReviews" class="text-center py-4">
+          <div class="spinner-border text-secondary" role="status"></div>
+          <p class="text-muted mt-2">Loading reviews...</p>
+        </div>
+
+        <div v-else-if="reviews.length === 0" class="text-center py-5 bg-light rounded-3">
+          <i class="bi bi-chat-square-text fs-1 text-muted"></i>
+          <p class="mt-3 text-muted">No reviews yet. Be the first to review this product!</p>
+          <button class="btn btn-sm btn-primary mt-2" @click="openReviewModal">Write a Review</button>
+        </div>
+
+        <div v-else class="reviews-list">
           <div 
-            v-for="review in product.reviews" 
+            v-for="review in reviews" 
             :key="review.id" 
             class="review-card"
           >
@@ -192,12 +206,103 @@
                   ></i>
                 </div>
               </div>
-              <span class="review-date">{{ formatDate(review.created_at) }}</span>
+              <div class="text-end">
+                <span class="review-date d-block">{{ formatDate(review.created_at) }}</span>
+                <span v-if="review.is_verified" class="badge bg-success-subtle text-success-emphasis" style="font-size: 0.7rem;">
+                  <i class="bi bi-patch-check-fill"></i> Verified
+                </span>
+                <!-- Edit/Delete buttons for own reviews -->
+                <div v-if="isOwnReview(review)" class="review-edit-actions mt-2">
+                  <button class="btn btn-sm btn-outline-secondary" @click="editReview(review)" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger ms-1" @click="deleteReviewConfirm(review.id)" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
             </div>
-            <p class="review-comment">{{ review.comment }}</p>
+            <h6 v-if="review.title" class="fw-bold mb-2">{{ review.title }}</h6>
+            <p class="review-comment">{{ review.body || review.comment }}</p>
           </div>
         </div>
       </div>
+
+    <!-- Review Modal -->
+    <div v-if="showReviewModal" class="modal-backdrop-custom">
+      <div class="modal-dialog-custom">
+        <div class="modal-content-custom">
+          <div class="modal-header-custom">
+            <h5 class="mb-0">{{ isEditingReview ? 'Edit Review' : 'Write a Review' }}</h5>
+            <button class="btn-close-custom" @click="closeReviewModal">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-body-custom">
+            <div v-if="submitError" class="alert alert-danger py-2 mb-3">{{ submitError }}</div>
+            
+            <div class="mb-3">
+              <label class="form-label">Rating</label>
+              <div class="star-rating-input">
+                <i 
+                  v-for="i in 5" 
+                  :key="i"
+                  class="bi fs-4 cursor-pointer"
+                  :class="i <= reviewForm.rating ? 'bi-star-fill text-warning' : 'bi-star text-muted'"
+                  @click="reviewForm.rating = i"
+                ></i>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Title (Optional)</label>
+              <input type="text" class="form-control" v-model="reviewForm.title" placeholder="Summarize your experience">
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Review</label>
+              <textarea 
+                class="form-control" 
+                rows="4" 
+                v-model="reviewForm.comment" 
+                placeholder="What did you like or dislike?"
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer-custom">
+            <button class="btn btn-light" @click="closeReviewModal" :disabled="submittingReview">Cancel</button>
+            <button class="btn btn-primary" @click="submitReview" :disabled="submittingReview || !reviewForm.rating || !reviewForm.comment">
+              <span v-if="submittingReview" class="spinner-border spinner-border-sm me-2"></span>
+              {{ isEditingReview ? 'Update Review' : 'Submit Review' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="modal-backdrop-custom">
+      <div class="modal-dialog-custom" style="max-width: 400px;">
+        <div class="modal-content-custom">
+          <div class="modal-header-custom">
+            <h5 class="mb-0 text-danger">Delete Review</h5>
+            <button class="btn-close-custom" @click="closeDeleteModal">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-body-custom">
+            <p>Are you sure you want to delete this review? This action cannot be undone.</p>
+          </div>
+          <div class="modal-footer-custom">
+            <button class="btn btn-light" @click="closeDeleteModal" :disabled="reviewDeleting">Cancel</button>
+            <button class="btn btn-danger" @click="confirmDeleteReview" :disabled="reviewDeleting">
+              <span v-if="reviewDeleting" class="spinner-border spinner-border-sm me-2"></span>
+              Delete Review
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
       
       <!-- Similar Products -->
       <div class="similar-products-section" v-if="product.similar_products && product.similar_products.length">
@@ -219,7 +324,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProductDetails } from '@/api/apiCustomer'
+import { getProductDetails, getProductReviews, submitProductReview, updateProductReview, deleteProductReview, getWishlist, addToWishlist, removeFromWishlist } from '@/api/apiCustomer'
 import ProductCard from '@/components/cards/ProductCard.vue'
 
 const route = useRoute()
@@ -239,6 +344,41 @@ const loading = ref(true)
 const error = ref('')
 const activeImageIndex = ref(0)
 const isWishlisted = ref(false)
+
+// Auth
+const isAuthenticated = computed(() => !!localStorage.getItem('token'))
+const currentUserId = computed(() => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  return user.id
+})
+
+// Review State
+const reviews = ref([])
+const loadingReviews = ref(false)
+const showReviewModal = ref(false)
+const isEditingReview = ref(false)
+const editingReviewId = ref(null)
+const submittingReview = ref(false)
+const submitError = ref('')
+const reviewForm = ref({
+  rating: 0,
+  title: '',
+  comment: ''
+})
+
+// Delete Modal State
+const showDeleteModal = ref(false)
+const reviewToDelete = ref(null)
+const reviewDeleting = ref(false)
+
+const hasUserReviewed = computed(() => {
+  if (!isAuthenticated.value || !reviews.value.length) return false
+  return reviews.value.some(r => r.user_id === currentUserId.value)
+})
+
+const isOwnReview = (review) => {
+  return currentUserId.value && review.user_id === currentUserId.value
+}
 
 const FALLBACK_IMAGE = 'https://placehold.co/600x600?text=Product'
 
@@ -286,9 +426,13 @@ const fetchProductDetails = async () => {
     if (response.data?.product) {
       product.value = response.data.product
       
-      // Check wishlist status from localStorage
-      const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]')
-      isWishlisted.value = wishlist.includes(product.value.id)
+      // Check wishlist status from API if authenticated
+      if (isAuthenticated.value) {
+        checkWishlistStatus()
+      }
+
+      // Fetch reviews
+      fetchReviews()
     } else {
       throw new Error('Product not found')
     }
@@ -298,6 +442,19 @@ const fetchProductDetails = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const checkWishlistStatus = async () => {
+    try {
+        const res = await getWishlist()
+        const wishlistData = res.data?.data?.wishlist || res.data?.wishlist
+        if (wishlistData) {
+            const wishlistIds = wishlistData.map(item => item.id)
+            isWishlisted.value = wishlistIds.includes(product.value.id)
+        }
+    } catch (err) {
+        console.error("Failed to check wishlist status", err)
+    }
 }
 
 const formatRating = (rating) => {
@@ -329,19 +486,26 @@ const handleImageError = (e) => {
   e.target.src = FALLBACK_IMAGE
 }
 
-const toggleWishlist = () => {
+const toggleWishlist = async () => {
   if (!product.value) return
-  
-  let wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]')
-  
-  if (isWishlisted.value) {
-    wishlist = wishlist.filter(id => id !== product.value.id)
-  } else {
-    wishlist.push(product.value.id)
+  if (!isAuthenticated.value) {
+      // Redirect to login or show alert
+      alert("Please login to add to wishlist")
+      return
   }
   
-  localStorage.setItem('wishlist', JSON.stringify(wishlist))
-  isWishlisted.value = !isWishlisted.value
+  try {
+      if (isWishlisted.value) {
+        await removeFromWishlist(product.value.id)
+        isWishlisted.value = false
+      } else {
+        await addToWishlist(product.value.id)
+        isWishlisted.value = true
+      }
+  } catch (err) {
+      console.error("Failed to toggle wishlist", err)
+      alert("Failed to update wishlist")
+  }
 }
 
 const contactShop = () => {
@@ -360,6 +524,103 @@ const viewProduct = (item) => {
     name: 'CustomerProductDetail',
     params: { productId: item.id }
   })
+}
+
+// Review Methods
+const fetchReviews = async () => {
+  loadingReviews.value = true
+  try {
+    const res = await getProductReviews(product.value.id)
+    if (res.data && res.data.reviews) {
+      reviews.value = res.data.reviews
+    }
+  } catch (err) {
+    console.error("Failed to fetch reviews", err)
+  } finally {
+    loadingReviews.value = false
+  }
+}
+
+const openReviewModal = () => {
+  submitError.value = ''
+  reviewForm.value = { rating: 5, title: '', comment: '' }
+  isEditingReview.value = false
+  editingReviewId.value = null
+  showReviewModal.value = true
+}
+
+const editReview = (review) => {
+  reviewForm.value = {
+    rating: review.rating,
+    title: review.title || '',
+    comment: review.body || review.comment || ''
+  }
+  isEditingReview.value = true
+  editingReviewId.value = review.id
+  submitError.value = ''
+  showReviewModal.value = true
+}
+
+const closeReviewModal = () => {
+  showReviewModal.value = false
+  isEditingReview.value = false
+  editingReviewId.value = null
+}
+
+const submitReview = async () => {
+  if (!reviewForm.value.rating || !reviewForm.value.comment) return
+  
+  submittingReview.value = true
+  submitError.value = ''
+  
+  try {
+    if (isEditingReview.value && editingReviewId.value) {
+      await updateProductReview(product.value.id, editingReviewId.value, reviewForm.value)
+    } else {
+      await submitProductReview(product.value.id, reviewForm.value)
+    }
+    // Success
+    closeReviewModal()
+    fetchReviews() // Refresh reviews
+    fetchProductDetails() // Refresh product to update rating
+  } catch (err) {
+    console.error(err)
+    if (err.response && err.response.status === 409) {
+      submitError.value = "You have already reviewed this product."
+    } else {
+      submitError.value = err.response?.data?.message || 'Failed to submit review'
+    }
+  } finally {
+    submittingReview.value = false
+  }
+}
+
+const deleteReviewConfirm = (reviewId) => {
+  reviewToDelete.value = reviewId
+  showDeleteModal.value = true
+}
+
+const closeDeleteModal = () => {
+  showDeleteModal.value = false
+  reviewToDelete.value = null
+}
+
+const confirmDeleteReview = async () => {
+  if (!reviewToDelete.value) return
+  
+  reviewDeleting.value = true
+  
+  try {
+    await deleteProductReview(product.value.id, reviewToDelete.value)
+    closeDeleteModal()
+    fetchReviews() // Refresh reviews
+    fetchProductDetails() // Refresh product to update rating
+  } catch (err) {
+    console.error('Failed to delete review:', err)
+    submitError.value = err.response?.data?.message || 'Failed to delete review'
+  } finally {
+    reviewDeleting.value = false
+  }
 }
 
 // Lifecycle
@@ -822,5 +1083,80 @@ onMounted(() => {
     width: 60px;
     height: 60px;
   }
+}
+
+/* Modal Styles */
+.modal-backdrop-custom {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  backdrop-filter: blur(4px);
+}
+
+.modal-dialog-custom {
+  width: 100%;
+  max-width: 500px;
+  margin: 1rem;
+}
+
+.modal-content-custom {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.modal-header-custom {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-close-custom {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-body-custom {
+  padding: 1.5rem;
+}
+
+.modal-footer-custom {
+  padding: 1rem 1.5rem;
+  background: var(--bg-light, #f8fafc);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.star-rating-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.review-edit-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.review-edit-actions .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
 }
 </style>

@@ -4,7 +4,7 @@
     <CustomerSearchBar 
       v-model="searchQuery"
       placeholder="Search for Shops, Fabrics, and Products..."
-      :show-nearby-button="true"
+      :show-nearby-button="false"
       :show-voice-search="true"
       :show-image-search="true"
       nearby-button-text="Find Nearby"
@@ -139,6 +139,9 @@
                     <span class="rating-text"
                       >({{ Math.round(trendingFabrics[fabricIndex].rating) }}.0)</span
                     >
+                    <span v-if="trendingFabrics[fabricIndex].review_count" class="ms-2 text-muted small">
+                      {{ trendingFabrics[fabricIndex].review_count }} reviews
+                    </span>
                   </div>
                   <button class="btn btn-outline-gradient" @click="viewFabricDetails(trendingFabrics[fabricIndex])">
                     View Details
@@ -289,11 +292,21 @@
                     <span class="location-text">{{
                       popularShops[shopIndex].location
                     }}</span>
+                    <span v-if="popularShops[shopIndex].distance_text" class="badge bg-info-subtle text-info ms-2">
+                      {{ popularShops[shopIndex].distance_text }}
+                    </span>
                   </div>
-                  <div class="shop-meta mb-3" v-if="popularShops[shopIndex].product_count > 0">
-                    <span class="meta-item">
+                  <div class="shop-meta mb-3">
+                    <span class="meta-item" v-if="popularShops[shopIndex].product_count > 0">
                       <i class="bi bi-box-seam me-1"></i>
                       {{ popularShops[shopIndex].product_count }} Products
+                    </span>
+                    <span class="meta-item ms-2" v-if="popularShops[shopIndex].review_count > 0">
+                      <i class="bi bi-chat-dots me-1"></i>
+                      {{ popularShops[shopIndex].review_count }} Reviews
+                    </span>
+                    <span v-if="popularShops[shopIndex].popularity_badge" class="badge bg-warning-subtle text-warning ms-2">
+                      {{ popularShops[shopIndex].popularity_badge }}
                     </span>
                   </div>
                   <div class="d-flex gap-2">
@@ -502,12 +515,41 @@ const fetchTrendingFabrics = async () => {
 
 /**
  * Fetch popular shops from backend
+ * Uses user location (if available) for nearby filtering within 25km
  */
 const fetchPopularShops = async () => {
   loadingShops.value = true;
   errorShops.value = '';
   try {
-    const response = await getPopularShops();
+    // Try to get user location for nearby filtering
+    let locationParams = {};
+    
+    try {
+      const position = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 300000 // Cache for 5 minutes
+        });
+      });
+      
+      locationParams = {
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+        radius: 25 // 25km radius
+      };
+      userLocation.value = { lat: position.coords.latitude, lon: position.coords.longitude };
+      mapCenter.value = { lat: position.coords.latitude, lng: position.coords.longitude };
+      console.log('[Popular Shops] Using user location:', locationParams);
+    } catch (locErr) {
+      console.log('[Popular Shops] Location not available, fetching all popular shops');
+    }
+    
+    const response = await getPopularShops(locationParams);
     console.log('[Popular Shops Response]', response.data);
     if (response.data && response.data.shops) {
       popularShops.value = response.data.shops.map(shop => validateShopData(shop));
@@ -1271,6 +1313,6 @@ onMounted(() => {
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateX(120%);
 }
 </style>

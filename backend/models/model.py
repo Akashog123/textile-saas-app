@@ -359,7 +359,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
     price = db.Column(db.Numeric(10, 2), nullable=False)
     msrp = db.Column(db.Numeric(10, 2))
     badge = db.Column(db.String(50))
-    rating = db.Column(db.Float, default=4.0)
+    rating = db.Column(db.Float, default=0.0)
     is_trending = db.Column(db.Boolean, default=False, index=True)
     is_active = db.Column(db.Boolean, default=True, index=True)
     image_url = db.Column(db.String(512))
@@ -425,7 +425,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
             "category": self.category,
             "price": float(self.price) if self.price else 0,
             "price_formatted": f"₹{self.price:,.0f}" if self.price else "₹0",
-            "rating": round(self.rating or 4.0, 1),
+            "rating": round(self.rating or 0.0, 1),
             "is_trending": self.is_trending,
             "image": self.get_primary_image_url(resolve=True),
             "shop_name": self.shop.name if self.shop else None,
@@ -437,7 +437,7 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
         """Return detailed product info with resolved image URLs."""
         result = self.to_dict()
         result["price_formatted"] = f"₹{self.price:,.0f}" if self.price else "₹0"
-        result["rating"] = round(self.rating or 4.0, 1)
+        result["rating"] = round(self.rating or 0.0, 1)
         result["image"] = self.get_primary_image_url(resolve=True)
         # Resolve all image URLs in the images array
         result["images"] = [
@@ -468,8 +468,9 @@ class Product(db.Model, TimestampMixin, SerializerMixin):
             "price": float(self.price) if self.price else 0,
             "stock": inv.qty_available if inv else 0,
             "minimum_stock": inv.safety_stock if inv else 0,
+            "sales_qty": inv.total_sold if inv else 0,
             "sku": self.sku or f"AUTO-{self.id}",
-            "rating": round(self.rating or 4.0, 1),
+            "rating": round(self.rating or 0.0, 1),
             "shop_id": self.shop_id,
             "distributor_id": self.distributor_id,
             "distributor_username": self.distributor.username if self.distributor else None,
@@ -795,6 +796,31 @@ class ActivityLog(db.Model):
     
     def __repr__(self):
         return f"<ActivityLog {self.action}>"
+
+
+# ============================================================================
+# WISHLIST MODEL
+# ============================================================================
+
+class Wishlist(db.Model, TimestampMixin):
+    __tablename__ = "wishlist"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    
+    # Relationships
+    user = db.relationship("User", backref=db.backref("wishlist_items", lazy="dynamic", cascade="all, delete-orphan"))
+    product = db.relationship("Product")
+    
+    # Unique constraint to prevent duplicate wishlisting
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'product_id', name='uq_wishlist_user_product'),
+    )
+
+    def __repr__(self):
+        return f"<Wishlist user={self.user_id} product={self.product_id}>"
+
 
 
 # ============================================================================

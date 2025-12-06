@@ -4,7 +4,7 @@
     <CustomerSearchBar 
       v-model="searchQuery"
       placeholder="Search fabrics, products, or shops..."
-      :show-nearby-button="true"
+      :show-nearby-button="false"
       :show-voice-search="true"
       :show-image-search="true"
       @search="handleSearch"
@@ -54,8 +54,9 @@
         
         <!-- Sort Filter -->
         <div class="filter-dropdown">
-          <select v-model="filters.sort" class="filter-select" @change="fetchProducts">
+          <select v-model="filters.sort" class="filter-select" @change="handleSortChange">
             <option value="rating">Top Rated</option>
+            <option value="distance">Nearest</option>
             <option value="price_asc">Price: Low to High</option>
             <option value="price_desc">Price: High to Low</option>
             <option value="newest">Newest First</option>
@@ -83,7 +84,7 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
-      <div class="loading-spinner">
+      <div class="loading-content text-center">
         <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
           <span class="visually-hidden">Loading...</span>
         </div>
@@ -126,14 +127,15 @@
         :key="product.id"
         :product="product"
         :show-shop="true"
+        :is-wishlisted="wishlistIds.includes(product.id)"
         @view-details="viewProductDetails"
         @view-shop="viewShopDetails"
-        @add-to-wishlist="addToWishlist"
+        @add-to-wishlist="handleWishlistToggle"
       />
     </div>
 
     <!-- Pagination -->
-    <div v-if="products.length > 0 && pagination.totalPages > 1" class="pagination-container">
+    <div v-if="!loading && products.length > 0 && pagination.totalPages > 1" class="pagination-container">
       <button 
         class="btn btn-outline-gradient"
         :disabled="pagination.page <= 1"
@@ -164,7 +166,7 @@
     </div>
 
     <!-- Load More Button (Alternative) -->
-    <div v-if="products.length > 0 && hasMoreProducts && !pagination.totalPages" class="text-center mt-4">
+    <div v-if="!loading && products.length > 0 && hasMoreProducts && !pagination.totalPages" class="text-center mt-4">
       <button 
         class="btn btn-outline-gradient btn-load-more" 
         @click="loadMore"
@@ -183,8 +185,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { browseProducts, getCategories, searchShopsAndProducts, searchByImage, getNearbyShops } from '@/api/apiCustomer';
+import { browseProducts, getCategories, searchShopsAndProducts, searchByImage, getWishlist, addToWishlist as apiAddToWishlist, removeFromWishlist as apiRemoveFromWishlist } from '@/api/apiCustomer';
 import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
+import { getNearbyShopsAuto } from '@/services/locationService';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ProductCard from '@/components/cards/ProductCard.vue';
 
@@ -198,7 +201,9 @@ const error = ref('');
 const products = ref([]);
 const categories = ref([]);
 const totalProducts = ref(0);
+const userLocation = ref(null);
 const hasMoreProducts = ref(true);
+const wishlistIds = ref([]); // Store IDs of wishlisted items
 
 // Filters
 const filters = reactive({
@@ -223,11 +228,19 @@ const hasActiveFilters = computed(() => {
 });
 
 const emptyStateProps = computed(() => {
+  const isVoiceSearch = router.currentRoute.value.query.voiceSearch === 'true';
+  
   if (searchQuery.value === 'Visual Search Results') {
     return {
       icon: 'bi-camera',
       title: 'No Visual Matches Found',
       message: 'We couldn\'t find any products visually similar to your image. Try a different image or angle.'
+    };
+  } else if (isVoiceSearch && searchQuery.value) {
+    return {
+      icon: 'bi-mic',
+      title: 'No Voice Search Results',
+      message: `We couldn't find any products matching "${searchQuery.value}". Try a different phrase or check your filters.`
     };
   } else if (searchQuery.value) {
     return {
@@ -315,10 +328,39 @@ const clearFilters = () => {
 };
 
 /**
+ * Handle sort change
+ */
+const handleSortChange = async () => {
+  if (filters.sort === 'distance') {
+    if (!userLocation.value) {
+      try {
+        loading.value = true;
+        const result = await getNearbyShopsAuto(10000); // Just to get location
+        if (result.location) {
+          userLocation.value = {
+            lat: result.location.latitude,
+            lon: result.location.longitude
+          };
+        } else {
+          throw new Error("Location not found");
+        }
+      } catch (err) {
+        showErrorNotification("Location access required for 'Nearest' sort. Please enable location services.");
+        filters.sort = 'rating'; // Fallback
+        loading.value = false;
+        return;
+      }
+    }
+  }
+  fetchProducts();
+};
+
+/**
  * Fetch products from backend
  */
 const fetchProducts = async () => {
   loading.value = true;
+  products.value = []; // Clear products to prevent double spinners
   error.value = '';
   
   try {
@@ -327,6 +369,11 @@ const fetchProducts = async () => {
       per_page: pagination.perPage,
       sort: filters.sort
     };
+    
+    if (filters.sort === 'distance' && userLocation.value) {
+      params.lat = userLocation.value.lat;
+      params.lon = userLocation.value.lon;
+    }
     
     if (filters.category) params.category = filters.category;
     if (filters.min_price !== null) params.min_price = filters.min_price;
@@ -397,6 +444,15 @@ const goToPage = (page) => {
 };
 
 /**
+ * Handle nearby search (triggered from search bar)
+ * This now just sets the sort to distance and triggers fetch
+ */
+const handleNearbySearch = async () => {
+  filters.sort = 'distance';
+  await handleSortChange();
+};
+
+/**
  * Handle search from search bar
  */
 const handleSearch = async (queryInput) => {
@@ -448,51 +504,7 @@ const handleSuggestionSelect = (suggestion) => {
   }
 };
 
-/**
- * Handle nearby search
- */
-const handleNearbySearch = async (location) => {
-  loading.value = true;
-  error.value = '';
-  
-  try {
-    const response = await getNearbyShops({
-      lat: location.lat,
-      lon: location.lon,
-      radius: 10,
-      limit: 50
-    });
-    
-    if (response.data && response.data.shops) {
-      // Extract products from nearby shops
-      const nearbyProducts = [];
-      response.data.shops.forEach(shop => {
-        if (shop.products) {
-          shop.products.forEach(product => {
-            nearbyProducts.push({
-              ...product,
-              shop: { id: shop.id, name: shop.name },
-              distance: shop.distance
-            });
-          });
-        }
-      });
-      
-      if (nearbyProducts.length > 0) {
-        products.value = normalizeProducts(nearbyProducts);
-        totalProducts.value = nearbyProducts.length;
-        showSuccessNotification(`Found ${nearbyProducts.length} products from nearby shops`);
-      } else {
-        error.value = 'No products found from nearby shops. Try expanding your search radius.';
-      }
-    }
-  } catch (err) {
-    const errorMessage = handleApiError(err, 'Nearby Search');
-    error.value = errorMessage;
-  } finally {
-    loading.value = false;
-  }
-};
+
 
 /**
  * Handle image search results from search bar
@@ -563,21 +575,48 @@ const viewShopDetails = (shop) => {
 };
 
 /**
- * Add to wishlist
+ * Handle wishlist toggle
  */
-const addToWishlist = (product) => {
+const handleWishlistToggle = async (product) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    showErrorNotification("Please login to manage your wishlist");
+    return;
+  }
+
   try {
-    const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-    if (!wishlist.find(p => p.id === product.id)) {
-      wishlist.push(product);
-      localStorage.setItem('wishlist', JSON.stringify(wishlist));
-      showSuccessNotification(`${product.name} added to wishlist`);
+    if (wishlistIds.value.includes(product.id)) {
+      // Remove
+      await apiRemoveFromWishlist(product.id);
+      wishlistIds.value = wishlistIds.value.filter(id => id !== product.id);
+      showSuccessNotification("Removed from wishlist");
     } else {
-      showSuccessNotification(`${product.name} is already in your wishlist`);
+      // Add
+      await apiAddToWishlist(product.id);
+      wishlistIds.value.push(product.id);
+      showSuccessNotification("Added to wishlist");
     }
   } catch (e) {
-    console.error('Error adding to wishlist', e);
-    showErrorNotification('Could not add to wishlist');
+    console.error('Error toggling wishlist', e);
+    showErrorNotification('Failed to update wishlist');
+  }
+};
+
+/**
+ * Fetch user wishlist
+ */
+const fetchUserWishlist = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  
+  try {
+    const res = await getWishlist();
+    const wishlistData = res.data?.data?.wishlist || res.data?.wishlist;
+    if (wishlistData) {
+      wishlistIds.value = wishlistData.map(p => p.id);
+    }
+  } catch (err) {
+    console.error("Failed to fetch wishlist", err);
   }
 };
 
@@ -687,10 +726,21 @@ const checkVoiceSearchResults = () => {
         
         // Only use results if they're recent (within 60 seconds)
         const age = Date.now() - timestamp;
-        if (age < 60000 && voiceProducts && voiceProducts.length > 0) {
-          products.value = normalizeProducts(voiceProducts);
-          totalProducts.value = products.value.length;
-          searchQuery.value = transcript || 'Voice Search Results';
+        if (age < 60000) {
+          // Set search query from transcript regardless of product count
+          searchQuery.value = transcript || 'Voice Search';
+          
+          // Handle products - could be empty array
+          if (voiceProducts && voiceProducts.length > 0) {
+            products.value = normalizeProducts(voiceProducts);
+            totalProducts.value = products.value.length;
+            showSuccessNotification(`Found ${products.value.length} products for "${transcript}"`);
+          } else {
+            // No products found - set empty array to trigger empty state UI
+            products.value = [];
+            totalProducts.value = 0;
+            // Note: The emptyStateProps computed will handle showing "No Search Results" message
+          }
           
           // Apply extracted filters
           if (voiceFilters) {
@@ -707,7 +757,7 @@ const checkVoiceSearchResults = () => {
             else if (minP === 1000 && maxP === 2000) filters.priceRange = '1000-2000';
             else if (minP === 2000 && maxP === null) filters.priceRange = '2000+';
             else if (maxP === 1000 && minP === 0) filters.priceRange = '0-1000'; 
-            else filters.priceRange = 'custom'; // Custom range
+            else if (minP !== null || maxP !== null) filters.priceRange = 'custom'; // Custom range
 
             // Try to extract category from transcript if not provided
             if (categories.value.length > 0) {
@@ -730,7 +780,7 @@ const checkVoiceSearchResults = () => {
           }
 
           hasMoreProducts.value = false;
-          showSuccessNotification(`Found ${products.value.length} products for "${transcript}"`);
+          loading.value = false; // Ensure loading is false
           
           // Clean up
           sessionStorage.removeItem('voiceSearchResults');
@@ -750,6 +800,7 @@ const checkVoiceSearchResults = () => {
 // Initialize on mount
 onMounted(async () => {
   await fetchCategories();
+  fetchUserWishlist();
   
   // Check for image search results first, then voice search
   if (!checkImageSearchResults() && !checkVoiceSearchResults()) {

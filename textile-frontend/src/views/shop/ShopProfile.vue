@@ -200,7 +200,7 @@
             <div class="profile-field">
               <label class="text-muted small">Rating</label>
               <p class="fw-semibold mb-0">
-                <i class="bi bi-star-fill text-warning me-1"></i>{{ primaryShop.rating || '4.0' }}
+                <i class="bi bi-star-fill text-warning me-1"></i>{{ primaryShop.rating || '0.0' }}
               </p>
             </div>
           </div>
@@ -278,7 +278,7 @@
                     <i class="bi bi-box"></i> {{ shop.product_count || 0 }}
                   </span>
                   <span class="badge bg-light text-dark">
-                    <i class="bi bi-star-fill text-warning"></i> {{ shop.rating || '4.0' }}
+                    <i class="bi bi-star-fill text-warning"></i> {{ shop.rating || '0.0' }}
                   </span>
                 </td>
                 <td class="text-end">
