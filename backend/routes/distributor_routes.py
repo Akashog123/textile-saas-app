@@ -2347,20 +2347,28 @@ def ai_chat_assistant(current_user):
             context = build_basic_context(distributor_id)
         
         # Build prompt for AI
-        prompt = f"""You are an AI inventory assistant for a textile distributor. Answer the user's question based on their inventory data.
+        prompt = f"""You are an AI supply chain assistant for a textile distributor/manufacturer. 
+The user is a DISTRIBUTOR who SUPPLIES stock to various retail shops - they do NOT own or manage the shop inventory themselves.
+
+Your role is to help them understand:
+- Which shops need supplies and what products to prioritize shipping
+- Stock levels at the shops they supply to
+- Demand forecasts to plan production and distribution
+- Supply chain optimization and delivery priorities
 
 {context}
 
 USER QUESTION: {user_message}
 
-Provide a helpful, specific, and actionable response. If the question is about:
-- Restocking: Give specific product names, quantities, and priority order based on demand forecasts
-- Stockouts: Reference days until stockout and urgency levels
-- Trends: Analyze the sales patterns and predicted demand shown
-- General advice: Be specific to their actual inventory situation
+Provide a helpful, specific, and actionable response framed from the DISTRIBUTOR's perspective:
+- Restocking: Tell them which SHOPS need supplies, what products to prioritize SHIPPING, and quantities to DELIVER
+- Stockouts: Reference which shops are at risk and need urgent DELIVERIES from the distributor
+- Trends: Analyze demand patterns to help plan PRODUCTION and DISTRIBUTION
+- General advice: Focus on supply chain, production planning, and distribution optimization
 
+Always frame your response from the distributor's viewpoint - they SUPPLY TO shops, they don't manage shop inventory directly.
 Keep responses concise (2-4 sentences) and use **bold** for emphasis on key figures and recommendations.
-If the question is unclear or unrelated to inventory, politely redirect to inventory-related topics."""
+If the question is unclear or unrelated to supply chain/distribution, politely redirect to relevant topics."""
 
         ai_provider = get_provider()
         
@@ -2388,19 +2396,22 @@ If the question is unclear or unrelated to inventory, politely redirect to inven
 
 
 def build_rich_context(frontend_context):
-    """Build rich context from pre-loaded AI insights."""
+    """Build rich context from pre-loaded AI insights for distributor supply chain view."""
     context_parts = []
+    
+    context_parts.append("DISTRIBUTOR SUPPLY CHAIN OVERVIEW:")
+    context_parts.append("(Data shows stock levels at shops you supply to - these are NOT your inventory, these are your RETAIL PARTNERS' stock levels)")
     
     # Stock Planning Summary
     if frontend_context.get('stockPlanning'):
         sp = frontend_context['stockPlanning']
         if sp.get('summary'):
             context_parts.append(f"""
-STOCK PLANNING SUMMARY:
-- Total Products Monitored: {sp['summary'].get('totalProducts', 'N/A')}
-- Critical Stock Items: {sp['summary'].get('criticalCount', 0)}
-- Low Stock Items: {sp['summary'].get('lowCount', 0)}
-- Healthy Stock Items: {sp['summary'].get('healthyCount', 0)}
+SHOPS' STOCK STATUS (shops you supply to):
+- Total Products Across Shops: {sp['summary'].get('totalProducts', 'N/A')}
+- Products Needing Urgent Supply: {sp['summary'].get('criticalCount', 0)} (critical stock at shops)
+- Products to Monitor for Supply: {sp['summary'].get('lowCount', 0)} (low stock at shops)
+- Products Well-Stocked at Shops: {sp['summary'].get('healthyCount', 0)}
 """)
         if sp.get('aiInsights', {}).get('keyFindings'):
             context_parts.append("KEY FINDINGS:\n" + "\n".join([f"- {f}" for f in sp['aiInsights']['keyFindings'][:5]]))
@@ -2410,43 +2421,45 @@ STOCK PLANNING SUMMARY:
         df = frontend_context['demandForecast']
         
         if df.get('summary'):
-            context_parts.append(f"\nDEMAND FORECAST SUMMARY:")
+            context_parts.append(f"\nDEMAND FORECAST - SUPPLY PLANNING:")
             context_parts.append(f"- Total Products Analyzed: {df['summary'].get('totalProducts', 0)}")
-            context_parts.append(f"- Products needing immediate order (CRITICAL): {df['summary'].get('criticalCount', 0)}")
-            context_parts.append(f"- Products to restock soon: {df['summary'].get('warningCount', 0)}")
-            context_parts.append(f"- Products with adequate stock: {df['summary'].get('healthyCount', 0)}")
+            context_parts.append(f"- Shops needing URGENT DELIVERY (CRITICAL): {df['summary'].get('criticalCount', 0)}")
+            context_parts.append(f"- Shops to supply soon: {df['summary'].get('warningCount', 0)}")
+            context_parts.append(f"- Shops with adequate stock (no supply needed): {df['summary'].get('healthyCount', 0)}")
         
         if df.get('forecasts'):
             # Include ALL Critical items
             critical_items = [f for f in df['forecasts'] if f.get('action') == 'CRITICAL']
             if critical_items:
-                context_parts.append(f"\nALL CRITICAL PRODUCTS ({len(critical_items)} items):")
+                context_parts.append(f"\nURGENT SUPPLY NEEDED - CRITICAL ({len(critical_items)} items):")
+                context_parts.append("(These shops need immediate delivery from you)")
                 for item in critical_items:
-                    context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('currentStock', 0)} in stock, predicted demand {item.get('predictedDemand14d', 0)} units, stockout in {item.get('daysUntilStockout', 'N/A')} days, avg {item.get('avgDailySales', 0)}/day")
+                    context_parts.append(f"- SHIP TO {item.get('shopName', 'Unknown Shop')}: {item.get('productName', 'Unknown')} - shop has only {item.get('currentStock', 0)} units, needs {item.get('predictedDemand14d', 0)} units for 14 days, stockout in {item.get('daysUntilStockout', 'N/A')} days, avg sales {item.get('avgDailySales', 0)}/day")
             
             # Include ALL RESTOCK SOON items
             restock_soon_items = [f for f in df['forecasts'] if f.get('action') == 'RESTOCK SOON']
             if restock_soon_items:
-                context_parts.append(f"\nALL PRODUCTS TO RESTOCK SOON ({len(restock_soon_items)} items):")
+                context_parts.append(f"\nSUPPLY SOON - PLAN DELIVERY ({len(restock_soon_items)} items):")
+                context_parts.append("(Schedule these deliveries in your production/distribution plan)")
                 for item in restock_soon_items:
-                    context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('currentStock', 0)} in stock, predicted demand {item.get('predictedDemand14d', 0)} units, stockout in {item.get('daysUntilStockout', 'N/A')} days")
+                    context_parts.append(f"- PLAN FOR {item.get('shopName', 'Unknown Shop')}: {item.get('productName', 'Unknown')} - shop has {item.get('currentStock', 0)} units, needs {item.get('predictedDemand14d', 0)} units, stockout in {item.get('daysUntilStockout', 'N/A')} days")
             
             # Include ALL ADEQUATE items (for complete picture)
             adequate_items = [f for f in df['forecasts'] if f.get('action') == 'ADEQUATE']
             if adequate_items:
-                context_parts.append(f"\nPRODUCTS WITH ADEQUATE STOCK ({len(adequate_items)} items):")
+                context_parts.append(f"\nWELL-STOCKED SHOPS - NO SUPPLY NEEDED ({len(adequate_items)} items):")
                 for item in adequate_items:
-                    context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('currentStock', 0)} in stock")
+                    context_parts.append(f"- {item.get('shopName', 'Unknown Shop')}: {item.get('productName', 'Unknown')} - {item.get('currentStock', 0)} units in stock")
     
     # Stock Impact Data - Include ALL products
     if frontend_context.get('stockImpact'):
         si = frontend_context['stockImpact']
         if si.get('summary'):
-            context_parts.append(f"\nSTOCK IMPACT ANALYSIS:")
-            context_parts.append(f"- Critical Products: {si['summary'].get('criticalProducts', 0)}")
-            context_parts.append(f"- Low Stock Products: {si['summary'].get('warningProducts', 0)}")
-            context_parts.append(f"- Total Units at Risk: {si['summary'].get('totalUnitsAtRisk', 0)}")
-            context_parts.append(f"- Total Restock Needed: {si['summary'].get('totalRestockNeeded', 0)} units")
+            context_parts.append(f"\nSUPPLY IMPACT ANALYSIS:")
+            context_parts.append(f"- Shops needing critical supply: {si['summary'].get('criticalProducts', 0)}")
+            context_parts.append(f"- Shops with low stock: {si['summary'].get('warningProducts', 0)}")
+            context_parts.append(f"- Total Units at Risk (potential lost sales at shops): {si['summary'].get('totalUnitsAtRisk', 0)}")
+            context_parts.append(f"- Total Units YOU NEED TO SUPPLY: {si['summary'].get('totalRestockNeeded', 0)} units")
         
         if si.get('stockImpacts'):
             # Group by status
@@ -2455,25 +2468,25 @@ STOCK PLANNING SUMMARY:
             healthy_items = [item for item in si['stockImpacts'] if item.get('status') == 'healthy']
             
             if critical_items:
-                context_parts.append(f"\nALL CRITICAL STOCK PRODUCTS ({len(critical_items)} items):")
+                context_parts.append(f"\nCRITICAL - SHIP IMMEDIATELY ({len(critical_items)} items):")
                 for item in critical_items:
-                    context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('stockRatio', 0)}% stock level, {item.get('unitsAtRisk', 0)} units at risk, restock {item.get('restockQty', 0)} units, sold {item.get('totalSold', 0)} units")
+                    context_parts.append(f"- URGENT DELIVERY TO {item.get('shopName', 'Unknown Shop')}: {item.get('productName', 'Unknown')} - {item.get('stockRatio', 0)}% stock, {item.get('unitsAtRisk', 0)} units at risk of stockout, SUPPLY {item.get('restockQty', 0)} units, sold {item.get('totalSold', 0)} units")
             
             if low_items:
-                context_parts.append(f"\nALL LOW STOCK PRODUCTS ({len(low_items)} items):")
+                context_parts.append(f"\nLOW STOCK AT SHOPS - SCHEDULE SUPPLY ({len(low_items)} items):")
                 for item in low_items:
-                    context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('stockRatio', 0)}% stock level, restock {item.get('restockQty', 0)} units")
+                    context_parts.append(f"- SCHEDULE FOR {item.get('shopName', 'Unknown Shop')}: {item.get('productName', 'Unknown')} - {item.get('stockRatio', 0)}% stock level, supply {item.get('restockQty', 0)} units")
             
             if healthy_items:
-                context_parts.append(f"\nHEALTHY STOCK PRODUCTS ({len(healthy_items)} items):")
+                context_parts.append(f"\nWELL-STOCKED SHOPS - NO ACTION NEEDED ({len(healthy_items)} items):")
                 for item in healthy_items:
-                    context_parts.append(f"- {item.get('productName', 'Unknown')} at {item.get('shopName', 'Unknown Shop')}: {item.get('stockRatio', 0)}% stock level, sold {item.get('totalSold', 0)} units")
+                    context_parts.append(f"- {item.get('shopName', 'Unknown Shop')}: {item.get('productName', 'Unknown')} - {item.get('stockRatio', 0)}% stock level, sold {item.get('totalSold', 0)} units")
     
     return "\n".join(context_parts) if context_parts else "No detailed insights available."
 
 
 def build_basic_context(distributor_id):
-    """Build basic context from database (fallback when no frontend context)."""
+    """Build basic context from database (fallback when no frontend context) for distributor supply chain."""
     stock_status = db.session.query(
         Product.name,
         Product.category,
@@ -2522,18 +2535,21 @@ def build_basic_context(distributor_id):
             healthy_products.append(product_info)
     
     return f"""
-INVENTORY CONTEXT FOR DISTRIBUTOR:
-- Total Products: {len(stock_status)}
-- Critical Stock (< 50% safety): {len(critical_products)} products
-- Low Stock (50-100% safety): {len(low_products)} products
-- Healthy Stock (> 100% safety): {len(healthy_products)} products
+DISTRIBUTOR SUPPLY CHAIN OVERVIEW:
+(You supply products to these shops - this shows THEIR stock levels, not your inventory)
 
-CRITICAL PRODUCTS (need immediate restocking):
-{chr(10).join([f"- {p['name']} at {p['shop']}: {p['stock']} units (safety: {p['safety']}), sold {p['sold']} units" for p in critical_products[:5]]) or "None"}
+SHOPS YOU SUPPLY TO - STOCK STATUS:
+- Total Products Across Shops: {len(stock_status)}
+- Shops needing URGENT SUPPLY (< 50% stock): {len(critical_products)} products
+- Shops needing supply soon (50-100% stock): {len(low_products)} products
+- Well-stocked shops (> 100% stock): {len(healthy_products)} products
 
-LOW STOCK PRODUCTS (watch list):
-{chr(10).join([f"- {p['name']} at {p['shop']}: {p['stock']} units (safety: {p['safety']})" for p in low_products[:5]]) or "None"}
+URGENT DELIVERIES NEEDED (ship these immediately):
+{chr(10).join([f"- SHIP TO {p['shop']}: {p['name']} - only {p['stock']} units left (safety: {p['safety']}), sold {p['sold']} units" for p in critical_products[:5]]) or "None - all shops well supplied"}
 
-TOP SELLING PRODUCTS (by units sold):
-{chr(10).join([f"- {p['name']}: {p['sold']} units sold" for p in sorted(critical_products + low_products + healthy_products, key=lambda x: -x['sold'])[:5]])}
+SCHEDULE FUTURE SUPPLY (plan these deliveries):
+{chr(10).join([f"- PLAN FOR {p['shop']}: {p['name']} - {p['stock']} units left (safety: {p['safety']})" for p in low_products[:5]]) or "None"}
+
+TOP SELLING PRODUCTS (prioritize production of these):
+{chr(10).join([f"- {p['name']} at {p['shop']}: {p['sold']} units sold" for p in sorted(critical_products + low_products + healthy_products, key=lambda x: -x['sold'])[:5]])}
 """
