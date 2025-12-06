@@ -143,11 +143,7 @@ def serve_upload(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
-@app.route("/datasets/<path:filename>")
-def serve_dataset_file(filename):
-    """Serve dataset files (images) for frontend access."""
-    datasets_folder = os.path.join(BASE_DIR, "datasets")
-    return send_from_directory(datasets_folder, filename)
+
 
 
 @app.route("/docs", methods=["GET"])
@@ -295,19 +291,6 @@ def serve_uploads(filename):
 if __name__ == "__main__":
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     with app.app_context():
-        rag_service.load_from_disk_startup(BASE_DIR)
-
-        if not rag_service.is_initialized:
-            from utils.export_data import fetch_rag_data
-            data = fetch_rag_data()
-            rag_service.load_from_memory(data, BASE_DIR)
-        try:
-            print(f"[ShopRAG] base_dir: {shop_rag_service_singleton.base_dir}")
-        except Exception as e:
-            print(f"[ShopRAG] init failed: {e}")
-        rag_pipeline.init_app(app)
-    
-    with app.app_context():
         db.create_all()
 
         # Enable SQLite WAL mode for better concurrent access
@@ -330,6 +313,19 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Seeding failed: {e}")
                 print("Continuing with application startup...")
+
+        # Initialize AI Services after DB is ready
+        rag_service.load_from_disk_startup(BASE_DIR)
+
+        if not rag_service.is_initialized:
+            from utils.export_data import fetch_rag_data
+            data = fetch_rag_data()
+            rag_service.load_from_memory(data, BASE_DIR)
+        try:
+            print(f"[ShopRAG] base_dir: {shop_rag_service_singleton.base_dir}")
+        except Exception as e:
+            print(f"[ShopRAG] init failed: {e}")
+        rag_pipeline.init_app(app)
 
         # Initialize product image search index
         try:

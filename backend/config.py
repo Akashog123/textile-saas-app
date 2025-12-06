@@ -93,7 +93,7 @@ class Config:
     
     # Image serving paths
     STATIC_IMAGE_PATH = "/uploads" 
-    DATASET_IMAGE_PATH = "/datasets" 
+
     
     # Fallback placeholder images
     PLACEHOLDER_IMAGE_SERVICE = os.getenv("PLACEHOLDER_IMAGE_SERVICE", "https://placehold.co")
