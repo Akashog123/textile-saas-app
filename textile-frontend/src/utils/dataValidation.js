@@ -184,7 +184,7 @@ const validateRating = (rating) => {
       return Math.max(0, Math.min(5, num));
     }
   }
-  return 4.0; // Default rating
+  return 0.0; // Default rating
 };
 
 /**
@@ -251,7 +251,7 @@ const createFallbackProduct = () => ({
   price: 'Price not available',
   description: 'This product information is currently unavailable.',
   category: 'Unknown',
-  rating: 4.0,
+  rating: 0.0,
   seller: 'Independent Seller',
   badge: '',
   is_trending: false,
@@ -274,7 +274,7 @@ const createFallbackShop = () => ({
   address: 'Address not available',
   contact: 'Contact not available',
   hours: 'Open during business hours',
-  rating: 4.0,
+  rating: 0.0,
   location: 'Location not available',
   city: 'Unknown',
   image: 'https://placehold.co/800x600?text=Shop+Not+Available',
@@ -293,7 +293,7 @@ const createFallbackFabric = () => ({
   price: 'Price not available',
   description: 'Fabric information is currently unavailable.',
   category: 'Unknown',
-  rating: 4.0,
+  rating: 0.0,
   badge: 'Trending',
   seller: 'Independent Seller',
   image: 'https://placehold.co/800x600?text=Fabric+Not+Available',

@@ -15,21 +15,31 @@ export const getTrendingFabrics = () => {
     return api.get('/customer/trending-fabrics');
 };
 export const getShopReviews = (shopId) => {
-  return api.get(`/customer/shops/${shopId}/reviews`);
+    return api.get(`/customer/shops/${shopId}/reviews`);
 };
 
 export const submitShopReview = (shopId, payload) => {
-  return api.post(`/customer/shops/${shopId}/reviews`, payload);
+    return api.post(`/customer/shops/${shopId}/reviews`, payload);
 };
 
 
 /**
- * Get popular shops based on sales and ratings
- * @param {string} [city] - Optional city filter
+ * Get popular shops based on reviews and optionally nearby location
+ * @param {Object} [options] - Filter options
+ * @param {string} [options.city] - Optional city filter
+ * @param {number} [options.lat] - User latitude for nearby filtering
+ * @param {number} [options.lon] - User longitude for nearby filtering
+ * @param {number} [options.radius=25] - Search radius in km (default: 25)
+ * @param {number} [options.limit=10] - Number of shops to return
  * @returns {Promise} Response with popular shops list
  */
-export const getPopularShops = (city = null) => {
-    const params = city ? { city } : {};
+export const getPopularShops = (options = {}) => {
+    const params = {};
+    if (options.city) params.city = options.city;
+    if (options.lat !== undefined) params.lat = options.lat;
+    if (options.lon !== undefined) params.lon = options.lon;
+    if (options.radius) params.radius = options.radius;
+    if (options.limit) params.limit = options.limit;
     return api.get('/customer/popular-shops', { params });
 };
 
@@ -152,7 +162,7 @@ export const searchNearbyWithProducts = (data) => {
 export const searchByImage = async (imageFile, optionsOrLimit = 20) => {
     const formData = new FormData();
     formData.append('image', imageFile);
-    
+
     let limit = 20;
 
     if (typeof optionsOrLimit === 'number') {
@@ -160,9 +170,9 @@ export const searchByImage = async (imageFile, optionsOrLimit = 20) => {
     } else if (typeof optionsOrLimit === 'object') {
         limit = optionsOrLimit.limit || 20;
     }
-    
+
     formData.append('limit', limit);
-    
+
     return api.post('/image-search/similar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 15000 // 15 second timeout
@@ -215,6 +225,26 @@ export const getCategories = () => {
 };
 
 // ============================================================================
+// PRODUCT REVIEWS
+// ============================================================================
+
+export const getProductReviews = (productId) => {
+    return api.get(`/customer/products/${productId}/reviews`);
+};
+
+export const submitProductReview = (productId, payload) => {
+    return api.post(`/customer/products/${productId}/reviews`, payload);
+};
+
+export const updateProductReview = (productId, reviewId, payload) => {
+    return api.put(`/customer/products/${productId}/reviews/${reviewId}`, payload);
+};
+
+export const deleteProductReview = (productId, reviewId) => {
+    return api.delete(`/customer/products/${productId}/reviews/${reviewId}`);
+};
+
+// ============================================================================
 // SERVICE STATUS
 // ============================================================================
 
@@ -224,6 +254,22 @@ export const getCategories = () => {
  */
 export const getSearchStatus = () => {
     return api.get('/customer/search/status');
+};
+
+// ============================================================================
+// WISHLIST
+// ============================================================================
+
+export const getWishlist = () => {
+    return api.get('/customer/wishlist');
+};
+
+export const addToWishlist = (productId) => {
+    return api.post(`/customer/wishlist/${productId}`);
+};
+
+export const removeFromWishlist = (productId) => {
+    return api.delete(`/customer/wishlist/${productId}`);
 };
 
 export default {
@@ -248,5 +294,16 @@ export default {
     getProductDetails,
     getCategories,
     // Status
-    getSearchStatus
+    getSearchStatus,
+    // Product Reviews
+    getProductReviews,
+    submitProductReview,
+    updateProductReview,
+    deleteProductReview,
+    // Wishlist
+    getWishlist,
+    addToWishlist,
+    removeFromWishlist
 };
+
+

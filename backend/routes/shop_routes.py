@@ -112,6 +112,7 @@ def shop_dashboard(current_user):
     if df is None or not has_inventory:
         default_data = _default_dashboard_data()
         default_data["customer_rating"] = actual_rating
+        default_data["shop_name"] = shop.name if shop else "Shop"
         
         if not has_inventory:
             info_message = "Welcome! Start by adding products to your inventory. Once you have products and sales, your dashboard analytics will appear here."
@@ -250,6 +251,7 @@ def shop_dashboard(current_user):
         return jsonify({
             "status": "success",
             "data": {
+                "shop_name": shop.name if shop else "Shop",
                 "weekly_sales": f"₹{weekly_sales:,.2f}",
                 "pending_reorders": total_pending_reorders,
                 "total_orders": total_orders,
@@ -615,6 +617,9 @@ def upload_sales_data(current_user):
                 old_stock = inventory.qty_available
                 new_stock = max(0, old_stock - delta_qty)
                 inventory.qty_available = new_stock
+                
+                # Update total_sold to track cumulative sales quantity
+                inventory.total_sold = (inventory.total_sold or 0) + max(0, delta_qty)
                 
                 stock_updates.append({
                     "product_name": product.name,

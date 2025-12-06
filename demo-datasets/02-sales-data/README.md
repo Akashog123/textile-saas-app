@@ -48,5 +48,6 @@ Content-Type: multipart/form-data
 Authorization: Bearer <token>
 
 Form Data:
-- file: weekly_sales.csv
+- file: weekly_sales1.csv
+- file: weekly_sales2.csv
 ```

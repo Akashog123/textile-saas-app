@@ -1,14 +1,12 @@
 # routes/shop_explorer.py
 
 from flask import Blueprint, jsonify, request
-from models.model import db, Shop, Product, User
+from models.model import Shop, Product
 from config import Config
 from utils.image_utils import resolve_product_image, resolve_shop_image
-from utils.auth_utils import token_required
-from services.ai_service import generate_ai_caption
 import requests
 from math import cos, radians
-# add near the top of routes/shop_explorer.py
+from sqlalchemy import func
 import logging
 logger = logging.getLogger(__name__)
 
@@ -35,7 +33,8 @@ def _serialize_shop(shop):
                 owner = {
                     "id": getattr(shop.owner, "id", None),
                     "full_name": getattr(shop.owner, "full_name", None),
-                    "username": getattr(shop.owner, "username", None)
+                    "username": getattr(shop.owner, "username", None),
+                    "contact": getattr(shop.owner, "contact", None)
                 }
         except Exception:
             owner = None
@@ -49,7 +48,7 @@ def _serialize_shop(shop):
             "state": getattr(shop, "state", None),
             "lat": float(getattr(shop, "lat", None)) if getattr(shop, "lat", None) is not None else None,
             "lon": float(getattr(shop, "lon", None)) if getattr(shop, "lon", None) is not None else None,
-            "rating": round(getattr(shop, "rating", 4.0) or 4.0, 1),
+            "rating": round(getattr(shop, "rating", 0.0) or 0.0, 1),
             "is_popular": bool(getattr(shop, "is_popular", False)),
             "image": resolve_shop_image(shop) if 'resolve_shop_image' in globals() else getattr(shop, "image_url", None),
             "owner": owner,
@@ -67,7 +66,7 @@ def _serialize_shop(shop):
             "address": "",
             "lat": None,
             "lon": None,
-            "rating": 4.0,
+            "rating": 0.0,
             "image": getattr(shop, "image_url", None)
         }
 
@@ -88,7 +87,7 @@ def _serialize_shop(s: Shop):
         "latitude": float(s.lat) if s.lat is not None else None,
         "longitude": float(s.lon) if s.lon is not None else None,
         "image": resolve_shop_image(s),
-        "rating": round(s.rating or 4.0, 1),
+        "rating": round(s.rating or 0.0, 1),
     }
 
 
@@ -96,8 +95,20 @@ def _serialize_shop(s: Shop):
 @shop_explorer_bp.route("/shops", methods=["GET"])
 def get_all_shops():
     try:
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        sort_by = request.args.get('sort', 'rating')
+
+        query = Shop.query
+
+        if sort_by == 'distance' and lat is not None and lon is not None:
+            # Calculate squared Euclidean distance for sorting
+            distance_expr = func.pow(Shop.lat - lat, 2) + func.pow(Shop.lon - lon, 2)
+            query = query.order_by(distance_expr.asc())
+        else:
+            query = query.order_by(Shop.rating.desc())
         
-        shops = Shop.query.all()
+        shops = query.all()
         result = [_serialize_shop(s) for s in shops]
         return jsonify({"status": "success", "count": len(result), "shops": result}), 200
     except Exception:
@@ -132,7 +143,7 @@ def get_shop_details(shop_id):
                 "price": f"₹{price:,.0f}",
                 "description": product.description or "",
                 "category": product.category,
-                "rating": round(getattr(product, "rating", 4.0) or 4.0, 1),
+                "rating": round(getattr(product, "rating", 0.0) or 0.0, 1),
                 "seller": product.shop.owner.full_name if product.shop and product.shop.owner else "Independent Seller",
                 "image": resolve_product_image(product)
             })
@@ -166,7 +177,7 @@ def search():
             "id": s.id,
             "name": s.name,
             "description": s.description,
-            "rating": round(getattr(s, "rating", 4.0) or 4.0, 1),
+            "rating": round(getattr(s, "rating", 0.0) or 0.0, 1),
             "image": getattr(s, "image_url", None)
         } for s in shops]
 
@@ -254,7 +265,7 @@ def _query_local_nearby_shops(lat: float, lon: float, radius_meters: float):
             "address": shop.location or shop.address or "Unknown",
             "lat": float(shop.lat) if shop.lat is not None else None,
             "lon": float(shop.lon) if shop.lon is not None else None,
-            "rating": round(shop.rating or 4.0, 1),
+            "rating": round(shop.rating or 0.0, 1),
             "shortName": (shop.name or "Shop")[:10],
         })
 

@@ -308,9 +308,9 @@ defineExpose({
       <div class="chat-header shop-owner-header">
         <div class="d-flex align-items-center gap-2">
           <div class="header-icon">
-            <i class="bi bi-flower1"></i>
+            <img src="@/assets/icon.png" alt="Bot Logo" style="width: 20px; height: 20px; object-fit: contain;" />
           </div>
-          <span class="mb-0 fw-bold brand-text-white text-white">SE Assistant</span>
+          <span class="mb-0 fw-bold brand-text-white text-white">Assistant</span>
         </div>
         <button class="close-btn" @click="toggleChat" aria-label="Close chat">
           <i class="bi bi-dash-lg"></i>
@@ -504,7 +504,7 @@ defineExpose({
 }
 
 .header-icon {
-  background: rgba(255,255,255,0.2);
+  background: white;
   width: 32px;
   height: 32px;
   border-radius: 8px;

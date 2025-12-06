@@ -1,0 +1,73 @@
+date,sku,product_name,category,quantity_sold,selling_price,region
+2025-11-29,COT-002,Handloom Cotton,Cotton,7,2200,West
+2025-11-29,BRO-001,Banarasi Brocade,Brocade,15,6100,East
+2025-11-29,CRP-001,Crepe Fabric,Crepe,4,1250,North
+2025-11-29,NET-001,Net Fabric Embroidered,Net,15,1600,South
+2025-11-30,VEL-001,Velvet Fabric,Velvet,19,3900,West
+2025-11-30,SLK-002,Chanderi Silk Cotton,Silk,14,3500,North
+2025-11-30,COT-002,Handloom Cotton,Cotton,15,2000,North
+2025-11-30,WOL-001,Wool Blend Fabric,Wool,19,3600,East
+2025-11-30,CRP-001,Crepe Fabric,Crepe,18,1350,North
+2025-11-30,RAY-001,Rayon Printed,Rayon,7,1000,East
+2025-11-30,COT-001,Premium Cotton Fabric Roll,Cotton,14,1650,North
+2025-12-01,VEL-001,Velvet Fabric,Velvet,11,3700,Central
+2025-12-01,WOL-001,Wool Blend Fabric,Wool,13,3150,West
+2025-12-01,GOV-001,Govind Silk,Silk,3,1400,East
+2025-12-02,CHF-001,Chiffon Silk,Chiffon,10,1900,Central
+2025-12-02,KHD-001,Khadi Cotton,Khadi,13,1000,North
+2025-12-02,COT-002,Handloom Cotton,Cotton,3,2300,West
+2025-12-02,CRP-001,Crepe Fabric,Crepe,6,1250,North
+2025-12-03,VEL-001,Velvet Fabric,Velvet,9,4150,West
+2025-12-03,BRO-001,Banarasi Brocade,Brocade,12,6100,East
+2025-12-03,WOL-001,Wool Blend Fabric,Wool,9,3250,Central
+2025-12-03,COT-002,Handloom Cotton,Cotton,15,2150,West
+2025-12-04,BAM-001,Bamboo Fabric,Bamboo,1,1900,South
+2025-12-04,ORG-001,Organza Silk,Organza,13,2450,East
+2025-12-04,BRO-001,Banarasi Brocade,Brocade,10,6950,Central
+2025-12-04,SLK-002,Chanderi Silk Cotton,Silk,9,3400,North
+2025-12-04,JAC-001,Jacquard Woven,Jacquard,16,3000,East
+2025-12-04,CRP-001,Crepe Fabric,Crepe,6,1350,East
+2025-12-04,CHF-001,Chiffon Silk,Chiffon,18,1900,West
+2025-12-05,WOL-001,Wool Blend Fabric,Wool,17,3600,East
+2025-12-05,NET-001,Net Fabric Embroidered,Net,15,1800,West
+2025-12-05,COT-002,Handloom Cotton,Cotton,9,2300,East
+2025-12-05,KHD-001,Khadi Cotton,Khadi,18,1100,South
+2025-12-05,KOT-001,Kota Doria,Cotton,17,1500,Central
+2025-12-05,COT-001,Premium Cotton Fabric Roll,Cotton,2,1900,North
+2025-12-05,JAC-001,Jacquard Woven,Jacquard,9,2850,West
+2025-12-05,VEL-001,Velvet Fabric,Velvet,18,3900,North
+2025-12-06,COT-002,Handloom Cotton,Cotton,17,2000,South
+2025-12-06,CHF-001,Chiffon Silk,Chiffon,10,1950,Central
+2025-12-06,CRP-001,Crepe Fabric,Crepe,14,1250,North
+2025-12-07,SLK-001,Tussar Silk Fabric,Silk,6,4250,Central
+2025-12-07,GOV-001,Govind Silk,Silk,9,1350,West
+2025-12-07,CRP-001,Crepe Fabric,Crepe,4,1350,Central
+2025-12-07,GEO-001,Georgette Fabric,Georgette,7,1550,Central
+2025-12-07,COT-002,Handloom Cotton,Cotton,2,2300,West
+2025-12-07,JAC-001,Jacquard Woven,Jacquard,6,2700,Central
+2025-12-07,RAY-001,Rayon Printed,Rayon,19,900,Central
+2025-12-08,RAY-001,Rayon Printed,Rayon,19,950,North
+2025-12-08,SLK-002,Chanderi Silk Cotton,Silk,16,3350,East
+2025-12-08,COT-001,Premium Cotton Fabric Roll,Cotton,7,1650,North
+2025-12-08,VEL-001,Velvet Fabric,Velvet,18,4000,West
+2025-12-08,BAM-001,Bamboo Fabric,Bamboo,9,2050,South
+2025-12-08,WOL-001,Wool Blend Fabric,Wool,20,3350,South
+2025-12-09,CHF-001,Chiffon Silk,Chiffon,5,1800,South
+2025-12-09,KHD-001,Khadi Cotton,Khadi,2,1050,North
+2025-12-09,BRO-001,Banarasi Brocade,Brocade,19,6550,North
+2025-12-10,JAC-001,Jacquard Woven,Jacquard,20,3100,South
+2025-12-10,WOL-001,Wool Blend Fabric,Wool,8,3300,West
+2025-12-10,COT-001,Premium Cotton Fabric Roll,Cotton,8,1750,South
+2025-12-10,BAM-001,Bamboo Fabric,Bamboo,20,2000,East
+2025-12-10,SLK-002,Chanderi Silk Cotton,Silk,15,3250,East
+2025-12-10,NET-001,Net Fabric Embroidered,Net,9,1750,West
+2025-12-10,KOT-001,Kota Doria,Cotton,4,1550,North
+2025-12-10,GOV-001,Govind Silk,Silk,14,1400,South
+2025-12-11,VEL-001,Velvet Fabric,Velvet,3,3550,Central
+2025-12-11,SLK-002,Chanderi Silk Cotton,Silk,8,3300,Central
+2025-12-11,ORG-001,Organza Silk,Organza,6,2350,North
+2025-12-11,COT-002,Handloom Cotton,Cotton,12,2100,South
+2025-12-12,ART-001,Art Silk,Silk,17,1200,West
+2025-12-12,ORG-001,Organza Silk,Organza,2,2350,East
+2025-12-12,CRP-001,Crepe Fabric,Crepe,12,1300,North
+2025-12-12,SLK-002,Chanderi Silk Cotton,Silk,18,3100,South
