@@ -300,7 +300,7 @@
         <div class="chat-panel-header">
           <div class="chat-header-info">
             <i class="bi bi-robot me-2"></i>
-            <span>AI Inventory Assistant</span>
+            <span>AI Supply Chain Assistant</span>
           </div>
           <div class="chat-header-actions">
             <button class="chat-action-btn" @click="toggleChatSize" :title="isChatExpanded ? 'Minimize' : 'Expand'">
@@ -319,16 +319,16 @@
               <i class="bi bi-robot"></i>
             </div>
             <h6>How can I help you today?</h6>
-            <p>I have access to your AI insights, demand forecasts, stock risks, and planning data.</p>
+            <p>I have access to shop stock levels, demand forecasts, and supply chain insights for shops you supply to.</p>
             <div class="quick-actions">
-              <button @click="askSuggested('What should I prioritize restocking?')" class="quick-action-btn">
-                <i class="bi bi-arrow-repeat me-1"></i>Restock priorities
+              <button @click="askSuggested('Which shops need urgent supply from me?')" class="quick-action-btn">
+                <i class="bi bi-truck me-1"></i>Urgent deliveries
               </button>
-              <button @click="askSuggested('Which products are at highest stockout risk?')" class="quick-action-btn">
-                <i class="bi bi-exclamation-triangle me-1"></i>Stockout risks
+              <button @click="askSuggested('Which products should I prioritize for production?')" class="quick-action-btn">
+                <i class="bi bi-gear me-1"></i>Production priorities
               </button>
-              <button @click="askSuggested('Give me a summary of my inventory health')" class="quick-action-btn">
-                <i class="bi bi-clipboard-data me-1"></i>Inventory summary
+              <button @click="askSuggested('Give me a summary of shop stock health')" class="quick-action-btn">
+                <i class="bi bi-clipboard-data me-1"></i>Supply chain summary
               </button>
             </div>
           </div>
@@ -352,7 +352,7 @@
             @keyup.enter="sendChatMessage"
             type="text"
             class="chat-input-floating"
-            placeholder="Ask about inventory, demand, restocking..."
+            placeholder="Ask about supply needs, deliveries, production..."
             :disabled="chatLoading"
           >
           <button @click="sendChatMessage" class="send-btn-floating" :disabled="chatLoading || !chatInput.trim()">
