@@ -2273,7 +2273,7 @@ onUnmounted(() => {
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateX(120%);
 }
 
 /* ============================================================================

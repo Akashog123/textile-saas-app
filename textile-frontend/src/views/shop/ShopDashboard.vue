@@ -428,7 +428,15 @@
                 <span v-else><i class="bi bi-download me-1"></i>Export Report</span>
               </button>
             </div>
-            <div class="insights-container flex-grow-1 custom-scrollbar pe-2">
+            <!-- Loading State -->
+            <div v-if="loading" class="flex-grow-1 d-flex align-items-center justify-content-center py-5">
+              <div class="text-center">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <p class="text-muted mb-0 small">Analyzing trends...</p>
+              </div>
+            </div>
+
+            <div v-else class="insights-container flex-grow-1 custom-scrollbar">
               <!-- Empty State -->
               <div v-if="aiInsights.length === 0" class="h-100 d-flex align-items-center justify-content-center text-center">
                  <div class="p-4">
@@ -445,7 +453,7 @@
               <!-- Insights List -->
               <div
                 v-else
-                class="insight-item mb-3 p-3 rounded-3"
+                class="insight-item mb-3 p-3 rounded-3 mx-2"
                 :class="[
                   insight.type === 'success' ? 'insight-success' : 
                   insight.type === 'warning' ? 'insight-warning' : 'insight-info'
@@ -464,12 +472,12 @@
                   >
                     <i :class="insight.icon"></i>
                   </div>
-                  <div class="flex-grow-1">
+                  <div class="flex-grow-1 min-w-0">
                     <div class="d-flex align-items-center gap-2 mb-1">
-                      <strong class="text-dark" style="font-size: 0.95rem;">{{ insight.title }}</strong>
+                      <strong class="text-dark text-truncate" style="font-size: 0.95rem;">{{ insight.title }}</strong>
                       <span 
                         v-if="insight.category" 
-                        class="badge rounded-pill"
+                        class="badge rounded-pill flex-shrink-0"
                         :class="[
                           insight.type === 'success' ? 'bg-success-soft text-success' : 
                           insight.type === 'warning' ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary'
@@ -479,7 +487,7 @@
                         {{ insight.category }}
                       </span>
                     </div>
-                    <p class="mb-0 small text-muted lh-sm">
+                    <p class="mb-0 small text-muted lh-sm text-line-clamp-2">
                       {{ insight.description }}
                     </p>
                   </div>
@@ -499,17 +507,16 @@
                 <span class="bg-success-soft text-success rounded p-1 me-2"><i class="bi bi-cart-check"></i></span>
                 Smart Reorder Suggestions
               </h6>
-              <button
-                class="btn btn-outline-primary btn-sm rounded-pill"
-                @click="viewAllSuggestions"
-              >
-                <i class="bi bi-grid-3x3-gap me-1"></i>
-                View All
-              </button>
+            </div>
+            
+            <!-- Loading State -->
+            <div v-if="loading" class="text-center py-5">
+              <div class="spinner-border text-primary mb-3" role="status"></div>
+              <p class="text-muted mb-0">Checking inventory levels...</p>
             </div>
             
             <!-- Grouped reorder suggestions -->
-            <div v-if="Object.keys(groupedReorderSuggestions).length === 0" class="text-center py-5 text-muted bg-light rounded-3">
+            <div v-else-if="Object.keys(groupedReorderSuggestions).length === 0" class="text-center py-5 text-muted bg-light rounded-3">
               <div class="empty-state-icon mb-3">
                 <i class="bi bi-inbox fs-1"></i>
               </div>
@@ -1514,64 +1521,36 @@ const uploadSalesFile = async () => {
       throw new Error(response.data.message || 'Analysis failed');
     }
 
-    // Update AI Insights directly on dashboard
-    if (response.data && (response.data.ai_insights || response.data.demand_summary)) {
-      const newInsights = [];
-      if (response.data.demand_summary) {
-        newInsights.push({
-          icon: 'bi bi-graph-up-arrow',
-          title: 'Demand Summary',
-          description: limitSentences(response.data.demand_summary, 4),
-          type: 'info',
-          category: 'Analysis'
-        });
-      }
-      if (response.data.recommendation) {
-        newInsights.push({
-          icon: 'bi bi-lightbulb-fill',
-          title: 'AI Recommendation',
-          description: limitSentences(response.data.recommendation, 4),
-          type: 'success',
-          category: 'Action'
-        });
-      }
-      if (response.data.ai_insights && response.data.ai_insights.length > 0) {
-        response.data.ai_insights.forEach(item => {
-          newInsights.push({
-            icon: getInsightIcon(item),
-            title: item.title,
-            description: limitSentences(item.message || item.description || item.impact, 4),
-            type: item.type || 'info',
-            category: item.category || 'General'
-          });
-        });
-      }
-      if (newInsights.length > 0) {
-        aiInsights.value = newInsights;
-      }
-    }
+    // Success! Close modal immediately
+    closeSalesUploadModal();
 
-    // Refresh dashboard
-    try {
-      await fetchDashboard();
-    } catch (refreshErr) {
-      console.error('[Dashboard Refresh Error]', refreshErr);
-    }
+    // User feedback via Toast
+    toastMessage.value = 'Sales data uploaded! Updating dashboard...';
+    toastIcon.value = 'bi bi-arrow-repeat';
+    showToast.value = true;
 
+    // Trigger granular updates - fire and forget (don't await them blocking each other)
+    // We explicitly call each fetch function to trigger its own independent loading state
+    fetchSalesSummary();
+    fetchSalesGrowthTrend(true); // Force refresh
+    fetchQuarterlyForecast();
+    fetchDashboard(); // This will trigger 'loading' for AI insights and Reorders
+
+    // Show final success toast with timing from the response if available
     const timingMessage = formatUploadTiming(response.data?.upload_log);
     
-    if (response.data?.warning) {
-      salesUploadStatus.value = { type: 'warning', message: response.data.warning };
-      toastMessage.value = response.data.warning;
-      toastIcon.value = 'bi bi-exclamation-triangle';
-    } else {
-      salesUploadStatus.value = { type: 'success', message: timingMessage || 'Upload successful!' };
-      toastMessage.value = 'Sales data uploaded successfully!';
-      toastIcon.value = 'bi bi-check-circle-fill';
-    }
-    
-    showToast.value = true;
-    setTimeout(() => (showToast.value = false), 5000);
+    // We set a timeout for the completion toast to not override the "Updating" toast immediately
+    setTimeout(() => {
+        if (response.data?.warning) {
+        toastMessage.value = response.data.warning;
+        toastIcon.value = 'bi bi-exclamation-triangle';
+        } else {
+        toastMessage.value = `Dashboard updated! ${timingMessage || ''}`;
+        toastIcon.value = 'bi bi-check-circle-fill';
+        }
+        showToast.value = true;
+        setTimeout(() => (showToast.value = false), 5000);
+    }, 1500);
 
   } catch (err) {
     console.error('[Upload Error]', err);
@@ -1586,7 +1565,16 @@ const uploadSalesFile = async () => {
     } else {
       errorMsg = err.response?.data?.message || err.message || 'Upload failed. Please try again.';
     }
-    salesUploadStatus.value = { type: 'error', message: errorMsg };
+    
+    if (salesUploading.value) {
+        // Still in upload phase, show in modal
+        salesUploadStatus.value = { type: 'error', message: errorMsg };
+    } else {
+        // Modal likely closed
+        toastMessage.value = errorMsg;
+        toastIcon.value = 'bi bi-x-circle-fill';
+        showToast.value = true;
+    }
   } finally {
     salesUploading.value = false;
   }
@@ -1632,98 +1620,129 @@ const generateInsightsPDF = async () => {
 
   generatingPDF.value = true;
   try {
-    // Construct PDF content from current dashboard state
-    const sections = [];
-
-    // 1. Sales Summary
-    if (salesSummaryData.value && salesSummaryData.value.metrics) {
-      const metrics = salesSummaryData.value.metrics;
-      const comparison = salesSummaryData.value.comparison || {};
-      
-      let summaryBody = `Total Revenue: ${metrics.total_revenue}\n`;
-      summaryBody += `Total Quantity: ${metrics.total_quantity}\n`;
-      summaryBody += `Avg Order Value: ${metrics.average_order_value_formatted}\n`;
-      
-      if (comparison.trend) {
-        summaryBody += `\nTrend: ${comparison.trend.toUpperCase()} (${comparison.revenue_change_percent}%)\n`;
-        summaryBody += `${comparison.message || ''}\n`;
-      }
-      
-      sections.push({
-        heading: 'Sales Summary (Last 7 Days)',
-        body: summaryBody
-      });
-    }
-
-    // 2. AI Insights
-    if (aiInsights.value && aiInsights.value.length > 0) {
-      let insightsBody = '';
-      aiInsights.value.forEach(insight => {
-        insightsBody += `• ${insight.title} [${insight.category}]\n`;
-        insightsBody += `  ${insight.description}\n\n`;
-      });
-      
-      sections.push({
-        heading: 'AI-Powered Insights',
-        body: insightsBody
-      });
-    }
-
-    // 3. Forecast
-    if (quarterlyForecastData.value && quarterlyForecastData.value.summary) {
-       const summary = quarterlyForecastData.value.summary;
-       let forecastBody = `Predicted Revenue: ${summary.total_predicted_revenue_formatted}\n`;
-       forecastBody += `Confidence Level: ${summary.confidence_level}\n\n`;
-       
-       if (quarterlyForecastData.value.category_forecast) {
-         forecastBody += 'Top Category Forecasts:\n';
-         quarterlyForecastData.value.category_forecast.slice(0, 5).forEach(cat => {
-           forecastBody += `- ${cat.name}: ${cat.predicted} (${cat.growth_rate > 0 ? '+' : ''}${cat.growth_rate}%)\n`;
-         });
-       }
-       
-       sections.push({
-         heading: 'Next Quarter Forecast',
-         body: forecastBody
-       });
-    }
-
-    // 4. Reorder Suggestions
-    if (reorderProducts.value && reorderProducts.value.length > 0) {
-      let reorderBody = '';
-      reorderProducts.value.slice(0, 5).forEach(prod => {
-        reorderBody += `• ${prod.name} [${prod.category || 'General'}]\n`;
-        reorderBody += `  Supplier: ${prod.supplier}\n`;
-        reorderBody += `  Price: ${prod.price} | Reorder Qty: ${prod.quantity}\n\n`;
-      });
-      
-      if (reorderProducts.value.length > 5) {
-        reorderBody += `...and ${reorderProducts.value.length - 5} more items.`;
-      }
-      
-      sections.push({
-        heading: 'Recommended Reorders',
-        body: reorderBody
-      });
-    }
-
-    const payload = {
-      title: 'Shop Insights Report',
-      subtitle: `Generated on ${new Date().toLocaleDateString()}`,
-      summary: 'This report contains AI-generated insights, sales summaries, and demand forecasts for your shop.',
-      sections: sections
+    const shopName = dashboardData.value?.shop_name || "Shop";
+    const reportData = {
+        title: `${shopName} Insights Report`,
+        subtitle: `Generated on ${new Date().toLocaleDateString()} | Textile Saas App Analytics`,
+        metrics: [],
+        summary: "Detailed analysis of sales performance, inventory needs, and AI-driven growth opportunities.",
+        sections: []
     };
 
-    const response = await generateSalesReportPdf(payload);
+    // Helper to check for empty/zero values
+    const isZeroOrEmpty = (val) => {
+        if (!val) return true;
+        const s = String(val).replace(/[₹Rs.\s,]/g, ''); // Remove currency symbols, spaces, commas
+        return s === '' || s === '—' || s === '-' || parseFloat(s) === 0;
+    };
+
+    // 1. Sales Summary Metrics
+    let hasSalesData = false;
+    let metricsList = [];
+
+    if (salesSummaryData.value && salesSummaryData.value.metrics) {
+      const m = salesSummaryData.value.metrics;
+      metricsList = [
+        { label: "Total Revenue", value: m.total_revenue_formatted || "—" },
+        { label: "Total Quantity", value: (m.total_quantity || 0).toLocaleString() },
+        { label: "Avg Order Value", value: m.average_order_value_formatted || "—" },
+        { label: "Revenue Growth", value: salesSummaryData.value.comparison?.revenue_change_percent || "—" }
+      ];
+    } else {
+       // Fallback metrics from ref
+       if (metrics.value && metrics.value.length > 0) {
+           metricsList = metrics.value.slice(0, 4).map(m => ({
+               label: m.label,
+               value: m.value
+           }));
+       }
+    }
+
+    // Filter metrics: Only show if there is at least one non-zero/non-empty value
+    hasSalesData = metricsList.some(m => !isZeroOrEmpty(m.value));
+    
+    if (hasSalesData) {
+        reportData.metrics = metricsList;
+    }
+
+    // 2. Sales Summary Text (Trend) - Only show if valid sales data exists
+    if (hasSalesData && salesComparison.value && salesComparison.value.message) {
+        let summaryText = salesComparison.value.message;
+        if (topCategory.value) {
+            summaryText += `\nTop performing category: ${topCategory.value.name} (${topCategory.value.percentage}% demand).`;
+        }
+        reportData.summary = summaryText;
+    }
+
+    // 3. AI Insights - Only show if sales data exists (avoids irrelevant insights on empty data)
+    if (hasSalesData && aiInsights.value && aiInsights.value.length > 0) {
+        let insightsBody = "";
+        aiInsights.value.forEach(insight => {
+            insightsBody += `• ${insight.title} (${insight.category || 'General'})\n  ${insight.description}\n\n`;
+        });
+        reportData.sections.push({
+            heading: "AI Strategic Insights",
+            body: insightsBody
+        });
+    }
+
+    // 4. Forecast - Only show if projected revenue/quantity is non-zero
+    if (quarterlyForecastData.value && quarterlyForecastData.value.summary) {
+        const fSummary = quarterlyForecastData.value.summary;
+        const predRev = fSummary.total_predicted_revenue_formatted;
+        const predQty = fSummary.total_predicted_quantity;
+        
+        // Show forecast only if there is a positive prediction
+        if (!isZeroOrEmpty(predRev) || (predQty && predQty > 0)) {
+            let forecastBody = `Projected Revenue: ${predRev}\n`;
+            forecastBody += `Projected Quantity: ${predQty}\n`;
+            forecastBody += `Confidence Level: ${fSummary.confidence_level || 'N/A'}\n\n`;
+            
+            if (quarterlyForecastData.value.category_forecast) {
+                 forecastBody += "Category Trends:\n";
+                 quarterlyForecastData.value.category_forecast.slice(0, 5).forEach(cat => {
+                     forecastBody += `- ${cat.name}: ${cat.predicted} (${cat.trend === 'up' ? 'Growing' : 'Declining'})\n`;
+                 });
+            }
+            reportData.sections.push({
+                heading: "Quarterly Forecast",
+                body: forecastBody
+            });
+        }
+    }
+
+    // 5. Reorder Suggestions
+    // Need to get valid reorder suggestions. 
+    // They are in groupedReorderSuggestions (dict) or reorderProducts (if that's a ref, but I saw grouped in template)
+    // Checking previous code: used reorderProducts.value if available, but let's check groupedReorderSuggestions
+    const suggestions = Object.values(groupedReorderSuggestions.value || {}).flat();
+    
+    if (suggestions.length > 0) {
+        let reorderBody = `Total Items Recommended: ${suggestions.length}\n\n`;
+        suggestions.slice(0, 10).forEach(p => {
+            reorderBody += `• ${p.name}: Order ${p.quantity} units (Stock: ${p.currentStock})\n`;
+        });
+        if (suggestions.length > 10) {
+            reorderBody += `...and ${suggestions.length - 10} more items.`;
+        }
+        reportData.sections.push({
+            heading: "Inventory Reorder Recommendations",
+            body: reorderBody
+        });
+    }
+
+    const response = await generateSalesReportPdf(reportData);
     
     // Create download link
     const blob = new Blob([response.data], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `shop_insights_${shopId.value}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = `Shop_Insights_${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(link);
     link.click();
     window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
 
     toastMessage.value = 'PDF report downloaded successfully!';
     toastIcon.value = 'bi bi-check-circle-fill';
@@ -1753,23 +1772,6 @@ const viewForecastDetails = (forecast) => {
   setTimeout(() => (showToast.value = false), 3000);
 };
 
-const viewAllSuggestions = () => {
-  toastMessage.value = 'Loading all suggestions...';
-  toastIcon.value = 'bi bi-grid-3x3-gap';
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
-};
-
-const scrollCarousel = (direction) => {
-  const track = carouselTrack.value;
-  const scrollAmount = 280;
-  if (direction === 'left') {
-    track.scrollLeft -= scrollAmount;
-  } else {
-    track.scrollLeft += scrollAmount;
-  }
-};
-
 const updateArrows = () => {
   const track = carouselTrack.value;
   if (track) {
@@ -1780,25 +1782,6 @@ const updateArrows = () => {
 };
 
 const viewProduct = (product) => {
-  selectedProduct.value = product;
-  showQuickView.value = true;
-};
-
-
-const selectFilter = (filterId) => {
-  selectedFilter.value = filterId;
-  toastMessage.value = `Filter applied: ${productFilters.value.find((f) => f.id === filterId).label}`;
-  toastIcon.value = 'bi bi-funnel-fill';
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), 3000);
-};
-
-const viewProductDetails = (product) => {
-  selectedProduct.value = product;
-  showQuickView.value = true;
-};
-
-const quickView = (product) => {
   selectedProduct.value = product;
   showQuickView.value = true;
 };
@@ -2573,9 +2556,10 @@ h6.card-title {
 }
 
 .insights-container {
-  max-height: 350px;
+  height: 400px;
   overflow-y: auto;
-  padding-right: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: 0 -0.5rem;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -2596,16 +2580,25 @@ h6.card-title {
   background: rgba(59, 130, 246, 0.4);
 }
 
+.text-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .insight-item {
   padding: 1.25rem;
   background: white;
   border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, 0.04);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   position: relative;
   overflow: hidden;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .insight-item::before {
@@ -2622,8 +2615,8 @@ h6.card-title {
 
 .insight-item:hover {
   border-color: rgba(59, 130, 246, 0.3);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
-  transform: translateX(5px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.1);
+  transform: translateY(-2px);
 }
 
 .insight-item:hover::before {
@@ -2708,11 +2701,29 @@ h6.card-title {
   overflow-x: auto;
   scroll-behavior: smooth;
   padding: 1rem 0.5rem;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--color-primary-light) transparent;
 }
 
 .carousel-track::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
+  height: 8px; /* Horizontal scrollbar thickness */
+}
+
+.carousel-track::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  margin: 0.5rem;
+}
+
+.carousel-track::-webkit-scrollbar-thumb {
+  background-color: rgba(59, 130, 246, 0.3);
+  border-radius: 10px;
+  border: 2px solid transparent; /* padding around thumb */
+  background-clip: content-box;
+}
+
+.carousel-track::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(59, 130, 246, 0.6);
 }
 
 /* ===== Reorder Product Cards ===== */

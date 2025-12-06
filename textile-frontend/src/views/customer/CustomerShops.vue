@@ -4,7 +4,7 @@
     <CustomerSearchBar 
       v-model="searchQuery"
       placeholder="Search for shops by name, location, or products..."
-      :show-nearby-button="true"
+      :show-nearby-button="false"
       :show-voice-search="true"
       :show-image-search="false"
       nearby-button-text="Find Nearby Shops"
@@ -51,11 +51,11 @@
         
         <!-- Sort Filter -->
         <div class="filter-dropdown">
-          <select v-model="filters.sort" class="filter-select" @change="fetchShops">
+          <select v-model="filters.sort" class="filter-select" @change="handleSortChange">
             <option value="rating">Top Rated</option>
+            <option value="distance">Nearest</option>
             <option value="name">Name (A-Z)</option>
             <option value="newest">Newest First</option>
-            <option value="distance" v-if="userLocation">Distance</option>
           </select>
         </div>
         
@@ -94,7 +94,7 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
-      <div class="loading-spinner">
+      <div class="loading-content text-center">
         <div class="spinner"></div>
         <p>Finding shops...</p>
       </div>
@@ -175,8 +175,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { getAllShops, searchShopsAndProducts, getNearbyShops } from '@/api/apiCustomer';
+import { getAllShops, searchShopsAndProducts } from '@/api/apiCustomer';
 import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
+import { getNearbyShopsAuto } from '@/services/locationService';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ShopCard from '@/components/cards/ShopCard.vue';
 import ShopLocatorMap from '@/components/ShopLocatorMap.vue';
@@ -230,6 +231,34 @@ const shopsWithCoordinates = computed(() => {
 });
 
 /**
+ * Handle sort change
+ */
+const handleSortChange = async () => {
+  if (filters.sort === 'distance') {
+    if (!userLocation.value) {
+      try {
+        loading.value = true;
+        const result = await getNearbyShopsAuto(10000); // Just to get location
+        if (result.location) {
+          userLocation.value = {
+            lat: result.location.latitude,
+            lon: result.location.longitude
+          };
+        } else {
+          throw new Error("Location not found");
+        }
+      } catch (err) {
+        showErrorNotification("Location access required for 'Nearest' sort. Please enable location services.");
+        filters.sort = 'rating'; // Fallback
+        loading.value = false;
+        return;
+      }
+    }
+  }
+  fetchShops();
+};
+
+/**
  * Fetch all shops from backend
  */
 const fetchShops = async () => {
@@ -242,6 +271,11 @@ const fetchShops = async () => {
       per_page: pagination.perPage,
       sort: filters.sort
     };
+    
+    if (filters.sort === 'distance' && userLocation.value) {
+      params.lat = userLocation.value.lat;
+      params.lon = userLocation.value.lon;
+    }
     
     if (filters.city) params.city = filters.city;
     if (filters.minRating) params.min_rating = filters.minRating;
@@ -311,6 +345,15 @@ const handleSearch = async (queryInput) => {
 };
 
 /**
+ * Handle nearby search (triggered from search bar)
+ * This now just sets the sort to distance and triggers fetch
+ */
+const handleNearbySearch = async () => {
+  filters.sort = 'distance';
+  await handleSortChange();
+};
+
+/**
  * Handle suggestion selection from search bar
  */
 const handleSuggestionSelect = (suggestion) => {
@@ -324,45 +367,7 @@ const handleSuggestionSelect = (suggestion) => {
   }
 };
 
-/**
- * Handle nearby search
- */
-const handleNearbySearch = async (location) => {
-  loading.value = true;
-  error.value = '';
-  
-  try {
-    userLocation.value = { lat: location.lat, lng: location.lon };
-    mapCenter.value = { lat: location.lat, lng: location.lon };
-    mapZoom.value = 13;
-    filters.sort = 'distance';
-    
-    const response = await getNearbyShops({
-      lat: location.lat,
-      lon: location.lon,
-      radius: 10, // 10km radius
-      limit: 50
-    });
-    const nearbyData = response.data?.data || response.data;
-    
-    if (nearbyData && nearbyData.shops) {
-      shops.value = normalizeShops(nearbyData.shops);
-      totalShops.value = shops.value.length;
-      
-      // Sort by distance
-      shops.value.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-      
-      showSuccessNotification(`Found ${shops.value.length} shops within 10km`);
-    } else {
-      error.value = 'No shops found nearby. Try expanding your search.';
-    }
-  } catch (err) {
-    const errorMessage = handleApiError(err, 'Nearby Search');
-    error.value = errorMessage;
-  } finally {
-    loading.value = false;
-  }
-};
+
 
 /**
  * Handle user location found from map

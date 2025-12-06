@@ -2,7 +2,7 @@
   <div class="customer-search-container">
     <div class="search-wrapper" ref="searchWrapper">
       <!-- Main Search Input Group -->
-      <div class="search-input-group" :class="{ 'focused': isFocused }">
+      <div class="search-input-group" :class="{ 'focused': isFocused, 'voice-active': isVoiceRecording }">
         <span class="search-icon">
           <i class="bi bi-search"></i>
         </span>
@@ -186,7 +186,7 @@
               <span class="status-text">{{ voiceStatusText }}</span>
             </div>
             
-            <button class="btn-stop-recording" @click="stopVoiceRecording" title="Stop Recording">
+            <button class="btn-stop-recording" @click="abortVoiceRecording" title="Cancel Recording">
               <i class="bi bi-stop-fill"></i>
             </button>
           </div>
@@ -286,13 +286,15 @@ const isImageSearching = ref(false)
 const voiceSupported = ref(false)
 const voiceManager = ref(null)
 const audioLevel = ref(0)
-const isSpeechDetected = ref(false)
 const voiceTranscript = ref('')
+const isSpeechDetected = ref(false)
 const useBackendTranscription = ref(true) // Use backend AI transcription (more reliable than browser SpeechRecognition)
 const recordingStartTime = ref(null)
 const recordingDuration = ref(0)
 const recordingTimer = ref(null)
 const MAX_RECORDING_SECONDS = 10
+const recognition = ref(null)
+const isAborted = ref(false)
 
 // Debounce timer
 let suggestionTimer = null
@@ -310,9 +312,9 @@ const voiceStatusText = computed(() => {
     return voiceTranscript.value
   }
   if (isSpeechDetected.value) {
-    return `Listening... (${MAX_RECORDING_SECONDS - recordingDuration.value}s)`
+    return `Listening...`
   }
-  return `Speak now (${MAX_RECORDING_SECONDS - recordingDuration.value}s)`
+  return `Speak now`
 })
 
 const getCategoryIndex = (idx) => idx
@@ -327,6 +329,8 @@ watch(searchQuery, (newVal) => {
     suggestions.value = { products: [], shops: [], categories: [] }
     return
   }
+  
+  if (isVoiceRecording.value) return // Don't fetch suggestions while recording voice
   
   suggestionTimer = setTimeout(() => {
     fetchSuggestions(newVal)
@@ -535,8 +539,49 @@ const initVoiceSearch = async () => {
   // Initialize voice manager with VAD settings
   voiceManager.value = voiceSearchUtils.createManager({
     maxRecordingTime: 10000, // 10 seconds max
-    redemptionMs: 2000 // 2 seconds silence to stop
+    redemptionMs: 1500 // 1.5 seconds silence to stop
   })
+  
+  // Initialize Web Speech API for live transcription
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    recognition.value = new SpeechRecognition()
+    recognition.value.continuous = true
+    recognition.value.interimResults = true
+    recognition.value.lang = 'en-US'
+    
+    recognition.value.onresult = (event) => {
+      let finalTranscript = ''
+      let interimTranscript = ''
+      
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript
+        } else {
+          interimTranscript += event.results[i][0].transcript
+        }
+      }
+      
+      // Update search query live
+      const currentText = finalTranscript || interimTranscript
+      if (currentText) {
+        console.log('[Voice] Live Transcript:', currentText)
+        searchQuery.value = currentText
+        // Force update the status text
+        voiceTranscript.value = currentText
+      }
+    }
+    
+    recognition.value.onerror = (event) => {
+      console.warn('[Voice] Live transcription error:', event.error)
+      // If network error (Speech API requires internet), fall back to simple status
+      if (event.error === 'network' || event.error === 'not-allowed') {
+        // Web Speech API failed - user will still see "Listening..." from voiceStatusText
+        // The backend Whisper will still transcribe the audio
+        console.log('[Voice] Web Speech API unavailable, using backend transcription only')
+      }
+    }
+  }
   
   // Always use backend transcription
   useBackendTranscription.value = true
@@ -544,7 +589,15 @@ const initVoiceSearch = async () => {
   // Audio recording callbacks
   voiceManager.value.onRecordingComplete = async (audioFile) => {
     stopRecordingTimer()
-    voiceTranscript.value = 'Transcribing...'
+    if (recognition.value) recognition.value.stop()
+    
+    if (isAborted.value) {
+      console.log('[Voice] Setup aborted, ignoring result')
+      resetVoiceState()
+      return
+    }
+
+    voiceTranscript.value = 'Processing...'
     await transcribeWithBackend(audioFile)
   }
   
@@ -564,7 +617,7 @@ const initVoiceSearch = async () => {
   
   voiceManager.value.onSpeechStart = () => {
     isSpeechDetected.value = true
-    voiceTranscript.value = 'Listening...'
+    // Do NOT clear voiceTranscript here, otherwise it hides the live text
   }
   
   voiceManager.value.onSpeechEnd = () => {
@@ -574,16 +627,33 @@ const initVoiceSearch = async () => {
   voiceManager.value.onAutoStop = () => {
     console.log('[Voice] Auto-stopped due to timeout')
     stopRecordingTimer()
+    if (recognition.value) recognition.value.stop()
     
-    if (isSpeechDetected.value) {
-      voiceTranscript.value = 'Transcribing...'
+    // Check if we have any input
+    if (isSpeechDetected.value || searchQuery.value) {
+       // Let onRecordingComplete handle the rest
+       voiceTranscript.value = 'Processing...'
     } else {
-      isVoiceRecording.value = false
-      voiceTranscript.value = ''
+      resetVoiceState()
       emit('error', { message: 'No speech detected', type: 'voice' })
     }
   }
 }
+
+// Lifecycle
+onMounted(() => {
+  initVoiceSearch()
+})
+
+onUnmounted(() => {
+  if (recordingTimer.value) clearInterval(recordingTimer.value)
+  if (recognition.value) {
+    try { recognition.value.stop() } catch (e) {}
+  }
+  if (voiceManager.value) {
+    voiceManager.value.stopRecording()
+  }
+})
 
 /**
  * Start voice search using backend AI transcription
@@ -596,19 +666,38 @@ const startBackendVoiceSearch = async () => {
     recordingDuration.value = 0
     recordingStartTime.value = Date.now()
     
-    // Start recording timer
+    // Start recording timer immediately
     recordingTimer.value = setInterval(() => {
       recordingDuration.value = Math.floor((Date.now() - recordingStartTime.value) / 1000)
     }, 1000)
     
-    // Use VAD-enabled recording for better audio capture
-    await voiceManager.value.startRecording()
+    // Start Live Transcription and Recording
+    // We don't await Promise.all here to ensure the UI remains responsive
+    // and one failure doesn't block the other completely immediately
+    
+    // 1. Live Web Speech API
+    if (recognition.value) {
+      try {
+        recognition.value.start()
+      } catch (e) {
+        console.warn('Speech recognition start error', e)
+        // If it's already started, that's fine
+      }
+    }
+    
+    // 2. VAD Recorder (Backend Audio)
+    voiceManager.value.startRecording().catch(err => {
+        console.error(`VAD start failed: ${err.message}`)
+        // We don't stop the whole thing immediately if VAD fails but Speech works, 
+        // but for this app we usually need VAD for the backend file.
+        // However, letting the error event flow naturally is better than a block.
+        emit('error', { message: 'High-quality recording failed, but live speech may work.', type: 'voice' })
+    })
+    
   } catch (err) {
     console.error('Failed to start audio recording:', err)
-    isVoiceRecording.value = false
-    audioLevel.value = 0
-    stopRecordingTimer()
-    emit('error', { message: 'Microphone access failed', type: 'voice' })
+    stopVoiceRecording() // Reset state
+    emit('error', { message: 'Microphone access failed. Please check permissions.', type: 'voice' })
   }
 }
 
@@ -623,30 +712,51 @@ const stopRecordingTimer = () => {
 }
 
 /**
- * Stop voice recording manually
+ * Abort voice recording without processing
+ */
+const abortVoiceRecording = () => {
+  isAborted.value = true
+  stopVoiceRecording()
+}
+
+/**
+ * Reset voice state
+ */
+const resetVoiceState = () => {
+  isVoiceRecording.value = false
+  audioLevel.value = 0
+  isSpeechDetected.value = false
+  voiceTranscript.value = ''
+  isAborted.value = false
+  if (recognition.value) {
+    try { recognition.value.stop() } catch (e) {}
+  }
+}
+
+/**
+ * Stop voice recording manually (triggers processing if not aborted)
  */
 const stopVoiceRecording = () => {
   if (voiceManager.value && isVoiceRecording.value) {
     stopRecordingTimer()
+    if (recognition.value) {
+      try { recognition.value.stop() } catch (e) {}
+    }
     
-    // If already transcribing or processing, just close the UI (Cancel)
-    if (voiceTranscript.value === 'Transcribing...' || voiceTranscript.value === 'Processing...') {
-      isVoiceRecording.value = false
+    // If already processing, just close
+    if (voiceTranscript.value === 'Processing...') {
+      // If we are aborting, make sure to close
+      if (isAborted.value) {
+        resetVoiceState()
+      }
       return
     }
     
-    // Check if we were speaking (VAD will trigger submission)
-    // If not speaking, we need to manually close as VAD won't trigger onSpeechEnd
-    const wasSpeaking = isSpeechDetected.value
-    
+    // Stop VAD recorder
+    // This will trigger onRecordingComplete which handles the rest
     voiceManager.value.stopRecording()
-    
-    if (wasSpeaking) {
-      voiceTranscript.value = 'Processing...'
-    } else {
-      isVoiceRecording.value = false
-      voiceTranscript.value = ''
-    }
+  } else {
+      resetVoiceState()
   }
 }
 
@@ -655,21 +765,21 @@ const stopVoiceRecording = () => {
  */
 const transcribeWithBackend = async (audioFile) => {
   if (!audioFile) {
-    isVoiceRecording.value = false
+    resetVoiceState()
     return
   }
   
-  voiceTranscript.value = 'Transcribing...'
+  voiceTranscript.value = 'Processing...'
   
   try {
     const response = await findStoresWithAI({ voiceFile: audioFile })
     
-    // Check if user cancelled (UI closed)
-    if (!isVoiceRecording.value) {
-      console.log('[Voice] Search cancelled by user')
+    // Check if user aborted during request
+    if (isAborted.value) {
+      console.log('[Voice] Search aborted by user')
       return
     }
-
+    
     console.log('[Voice Search Response]', JSON.stringify(response.data, null, 2))
     
     // Backend returns: { status, transcript, products, filters, ... }
@@ -686,42 +796,37 @@ const transcribeWithBackend = async (audioFile) => {
       searchQuery.value = transcript
       voiceTranscript.value = ''
       
-      // If we have matching products, store them and navigate with results
-      if (products.length > 0) {
-        // Store results in sessionStorage for the products page
-        sessionStorage.setItem('voiceSearchResults', JSON.stringify({
-          transcript: transcript,
-          products: products,
-          filters: filters,
-          timestamp: Date.now()
-        }))
-        
-        console.log('[Voice] Navigating to products page with', products.length, 'results')
-        
-        // Navigate to products page with voice search flag
-        router.push({
-          name: 'CustomerProducts',
-          query: { 
-            search: transcript,
-            voiceSearch: 'true'
-          }
-        })
-      } else {
-        // No products found, do regular search
-        console.log('[Voice] No products found, doing regular search')
-        handleSearch()
-      }
+      // Use the transcript for search even if no specific products were matched by the initial loose search
+      // Store results in sessionStorage for the products page
+      // Even if products are empty, we want the page to show "No results for X"
+      sessionStorage.setItem('voiceSearchResults', JSON.stringify({
+        transcript: transcript,
+        products: products, // Can be empty
+        filters: filters,
+        timestamp: Date.now()
+      }))
+      
+      console.log('[Voice] Navigating to products page with', products.length, 'results')
+      
+      // Navigate to products page with voice search flag
+      router.push({
+        name: 'CustomerProducts',
+        query: { 
+          search: transcript,
+          voiceSearch: 'true'
+        }
+      })
     } else {
       console.error('[Voice] No transcript in response:', data)
       emit('error', { message: 'Could not transcribe audio. Please try again.', type: 'voice' })
     }
   } catch (err) {
-    console.error('[Voice] Backend transcription failed:', err)
-    emit('error', { message: 'Voice transcription failed. Please try again.', type: 'voice' })
+    if (!isAborted.value) {
+      console.error('[Voice] Backend transcription failed:', err)
+      emit('error', { message: 'Voice transcription failed. Please try again.', type: 'voice' })
+    }
   } finally {
-    isVoiceRecording.value = false
-    audioLevel.value = 0
-    isSpeechDetected.value = false
+    resetVoiceState()
   }
 }
 
@@ -737,35 +842,21 @@ const handleVoiceSearch = async () => {
     return
   }
   
-  // Check microphone availability first
-  const micCheck = await voiceSearchUtils.checkMicrophone()
-  if (!micCheck.available) {
-    emit('error', { 
-      message: micCheck.error || 'No microphone found. Please connect a microphone and try again.', 
-      type: 'voice' 
-    })
-    return
-  }
-  
-  // Request permission if not already granted
-  const permCheck = await voiceSearchUtils.requestPermission()
-  if (!permCheck.granted) {
-    emit('error', { 
-      message: permCheck.error || 'Microphone permission denied. Please allow access in browser settings.', 
-      type: 'voice' 
-    })
-    return
-  }
-  
+  // Optimistic UI update: Start "recording" state immediately
   isVoiceRecording.value = true
-  voiceTranscript.value = ''
+  isAborted.value = false
+  voiceTranscript.value = 'Listening...'
+  isSpeechDetected.value = true // Visual feedback immediately
+  
+  // We skip redundant checks that slow down start-up
+  // microphone availability will be caught by startBackendVoiceSearch failure
   
   try {
     // Always use backend AI transcription (more reliable than browser SpeechRecognition)
     await startBackendVoiceSearch()
   } catch (err) {
     console.error('Voice search failed:', err)
-    isVoiceRecording.value = false
+    stopVoiceRecording() // Reset state if start failed
     emit('error', { message: err.message || 'Voice search failed to start', type: 'voice' })
   }
 }

@@ -10,12 +10,13 @@ demo-datasets/
 ├── 01-inventory/                      # Inventory management uploads
 │   └── inventory_upload.csv           # Products to add to shop inventory
 ├── 02-sales-data/                     # Sales tracking uploads
-│   └── weekly_sales.csv               # Weekly sales records
-├── 03-marketing/                      # Marketing content generation
-│   ├── marketing_products.csv         # Products with image URLs for AI captions
-│   └── product_image.jpg              # Sample product image for single upload
-├── 04-distributor/                    # Distributor/Manufacturer uploads
-│   └── regional_sales.csv             # Regional sales for production planning
+│   └── weekly_sales1.csv               # Weekly sales1 for shop owner 1 records
+│   └── weekly_sales2.csv               # Weekly sales2 for shop owner 1 records
+├── 03-marketing/                      
+│   ├── marketing_products.csv
+│   └── product_image.jpg
+├── 04-distributor/
+│   └── regional_sales.csv
 └── 05-image-search/                   # Visual search sample images
     ├── sample_saree.jpg               # Saree for similarity search
     ├── sample_cotton_fabric.jpg       # Cotton fabric image
@@ -31,7 +32,7 @@ demo-datasets/
 - **Description**: Add multiple products to shop inventory
 
 ### 2. Sales Data Upload (`/api/shops/upload_sales_data`)
-- **File**: `02-sales-data/weekly_sales.csv`
+- **File**: `02-sales-data/weekly_sales1.csv`
 - **Method**: POST
 - **Role**: shop_owner, shop_manager
 - **Description**: Upload weekly sales to update stock and enable AI insights

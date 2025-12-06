@@ -265,7 +265,7 @@ def search_items():
             "price": f"₹{_to_float(f.price):,.0f}",
             "description": f.description or "",
             "category": f.category or "General",
-            "rating": f.rating or 4.0,
+            "rating": f.rating or 0.0,
             "seller": f.seller.full_name if f.seller else "Independent Seller",
             "image": resolve_product_image(f)
         } for f in fabrics]

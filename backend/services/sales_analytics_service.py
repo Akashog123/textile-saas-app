@@ -719,6 +719,23 @@ class SalesAnalyticsService:
             trend = "down"
         else:
             trend = "stable"
+            
+        # Sanitize data for visualization (replace NaN/Inf/None with 0.0)
+        # This ensures both the SVG path and the interactive data points share valid, consistent data
+        clean_data = []
+        for x in data:
+            try:
+                if x is None:
+                    clean_data.append(0.0)
+                else:
+                    f_val = float(x)
+                    if np.isnan(f_val) or np.isinf(f_val):
+                        clean_data.append(0.0)
+                    else:
+                        clean_data.append(f_val)
+            except (ValueError, TypeError):
+                clean_data.append(0.0)
+        data = clean_data
         
         # Generate SVG path for chart
         chart_path, chart_area_path = self._generate_svg_paths(data)
@@ -726,12 +743,26 @@ class SalesAnalyticsService:
         # Create data points for interactive chart
         data_points = []
         max_val = max(data) if data and max(data) > 0 else 1
+        
+        count = len(data)
         for i, (label, value) in enumerate(zip(labels, data)):
-            x = (i / max(len(data) - 1, 1)) * 400
-            y = 160 - ((value / max_val) * 130) if max_val > 0 else 160
+            # Calculate X position
+            if count <= 1:
+                x = 0.0
+            else:
+                x = (i / (count - 1)) * 400
+                
+            # Calculate Y position
+            if max_val > 0:
+                y_raw = 160 - ((value / max_val) * 130)
+            else:
+                y_raw = 160
+                
+            y = max(30, min(160, y_raw))
+            
             data_points.append({
                 'x': round(x, 1),
-                'y': round(max(30, min(160, y)), 1),
+                'y': round(y, 1),
                 'value': round(value, 2),
                 'value_formatted': f"₹{value:,.0f}",
                 'label': label
@@ -758,28 +789,69 @@ class SalesAnalyticsService:
         }
     
     def _generate_svg_paths(self, data: List[float]) -> tuple:
-        """Generate SVG path strings for the chart line and area fill"""
-        if not data or all(v == 0 for v in data):
+        """
+        Generate SVG path strings for the chart line and area fill.
+        Robustly handles NaN, None, and infinite values to prevent chart gaps.
+        """
+        # Validate data: Sanitized list replacing None/NaN/Inf with 0
+        clean_data = []
+        for v in data:
+            if v is None:
+                clean_data.append(0.0)
+            else:
+                try:
+                    vf = float(v)
+                    if np.isnan(vf) or np.isinf(vf):
+                        clean_data.append(0.0)
+                    else:
+                        clean_data.append(vf)
+                except (ValueError, TypeError):
+                    clean_data.append(0.0)
+                    
+        # Check if we have any meaningful data to plot
+        if not clean_data or all(v == 0 for v in clean_data):
             # Return flat line at bottom
             return "M0,160 L400,160", "M0,160 L400,160 L400,180 L0,180 Z"
         
-        max_val = max(data) if max(data) > 0 else 1
+        # Calculate max value for scaling (avoid division by zero)
+        max_val = max(clean_data)
+        if max_val <= 0:
+            max_val = 1
+            
         points = []
+        count = len(clean_data)
         
-        for i, value in enumerate(data):
-            x = (i / max(len(data) - 1, 1)) * 400
-            y = 160 - ((value / max_val) * 130)
+        for i, value in enumerate(clean_data):
+            # Calculate X (distributed evenly across 0-400 width)
+            # handle case of single point -> center it or place at start
+            if count <= 1:
+                x = 0
+            else:
+                x = (i / (count - 1)) * 400
+                
+            # Calculate Y (scaled between 30 (top) and 160 (bottom))
+            # 130 is the height of the chart area (160 - 30)
+            if max_val > 0:
+                y = 160 - ((value / max_val) * 130)
+            else:
+                y = 160
+                
+            # Clamp Y just in case
             y = max(30, min(160, y))
+            
             points.append((round(x, 1), round(y, 1)))
         
-        # Generate line path
+        # Generate line path (M x0,y0 L x1,y1 L x2,y2 ...)
+        if not points:
+            return "M0,160 L400,160", "M0,160 L400,160 L400,180 L0,180 Z"
+            
         path_parts = [f"M{points[0][0]},{points[0][1]}"]
         for x, y in points[1:]:
             path_parts.append(f"L{x},{y}")
         line_path = " ".join(path_parts)
         
-        # Generate area path (closed for gradient fill)
-        area_path = line_path + f" L400,180 L0,180 Z"
+        # Generate area path (close the loop: line -> bottom right -> bottom left -> close)
+        area_path = line_path + " L400,180 L0,180 Z"
         
         return line_path, area_path
     
