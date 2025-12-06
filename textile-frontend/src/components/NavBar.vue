@@ -1,25 +1,23 @@
 <template>
   <div class="navbar-wrapper">
-    <nav class="navbar navbar-expand fixed-top" :class="{ 'scrolled': isScrolled }">
-      <div class="container-fluid">
+    <nav class="navbar navbar-expand-lg fixed-top" :class="{ 'scrolled': isScrolled }">
+      <div class="container-fluid px-4 px-lg-5">
         <!-- Brand Logo -->
         <router-link to="/" class="navbar-brand">
           <div class="brand-icon-wrapper">
             <div class="brand-icon">
-              <i class="bi bi-flower1"></i>
+              <img src="@/assets/icon.png" alt="Brand Logo" class="img-fluid" style="width: 80px; height: 80px;" />
             </div>
           </div>
-          <span class="brand-text">Textile Saas app</span>
+          <span class="brand-text">Textile Saas App</span>
         </router-link>
 
         <!-- Mobile Toggle Button -->
         <button
           class="navbar-toggler"
           type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#mainNav"
-          aria-controls="mainNav"
-          aria-expanded="false"
+          @click="toggleMenu"
+          :aria-expanded="isMenuOpen"
           aria-label="Toggle navigation"
         >
           <div class="hamburger-icon">
@@ -30,7 +28,7 @@
         </button>
 
         <!-- Navigation Content -->
-        <div class="collapse navbar-collapse" id="mainNav">
+        <div class="collapse navbar-collapse" :class="{ 'show': isMenuOpen }" id="mainNav">
           <ul class="navbar-nav ms-auto align-items-center">
             <!-- Navigation links for authenticated users -->
             <template v-if="isAuthenticated && user">
@@ -141,6 +139,11 @@
               <ul class="dropdown-menu dropdown-menu-end animate slideIn">
                 <li><h6 class="dropdown-header">Signed in as <br><strong>{{ user.username || user.email }}</strong></h6></li>
                 <li><hr class="dropdown-divider"></li>
+                <li v-if="user.role === 'customer'">
+                  <router-link to="/customer/wishlist" class="dropdown-item">
+                    <i class="bi bi-heart me-2"></i>Wishlist
+                  </router-link>
+                </li>
                 <li>
                   <a class="dropdown-item" href="#" @click.prevent="$emit('logout')">
                     <i class="bi bi-box-arrow-right me-2"></i>Logout
@@ -156,7 +159,8 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 // Props
 const props = defineProps({
@@ -173,8 +177,23 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['logout', 'refresh-auth'])
 
-// State for scroll effect
+// State for scroll and mobile menu
 const isScrolled = ref(false)
+const isMenuOpen = ref(false)
+const route = useRoute()
+
+const toggleMenu = () => {
+  isMenuOpen.value = !isMenuOpen.value
+}
+
+const closeMenu = () => {
+  isMenuOpen.value = false
+}
+
+// Close menu when route changes
+watch(() => route.fullPath, () => {
+  closeMenu()
+})
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 20
@@ -232,12 +251,12 @@ const userRole = computed(() => props.user?.role || '')
 .brand-icon {
   width: 40px;
   height: 40px;
-  background: var(--gradient-primary);
+  background: white;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--color-primary);
   font-size: 1.2rem;
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -441,7 +460,9 @@ const userRole = computed(() => props.user?.role || '')
 /* Responsive Adjustments */
 @media (max-width: 991px) {
   .navbar-collapse {
-    background: white;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     padding: 1.5rem;
     border-radius: 20px;
     margin-top: 1rem;

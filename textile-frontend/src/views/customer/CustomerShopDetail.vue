@@ -72,44 +72,6 @@
               </div>
             </div>
             
-            <!-- Products Section -->
-            <div class="content-card">
-              <div class="section-header">
-                <h3 class="section-title">
-                  Products 
-                  <span class="product-count" v-if="shop.product_count">({{ shop.product_count }})</span>
-                </h3>
-                <div class="product-filters" v-if="shop.products && shop.products.length > 0">
-                  <select v-model="selectedCategory" class="form-select form-select-sm">
-                    <option value="">All Categories</option>
-                    <option v-for="cat in shop.categories" :key="cat" :value="cat">{{ cat }}</option>
-                  </select>
-                  <select v-model="sortBy" class="form-select form-select-sm">
-                    <option value="rating">Top Rated</option>
-                    <option value="price_asc">Price: Low to High</option>
-                    <option value="price_desc">Price: High to Low</option>
-                    <option value="newest">Newest</option>
-                  </select>
-                </div>
-              </div>
-              
-              <!-- Products Grid -->
-              <div v-if="filteredProducts.length > 0" class="products-grid">
-                <ProductCard
-                  v-for="product in filteredProducts"
-                  :key="product.id"
-                  :product="product"
-                  :show-shop="false"
-                  @view-details="viewProduct"
-                  @quick-view="showQuickView"
-                />
-              </div>
-              <div v-else class="empty-state">
-                <i class="bi bi-box-seam fs-1 text-muted"></i>
-                <p class="mt-2">No products found</p>
-              </div>
-            </div>
-            
             <!-- Reviews Section -->
             <div class="content-card">
               <div class="section-header d-flex justify-content-between align-items-center">
@@ -118,12 +80,15 @@
                   <span class="review-count-badge" v-if="reviewCount">({{ reviewCount }})</span>
                 </h3>
                 <button 
-                  v-if="isAuthenticated"
+                  v-if="isAuthenticated && !hasUserReviewed"
                   class="btn btn-outline-gradient btn-sm" 
                   @click="openReviewModal()"
                 >
                   <i class="bi bi-star me-1"></i> Write Review
                 </button>
+                <div v-if="hasUserReviewed" class="text-success small fw-medium">
+                  <i class="bi bi-check-circle-fill"></i> Reviewed
+                </div>
               </div>
               
               <!-- Reviews Summary -->
@@ -190,6 +155,46 @@
                 <p class="text-muted small">Be the first to review this shop!</p>
               </div>
             </div>
+
+            <!-- Products Section -->
+            <div class="content-card">
+              <div class="section-header">
+                <h3 class="section-title">
+                  Products 
+                  <span class="product-count" v-if="shop.product_count">({{ shop.product_count }})</span>
+                </h3>
+                <div class="product-filters" v-if="shop.products && shop.products.length > 0">
+                  <select v-model="selectedCategory" class="form-select form-select-sm">
+                    <option value="">All Categories</option>
+                    <option v-for="cat in shop.categories" :key="cat" :value="cat">{{ cat }}</option>
+                  </select>
+                  <select v-model="sortBy" class="form-select form-select-sm">
+                    <option value="rating">Top Rated</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                    <option value="newest">Newest</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- Products Grid -->
+              <div v-if="filteredProducts.length > 0" class="products-grid">
+                <ProductCard
+                  v-for="product in filteredProducts"
+                  :key="product.id"
+                  :product="product"
+                  :show-shop="false"
+                  :is-wishlisted="wishlistIds.includes(product.id)"
+                  @view-details="viewProduct"
+                  @quick-view="showQuickView"
+                  @add-to-wishlist="handleWishlistToggle"
+                />
+              </div>
+              <div v-else class="empty-state">
+                <i class="bi bi-box-seam fs-1 text-muted"></i>
+                <p class="mt-2">No products found</p>
+              </div>
+            </div>
           </div>
           
           <!-- Sidebar -->
@@ -201,6 +206,10 @@
                 <div class="contact-item" v-if="shop.contact">
                   <i class="bi bi-telephone-fill"></i>
                   <a :href="'tel:' + shop.contact">{{ shop.contact }}</a>
+                </div>
+                <div class="contact-item" v-if="shop.owner && shop.owner.contact">
+                  <i class="bi bi-phone-fill"></i>
+                  <a :href="'tel:' + shop.owner.contact">{{ shop.owner.contact }} (Mobile)</a>
                 </div>
                 <div class="contact-item" v-if="shop.email">
                   <i class="bi bi-envelope-fill"></i>
@@ -411,7 +420,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getShopDetails } from '@/api/apiCustomer'
+import { getShopDetails, getWishlist, addToWishlist, removeFromWishlist } from '@/api/apiCustomer'
 import { getShopReviews, createReview, updateReview, deleteReview } from '@/api/apiReviews'
 import ProductCard from '@/components/cards/ProductCard.vue'
 import ShopLocatorMap from '@/components/ShopLocatorMap.vue'
@@ -447,6 +456,7 @@ const error = ref('')
 const selectedCategory = ref('')
 const sortBy = ref('rating')
 const quickViewProduct = ref(null)
+const wishlistIds = ref([]) // Store IDs of wishlisted items
 
 // Reviews State
 const reviews = ref([])
@@ -487,6 +497,12 @@ const currentUserId = computed(() => {
 const isOwnReview = (review) => {
   return currentUserId.value && review.user_id === currentUserId.value
 }
+
+// Check if user has already reviewed
+const hasUserReviewed = computed(() => {
+  if (!isAuthenticated.value || !reviews.value.length) return false
+  return reviews.value.some(r => r.user_id === currentUserId.value)
+})
 
 const FALLBACK_IMAGE = 'https://placehold.co/400x300?text=Shop'
 
@@ -763,9 +779,54 @@ const getDirections = () => {
   }
 }
 
+/**
+ * Handle wishlist toggle
+ */
+const handleWishlistToggle = async (product) => {
+  if (!isAuthenticated.value) {
+    showToast("Please login to manage your wishlist", 'error')
+    return
+  }
+
+  try {
+    if (wishlistIds.value.includes(product.id)) {
+      // Remove
+      await removeFromWishlist(product.id)
+      wishlistIds.value = wishlistIds.value.filter(id => id !== product.id)
+      showToast("Removed from wishlist", 'success')
+    } else {
+      // Add
+      await addToWishlist(product.id)
+      wishlistIds.value.push(product.id)
+      showToast("Added to wishlist", 'success')
+    }
+  } catch (e) {
+    console.error('Error toggling wishlist', e)
+    showToast('Failed to update wishlist', 'error')
+  }
+}
+
+/**
+ * Fetch user wishlist
+ */
+const fetchUserWishlist = async () => {
+  if (!isAuthenticated.value) return
+  
+  try {
+    const res = await getWishlist()
+    const wishlistData = res.data?.data?.wishlist || res.data?.wishlist
+    if (wishlistData) {
+      wishlistIds.value = wishlistData.map(p => p.id)
+    }
+  } catch (err) {
+    console.error("Failed to fetch wishlist", err)
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   await fetchShopDetails()
+  fetchUserWishlist()
   fetchReviews()
 })
 </script>
@@ -1479,6 +1540,6 @@ onMounted(async () => {
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateX(120%);
 }
 </style>

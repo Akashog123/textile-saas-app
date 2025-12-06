@@ -572,25 +572,32 @@ def semantic_search_products(
                 return min(base_score + boost, 1.0)
             
             # Calculate boosted scores and sort
-            products_with_scores = [
-                (p, calculate_boosted_score(p, score_map.get(p.id, 0)))
-                for p in products
-            ]
-            products_with_scores.sort(key=lambda x: x[1], reverse=True)
-            
-            for product, boosted_score in products_with_scores[:limit]:
-                results.append({
-                    **product.to_card_dict(),
-                    'relevance_score': round(boosted_score * 100, 2),
-                    'shop': product.shop.to_card_dict() if product.shop else None
-                })
+    # Filter by 50% accuracy threshold
+    products_with_scores = [
+        (p, calculate_boosted_score(p, score_map.get(p.id, 0)))
+        for p in products
+    ]
     
+    # Sort by score
+    products_with_scores.sort(key=lambda x: x[1], reverse=True)
+    
+    for product, boosted_score in products_with_scores[:limit]:
+        relevance = round(boosted_score * 100, 2)
+        if relevance >= 50.0:  # Strict 50% threshold
+            results.append({
+                **product.to_card_dict(),
+                'relevance_score': relevance,
+                'shop': product.shop.to_card_dict() if product.shop else None
+            })
+
     # Fallback to text search
     if not results:
         results = fallback_text_search_products(
             query, shop_id, category, min_price, max_price, limit
         )
-    
+        # Ensure fallback results also meet threshold
+        results = [r for r in results if r.get('relevance_score', 0) >= 50.0]
+
     response = {
         'products': results,
         'filters': {

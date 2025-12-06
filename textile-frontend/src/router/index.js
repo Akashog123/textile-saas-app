@@ -123,6 +123,12 @@ const routes = [
         component: () => import("@/views/customer/CustomerProfile.vue"),
         meta: { title: "Profile - Customer Portal" }
       },
+      {
+        path: "wishlist",
+        name: "CustomerWishlist",
+        component: () => import("@/views/customer/CustomerWishlist.vue"),
+        meta: { title: "Wishlist - Customer Portal" }
+      },
     ],
   },
   {
