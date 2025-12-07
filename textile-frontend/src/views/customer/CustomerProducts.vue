@@ -628,7 +628,7 @@ const normalizeProducts = (rawProducts) => {
     id: p.id || p.product_id,
     name: p.name || p.productDisplayName || 'Unknown Product',
     price: p.price || p.price_per_meter || 0,
-    unit: p.unit || '/meter',
+    unit: p.unit || '',
     description: p.description || p.product_description || '',
     category: p.category || p.masterCategory || '',
     rating: p.rating ?? p.average_rating ?? 4,

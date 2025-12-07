@@ -16,15 +16,15 @@ export const formatPrice = (priceValue, currency = '₹') => {
     if (priceValue.includes(currency) || priceValue.includes('$') || priceValue.includes('€')) {
       return priceValue;
     }
-    
+
     // Try to extract numeric value from string
     const numericValue = priceValue.replace(/[^\d.]/g, '');
     const parsedValue = parseFloat(numericValue);
-    
+
     if (isNaN(parsedValue)) {
       return `${currency}N/A`;
     }
-    
+
     return `${currency}${parsedValue.toLocaleString()}`;
   }
 
@@ -62,12 +62,12 @@ export const extractNumericPrice = (priceValue) => {
 };
 
 /**
- * Format price per meter specifically
+ * Format unit price generic
  * @param {any} priceValue - Price value from backend
  * @param {string} currency - Currency symbol (default: '₹')
- * @returns {string} - Formatted price per meter
+ * @returns {string} - Formatted unit price
  */
-export const formatPricePerMeter = (priceValue, currency = '₹') => {
+export const formatUnitPrice = (priceValue, currency = '₹') => {
   const formattedPrice = formatPrice(priceValue, currency);
   return formattedPrice === `${currency}N/A` ? 'Price not available' : `${formattedPrice}`;
 };
@@ -75,5 +75,5 @@ export const formatPricePerMeter = (priceValue, currency = '₹') => {
 export default {
   formatPrice,
   extractNumericPrice,
-  formatPricePerMeter
+  formatUnitPrice
 };
