@@ -36,7 +36,7 @@
                 <th>Image</th>
                 <th>Product Name</th>
                 <th>Sales QTY</th>
-                <th>Price/Meter</th>
+                <th>Unit Price</th>
                 <th>Stock</th>
                 <th>Min Stock</th>
                 <th>Status</th>
@@ -63,7 +63,7 @@
                   </div>
                 </td>
                 <td>
-                  <span class="qty-badge">{{ item.qty }} m</span>
+                  <span class="qty-badge">{{ item.qty }}</span>
                 </td>
                 <td>
                   <strong class="price-text">{{ item.price }}</strong>
@@ -121,7 +121,7 @@
             </span>
             <span class="stat-item">
               <i class="bi bi-graph-up-arrow"></i>
-              <strong>{{ totalQuantity }}</strong> Total Meters Sold
+              <strong>{{ totalQuantity }}</strong> Total Units Sold
             </span>
           </div>
         </div>
@@ -142,7 +142,7 @@
               <input type="text" class="form-control" v-model="editForm.name" disabled />
             </div>
             <div class="mb-3">
-              <label class="form-label">Price (per meter)</label>
+              <label class="form-label">Price (per unit)</label>
               <input
                 type="number"
                 class="form-control"
@@ -152,7 +152,7 @@
               />
             </div>
             <div class="mb-3">
-              <label class="form-label">Stock (meters)</label>
+              <label class="form-label">Stock (units)</label>
               <input
                 type="number"
                 class="form-control"
@@ -161,7 +161,7 @@
               />
             </div>
             <div class="mb-3">
-              <label class="form-label">Minimum Stock (meters)</label>
+              <label class="form-label">Minimum Stock (units)</label>
               <input
                 type="number"
                 class="form-control"
