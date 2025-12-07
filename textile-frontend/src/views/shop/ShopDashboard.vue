@@ -68,7 +68,7 @@
               <h6 class="card-title mb-0 fw-bold d-flex align-items-center">
                 <span class="bg-primary-soft text-primary rounded p-1 me-2"><i class="bi bi-graph-up"></i></span>
                 Sales Summary
-                <small class="text-muted ms-2 fw-normal" style="font-size: 0.8rem;">{{ salesDateRange }}</small>
+                <small class="bg-primary-soft ms-2 fw-normal" style="font-size: 0.8rem;">{{ salesDateRange }}</small>
               </h6>
               <span 
                 class="badge px-3 py-2 rounded-pill" 
@@ -125,7 +125,7 @@
               <div class="row g-3 mb-4">
                 <div class="col-6">
                   <div class="stat-box h-100 p-3 border rounded-3 bg-white text-center">
-                    <small class="text-muted d-block mb-1 text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Quantity</small>
+                    <small class="text-muted d-block mb-1 text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Quantity Sold</small>
                     <strong class="fs-4 text-dark">{{ salesSummaryMetrics.totalQuantity.toLocaleString() }}</strong>
                   </div>
                 </div>
@@ -140,19 +140,44 @@
               <!-- Daily Breakdown Mini Chart -->
               <div v-if="salesSummaryData?.daily_breakdown?.length" class="daily-mini-chart mt-auto">
                 <small class="text-muted d-block mb-2 fw-bold" style="font-size: 0.75rem;">Daily Breakdown</small>
-                <div class="d-flex align-items-end gap-1" style="height: 60px;">
-                  <div 
-                    v-for="(day, idx) in salesSummaryData.daily_breakdown" 
-                    :key="idx"
-                    class="daily-bar bg-primary rounded-top"
-                    :style="{ height: `${Math.max(10, (day.revenue / Math.max(...salesSummaryData.daily_breakdown.map(d => d.revenue), 1)) * 100)}%`, opacity: 0.7 }"
-                    :title="`${day.day_name}: ${day.revenue_formatted}`"
-                  ></div>
-                </div>
-                <div class="d-flex justify-content-between mt-2">
-                  <small v-for="(day, idx) in salesSummaryData.daily_breakdown" :key="idx" class="text-muted text-uppercase" style="font-size: 0.65rem;">
-                    {{ day.day_name?.substring(0, 2) }}
-                  </small>
+                <div class="d-flex" style="height: 80px;">
+                  <!-- Y-Axis Scale -->
+                  <div class="d-flex flex-column justify-content-end align-items-end me-2" style="min-width: 25px;">
+                      <div class="d-flex flex-column justify-content-between text-muted text-end" style="height: 60px; font-size: 0.6rem;">
+                          <span>{{ formatCompactNumber(dailyMaxRevenue) }}</span>
+                          <span>{{ formatCompactNumber(dailyMaxRevenue / 2) }}</span>
+                          <span>0</span>
+                      </div>
+                      <!-- Spacer to align with X-axis labels -->
+                      <small class="mt-1" style="font-size: 0.65rem; line-height: 1; visibility: hidden;">Spacer</small>
+                  </div>
+                  
+                  <!-- Bars -->
+                  <div class="d-flex justify-content-between align-items-end gap-1 flex-grow-1">
+                    <div 
+                      v-for="(day, idx) in salesSummaryData.daily_breakdown" 
+                      :key="idx"
+                      class="d-flex flex-column align-items-center justify-content-end"
+                      style="flex: 1; min-width: 0;"
+                    >
+                      <div class="d-flex align-items-end justify-content-center w-100" style="height: 60px;">
+                        <div 
+                          class="daily-bar bg-primary rounded-top"
+                          :style="{ 
+                            height: `${Math.max(10, (day.revenue / dailyMaxRevenue) * 100)}%`, 
+                            opacity: 0.7,
+                            width: '100%',
+                            maxWidth: '40px',
+                            flex: 'none'
+                          }"
+                          :title="`${day.day_name}: ${day.revenue_formatted}`"
+                        ></div>
+                      </div>
+                      <small class="text-muted text-uppercase mt-1" style="font-size: 0.65rem; line-height: 1;">
+                        {{ day.day_name?.substring(0, 2) }}
+                      </small>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -975,6 +1000,18 @@ const topCategory = computed(() => {
   return salesSummaryData.value.top_categories[0];
 });
 
+const dailyMaxRevenue = computed(() => {
+  if (!salesSummaryData.value?.daily_breakdown?.length) return 1;
+  return Math.max(...salesSummaryData.value.daily_breakdown.map(d => d.revenue), 1);
+});
+
+const formatCompactNumber = (value) => {
+  if (value === 0) return '0';
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  return `${value}`;
+};
+
 // Chart labels based on period
 const chartLabels = computed(() => {
   if (salesTrendData.value?.labels?.length) {
@@ -1079,7 +1116,7 @@ const shopId = computed(() => {
 // Metrics Data - dynamically populated from backend
 const metrics = ref([
   {
-    label: 'Avg Order Value',
+    label: 'Average Order Value',
     value: '₹0',
     change: '+0%',
     changeClass: 'positive',
@@ -1329,7 +1366,7 @@ const fetchDashboard = async () => {
  * Update metrics from dashboard data
  */
 const updateMetricsFromData = (data) => {
-  // metrics[0] = Avg Order Value (from sales summary if available)
+  // metrics[0] = Average Order Value (from sales summary if available)
   if (salesSummaryData.value?.metrics?.average_order_value_formatted) {
     metrics.value[0].value = salesSummaryData.value.metrics.average_order_value_formatted;
   } else if (data.weekly_sales && data.total_orders) {
@@ -1645,7 +1682,7 @@ const generateInsightsPDF = async () => {
       metricsList = [
         { label: "Total Revenue", value: m.total_revenue_formatted || "—" },
         { label: "Total Quantity", value: (m.total_quantity || 0).toLocaleString() },
-        { label: "Avg Order Value", value: m.average_order_value_formatted || "—" },
+        { label: "Average Order Value", value: m.average_order_value_formatted || "—" },
         { label: "Revenue Growth", value: salesSummaryData.value.comparison?.revenue_change_percent || "—" }
       ];
     } else {
@@ -1898,7 +1935,7 @@ const fetchSalesSummary = async () => {
         }
       }
       
-      // Update avg order value metric
+      // Update average order value metric
       if (salesSummaryData.value?.metrics?.average_order_value_formatted) {
         metrics.value[0].value = salesSummaryData.value.metrics.average_order_value_formatted;
       }
