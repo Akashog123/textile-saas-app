@@ -227,51 +227,79 @@ export const clearErrorLogs = () => {
 /**
  * Show user-friendly notification for errors
  * @param {string} message - Error message to show
- * @param {string} type - Type of notification ('error', 'warning', 'info')
+ * @param {string} type - Type of notification ('error', 'warning', 'info', 'success')
  * @param {number} duration - Duration in ms to show notification
  */
 export const showNotification = (message, type = 'info', duration = 5000) => {
-  // Create notification element if it doesn't exist
-  let notification = document.getElementById('error-notification');
-  if (!notification) {
-    notification = document.createElement('div');
-    notification.id = 'error-notification';
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 9999;
-      max-width: 400px;
-      padding: 15px;
-      border-radius: 8px;
-      color: white;
-      font-weight: 500;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-    `;
-    document.body.appendChild(notification);
-  }
+  // Remove any existing notifications to prevent stacking
+  const existingError = document.getElementById('error-notification');
+  if (existingError) existingError.remove();
+  
+  const existingSuccess = document.getElementById('success-notification');
+  if (existingSuccess) existingSuccess.remove();
+  
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.id = type === 'success' ? 'success-notification' : 'error-notification';
+  
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+    padding: 15px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateX(calc(100% + 40px));
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  `;
   
   // Set styling based on type
   const colors = {
     error: 'linear-gradient(135deg, #f56565, #e53e3e)',
     warning: 'linear-gradient(135deg, #ed8936, #dd6b20)',
-    info: 'linear-gradient(135deg, #4299e1, #3182ce)'
+    info: 'linear-gradient(135deg, #4299e1, #3182ce)',
+    success: 'linear-gradient(135deg, #48bb78, #38a169)'
   };
   
-  notification.style.background = colors[type] || colors.error;
-  notification.textContent = message;
+  notification.style.background = colors[type] || colors.info;
+  
+  // Add icon
+  let iconClass = 'bi-info-circle-fill';
+  if (type === 'success') iconClass = 'bi-check-circle-fill';
+  else if (type === 'error') iconClass = 'bi-exclamation-triangle-fill';
+  else if (type === 'warning') iconClass = 'bi-exclamation-circle-fill';
+  
+  notification.innerHTML = `<i class="bi ${iconClass}"></i><span>${message}</span>`;
+  
+  document.body.appendChild(notification);
   
   // Show notification
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     notification.style.transform = 'translateX(0)';
-  }, 100);
+  });
   
-  // Hide notification after duration
-  setTimeout(() => {
-    notification.style.transform = 'translateX(100%)';
-  }, duration);
+  // Helper to remove notification
+  const remove = () => {
+    if (!notification.parentNode) return;
+    notification.style.transform = 'translateX(calc(100% + 40px))';
+    setTimeout(() => {
+      if (notification.parentNode) notification.remove();
+    }, 300);
+  };
+  
+  // Click to dismiss
+  notification.onclick = remove;
+  
+  // Auto dismiss
+  setTimeout(remove, duration);
 };
 
 /**
@@ -285,41 +313,7 @@ export const showErrorNotification = (message, duration = 5000) => {
  * Show success notification (wrapper around showNotification)
  */
 export const showSuccessNotification = (message, duration = 5000) => {
-  const colors = {
-    success: 'linear-gradient(135deg, #48bb78, #38a169)'
-  };
-  
-  let notification = document.getElementById('success-notification');
-  if (!notification) {
-    notification = document.createElement('div');
-    notification.id = 'success-notification';
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 9999;
-      max-width: 400px;
-      padding: 15px;
-      border-radius: 8px;
-      color: white;
-      font-weight: 500;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-    `;
-    document.body.appendChild(notification);
-  }
-  
-  notification.style.background = colors.success;
-  notification.textContent = message;
-  
-  setTimeout(() => {
-    notification.style.transform = 'translateX(0)';
-  }, 100);
-  
-  setTimeout(() => {
-    notification.style.transform = 'translateX(100%)';
-  }, duration);
+  showNotification(message, 'success', duration);
 };
 
 export default {

@@ -339,7 +339,6 @@ defineOptions({
 }
 
 .feature-card:hover {
-  transform: translateY(-10px);
   box-shadow: 0 20px 40px rgba(0,0,0,0.05);
   border-color: var(--color-accent);
 }

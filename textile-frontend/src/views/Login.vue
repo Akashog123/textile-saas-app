@@ -184,13 +184,13 @@
                 >
                   <option disabled value="">Select your role</option>
                   <option value="customer">Customer</option>
-                  <option value="manufacturer">Manufacturer</option>
+                  <option value="manufacturer">Distributor / Manufacturer</option>
                   <option value="shop_owner">Shop Owner / Manager</option>
                 </select>
               </div>
 
-              <!-- Role-specific fields -->
-              <div v-if="registerForm.role === 'customer'" class="form-group">
+              <!-- Email Field (Common for all roles) -->
+              <div class="form-group">
                 <label for="registerEmail" class="form-label">Email</label>
                 <input
                   type="email"
@@ -201,6 +201,68 @@
                   placeholder="Enter your email address"
                 />
               </div>
+
+              <!-- Customer-specific optional fields -->
+              <template v-if="registerForm.role === 'customer'">
+                <div class="form-group">
+                  <label for="customerContact" class="form-label">Contact Number <small class="text-muted">(Optional)</small></label>
+                  <input
+                    type="tel"
+                    id="customerContact"
+                    class="form-control"
+                    v-model.trim="registerForm.contact"
+                    placeholder="Enter your phone number"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="customerAddress" class="form-label">Address <small class="text-muted">(Optional)</small></label>
+                  <input
+                    type="text"
+                    id="customerAddress"
+                    class="form-control"
+                    v-model.trim="registerForm.address"
+                    placeholder="Enter your address"
+                  />
+                </div>
+                <div class="row">
+                  <div class="col-4">
+                    <div class="form-group">
+                      <label for="customerCity" class="form-label">City <small class="text-muted">(Optional)</small></label>
+                      <input
+                        type="text"
+                        id="customerCity"
+                        class="form-control"
+                        v-model.trim="registerForm.city"
+                        placeholder="City"
+                      />
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="form-group">
+                      <label for="customerState" class="form-label">State <small class="text-muted">(Optional)</small></label>
+                      <input
+                        type="text"
+                        id="customerState"
+                        class="form-control"
+                        v-model.trim="registerForm.state"
+                        placeholder="State"
+                      />
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="form-group">
+                      <label for="customerPincode" class="form-label">Pincode <small class="text-muted">(Optional)</small></label>
+                      <input
+                        type="text"
+                        id="customerPincode"
+                        class="form-control"
+                        v-model.trim="registerForm.pincode"
+                        placeholder="Pincode"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </template>
 
               <!-- Shop Owner Fields -->
               <template v-if="registerForm.role === 'shop_owner'">
@@ -644,7 +706,12 @@ const registerForm = ref({
   name: "",
   username: "",
   role: "", // 'customer' | 'manufacturer' | 'shop_owner'
-  email: "", // customer-only
+  email: "", // common for all roles
+  contact: "", // customer optional field
+  address: "", // customer optional field
+  city: "", // customer optional field
+  state: "", // customer optional field
+  pincode: "", // customer optional field
   shop: {
     // shop_owner-only
     name: "",
@@ -654,7 +721,7 @@ const registerForm = ref({
     longitude: null,
   },
   manufacturer: {
-    // manufacturer-only
+    // manufacturer/distributor-only
     plantName: "",
     address: "",
     mobile: "",
@@ -770,8 +837,8 @@ const handleRegister = async () => {
       return;
     }
 
-    if (registerForm.value.role === "customer" && (!registerForm.value.email || registerForm.value.email.trim() === "")) {
-      registerError.value = "Email is required for customer accounts.";
+    if (!registerForm.value.email || registerForm.value.email.trim() === "") {
+      registerError.value = "Email is required.";
       return;
     }
 
@@ -804,10 +871,19 @@ const handleRegister = async () => {
     const base = {
       full_name: registerForm.value.name,
       username: registerForm.value.username,
-      email: registerForm.value.email || `${registerForm.value.username}@noemail.com`,
+      email: registerForm.value.email,
       password: registerForm.value.password,
       role: registerForm.value.role,
     };
+
+    // Add customer optional fields
+    if (registerForm.value.role === "customer") {
+      if (registerForm.value.contact) base.contact = registerForm.value.contact;
+      if (registerForm.value.address) base.address = registerForm.value.address;
+      if (registerForm.value.city) base.city = registerForm.value.city;
+      if (registerForm.value.state) base.state = registerForm.value.state;
+      if (registerForm.value.pincode) base.pincode = registerForm.value.pincode;
+    }
 
     if (registerForm.value.role === "shop_owner") {
       base.contact = registerForm.value.shop.mobile;
@@ -847,6 +923,11 @@ const handleRegister = async () => {
         username: "",
         role: "",
         email: "",
+        contact: "",
+        address: "",
+        city: "",
+        state: "",
+        pincode: "",
         shop: { name: "", address: "", mobile: "", latitude: null, longitude: null },
         manufacturer: { plantName: "", address: "", mobile: "", latitude: null, longitude: null },
         password: "",

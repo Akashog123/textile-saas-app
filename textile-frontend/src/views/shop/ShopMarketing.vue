@@ -528,7 +528,6 @@ onMounted(() => {
 }
 
 .btn-gradient:hover {
-  transform: translateY(-2px) scale(1.02);
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
   color: white;
 }
@@ -547,7 +546,6 @@ onMounted(() => {
   background: var(--gradient-primary) padding-box,
               var(--gradient-primary) border-box;
   color: white;
-  transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
 }
 
