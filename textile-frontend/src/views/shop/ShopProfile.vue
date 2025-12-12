@@ -1386,7 +1386,6 @@ onMounted(() => {
 }
 
 .btn-gradient:hover:not(:disabled) {
-  transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
   color: white;
 }
@@ -1413,9 +1412,9 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
-.btn-outline-secondary:hover {
+/* .btn-outline-secondary:hover {
   transform: translateY(-1px);
-}
+} */
 
 /* ===== Table Styles ===== */
 .shops-table-card .table {
@@ -1592,9 +1591,9 @@ onMounted(() => {
   transition: transform 0.2s ease;
 }
 
-.shop-image-card:hover {
+/* .shop-image-card:hover {
   transform: translateY(-2px);
-}
+} */
 
 /* ===== Toast Notification ===== */
 .toast-notification {

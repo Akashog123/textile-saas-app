@@ -178,6 +178,7 @@ import { useRouter } from 'vue-router';
 import { getAllShops, searchShopsAndProducts } from '@/api/apiCustomer';
 import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
 import { getNearbyShopsAuto } from '@/services/locationService';
+import { getPlaceholderImage } from '@/utils/imageUtils';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ShopCard from '@/components/cards/ShopCard.vue';
 import ShopLocatorMap from '@/components/ShopLocatorMap.vue';
@@ -239,10 +240,10 @@ const handleSortChange = async () => {
       try {
         loading.value = true;
         const result = await getNearbyShopsAuto(10000); // Just to get location
-        if (result.location) {
+        if (result.user_location) {
           userLocation.value = {
-            lat: result.location.latitude,
-            lon: result.location.longitude
+            lat: result.user_location.latitude,
+            lon: result.user_location.longitude
           };
         } else {
           throw new Error("Location not found");
@@ -448,14 +449,6 @@ const normalizeShops = (rawShops) => {
     opening_hours: s.opening_hours || 'Open during business hours',
     phone: s.phone || s.contact || ''
   }));
-};
-
-/**
- * Get placeholder image URL
- */
-const getPlaceholderImage = (name) => {
-  const encodedName = encodeURIComponent(name || 'Shop');
-  return `https://placehold.co/400x300/4A90E2/FFF?text=${encodedName}`;
 };
 
 // Watch for search query changes with debounce

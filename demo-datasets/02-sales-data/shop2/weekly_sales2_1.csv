@@ -1,0 +1,42 @@
+date,sku,product_name,category,quantity_sold,selling_price,region
+2025-11-18,PAT-001,Patola Double Ikat,Silk,8,6500,West
+2025-11-18,MAH-001,Maheshwari Silk Cotton,Silk,12,2600,North
+2025-11-18,POC-001,Pochampally Ikat,Cotton,15,1850,South
+2025-11-18,MAN-001,Mangalagiri Cotton,Cotton,22,1100,East
+2025-11-18,SAT-001,Satin Silk,Satin,18,1550,Central
+2025-11-19,MYS-001,Mysore Crepe Silk,Silk,9,4200,North
+2025-11-19,PAI-001,Paithani Saree Fabric,Silk,5,7500,West
+2025-11-19,KAL-001,Kalamkari Print Cotton,Cotton,14,1450,South
+2025-11-19,AJR-001,Rasavada Block Print,Cotton,11,1650,East
+2025-11-19,BAN-001,Bandhani Fabric,Cotton,19,1350,West
+2025-11-19,IKT-001,Ikat Weave Polyester,Polyester,25,750,North
+2025-11-20,MAT-001,Matka Silk,Silk,7,2900,Central
+2025-11-20,UPP-001,Uppada Silk,Silk,6,4800,South
+2025-11-20,POP-001,Cotton Poplin,Cotton,28,650,East
+2025-11-20,MOD-001,Porotta Fabric,Modal,16,1250,North
+2025-11-20,TEN-001,Tencel Lyocell,Tencel,13,1400,West
+2025-11-20,DUP-001,Raw Silk Dupion,Silk,10,2100,Central
+2025-11-21,CHN-002,Chanderi Zari Work,Silk,8,3100,North
+2025-11-21,TAN-001,Tant Cotton Bengal,Cotton,20,1200,East
+2025-11-21,SAM-001,Sambalpuri Ikat,Cotton,12,1750,South
+2025-11-21,PAT-001,Patola Double Ikat,Silk,4,6500,North
+2025-11-21,MAN-001,Mangalagiri Cotton,Cotton,18,1100,West
+2025-11-21,SAT-001,Satin Silk,Satin,14,1550,Central
+2025-11-22,POC-001,Pochampally Ikat,Cotton,17,1850,East
+2025-11-22,MYS-001,Mysore Crepe Silk,Silk,11,4200,South
+2025-11-22,KAL-001,Kalamkari Print Cotton,Cotton,9,1450,North
+2025-11-22,BAN-001,Bandhani Fabric,Cotton,21,1350,Central
+2025-11-22,IKT-001,Ikat Weave Polyester,Polyester,30,750,West
+2025-11-22,MAH-001,Maheshwari Silk Cotton,Silk,10,2600,East
+2025-11-23,PAI-001,Paithani Saree Fabric,Silk,3,7500,Central
+2025-11-23,AJR-001,Rasavada Block Print,Cotton,8,1650,South
+2025-11-23,MAT-001,Matka Silk,Silk,5,2900,North
+2025-11-23,TEN-001,Tencel Lyocell,Tencel,11,1400,East
+2025-11-23,UPP-001,Uppada Silk,Silk,4,4800,West
+2025-11-24,POP-001,Cotton Poplin,Cotton,32,650,Central
+2025-11-24,MOD-001,Porotta Fabric,Modal,14,1250,South
+2025-11-24,DUP-001,Raw Silk Dupion,Silk,9,2100,North
+2025-11-24,CHN-002,Chanderi Zari Work,Silk,7,3100,East
+2025-11-24,TAN-001,Tant Cotton Bengal,Cotton,18,1200,West
+2025-11-24,SAM-001,Sambalpuri Ikat,Cotton,15,1750,Central
+2025-11-24,PAT-001,Patola Double Ikat,Silk,6,6500,South

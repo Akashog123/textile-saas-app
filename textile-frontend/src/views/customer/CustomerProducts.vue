@@ -188,6 +188,7 @@ import { useRouter } from 'vue-router';
 import { browseProducts, getCategories, searchShopsAndProducts, searchByImage, getWishlist, addToWishlist as apiAddToWishlist, removeFromWishlist as apiRemoveFromWishlist } from '@/api/apiCustomer';
 import { handleApiError, showErrorNotification, showSuccessNotification } from '@/utils/errorHandling';
 import { getNearbyShopsAuto } from '@/services/locationService';
+import { getPlaceholderImage } from '@/utils/imageUtils';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import ProductCard from '@/components/cards/ProductCard.vue';
 
@@ -204,6 +205,7 @@ const totalProducts = ref(0);
 const userLocation = ref(null);
 const hasMoreProducts = ref(true);
 const wishlistIds = ref([]); // Store IDs of wishlisted items
+const skipSearchWatcher = ref(false); // Flag to skip search watcher when restoring state
 
 // Filters
 const filters = reactive({
@@ -336,10 +338,10 @@ const handleSortChange = async () => {
       try {
         loading.value = true;
         const result = await getNearbyShopsAuto(10000); // Just to get location
-        if (result.location) {
+        if (result.user_location) {
           userLocation.value = {
-            lat: result.location.latitude,
-            lon: result.location.longitude
+            lat: result.user_location.latitude,
+            lon: result.user_location.longitude
           };
         } else {
           throw new Error("Location not found");
@@ -513,11 +515,13 @@ const handleImageSearchResults = (data) => {
   if (data?.data?.similar_products) {
     products.value = normalizeProducts(data.data.similar_products);
     totalProducts.value = products.value.length;
+    skipSearchWatcher.value = true;
     searchQuery.value = 'Visual Search Results';
     showSuccessNotification(`Found ${products.value.length} similar products`);
   } else if (data?.similar_products) {
     products.value = normalizeProducts(data.similar_products);
     totalProducts.value = products.value.length;
+    skipSearchWatcher.value = true;
     searchQuery.value = 'Visual Search Results';
     showSuccessNotification(`Found ${products.value.length} similar products`);
   } else {
@@ -540,12 +544,14 @@ const handleImageSearch = async (imageData) => {
     if (response.data?.data?.similar_products) {
       products.value = normalizeProducts(response.data.data.similar_products);
       totalProducts.value = products.value.length;
+      skipSearchWatcher.value = true;
       searchQuery.value = 'Visual Search Results';
       showSuccessNotification(`Found ${products.value.length} similar products`);
     } else if (response.data?.similar_products) {
       // Alternative response format
       products.value = normalizeProducts(response.data.similar_products);
       totalProducts.value = products.value.length;
+      skipSearchWatcher.value = true;
       searchQuery.value = 'Visual Search Results';
       showSuccessNotification(`Found ${products.value.length} similar products`);
     } else {
@@ -643,14 +649,6 @@ const normalizeProducts = (rawProducts) => {
 };
 
 /**
- * Get placeholder image URL
- */
-const getPlaceholderImage = (name) => {
-  const encodedName = encodeURIComponent(name || 'Product');
-  return `https://placehold.co/400x400/EEE/999?text=${encodedName}`;
-};
-
-/**
  * Fetch categories
  */
 const fetchCategories = async () => {
@@ -667,6 +665,11 @@ const fetchCategories = async () => {
 // Watch for search query changes with debounce
 let searchTimeout;
 watch(searchQuery, (newVal) => {
+  if (skipSearchWatcher.value) {
+    skipSearchWatcher.value = false;
+    return;
+  }
+  
   clearTimeout(searchTimeout);
   if (newVal.length >= 2) {
     searchTimeout = setTimeout(() => handleSearch(newVal), 500);
@@ -692,7 +695,11 @@ const checkImageSearchResults = () => {
           const results = JSON.parse(storedResults);
           products.value = normalizeProducts(results);
           totalProducts.value = products.value.length;
+          
+          // Set flag to skip watcher before updating search query
+          skipSearchWatcher.value = true;
           searchQuery.value = 'Visual Search Results';
+          
           hasMoreProducts.value = false;
           showSuccessNotification(`Found ${products.value.length} similar products`);
           
@@ -727,6 +734,8 @@ const checkVoiceSearchResults = () => {
         // Only use results if they're recent (within 60 seconds)
         const age = Date.now() - timestamp;
         if (age < 60000) {
+          // Set flag to skip watcher before updating search query
+          skipSearchWatcher.value = true;
           // Set search query from transcript regardless of product count
           searchQuery.value = transcript || 'Voice Search';
           

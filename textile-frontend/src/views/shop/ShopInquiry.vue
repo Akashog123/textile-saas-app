@@ -1317,7 +1317,6 @@ onUnmounted(() => {
 }
 
 .btn-primary-action:hover {
-  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
 }
 
@@ -2181,7 +2180,6 @@ onUnmounted(() => {
 }
 
 .btn-send-inquiry:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
 }
 
