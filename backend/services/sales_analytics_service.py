@@ -117,7 +117,7 @@ class SalesAnalyticsService:
                     return None
                 
                 logger.info(f"[Cache Hit] Using cached forecast for shop {self.shop_id}")
-                return json.loads(cached.forecast_data) if isinstance(cached.forecast_data, str) else cached.forecast_data
+                return json.loads(cached.forecast_json) if isinstance(cached.forecast_json, str) else cached.forecast_json
             
             return None
         except Exception as e:
@@ -140,7 +140,7 @@ class SalesAnalyticsService:
             cached = CachedForecast(
                 shop_id=self.shop_id,
                 forecast_type=forecast_type,
-                forecast_data=json.dumps(forecast_data) if not isinstance(forecast_data, str) else forecast_data,
+                forecast_json=json.dumps(forecast_data) if not isinstance(forecast_data, str) else forecast_data,
                 data_hash=data_hash,
                 expires_at=expires_at,
                 created_at=datetime.utcnow()
