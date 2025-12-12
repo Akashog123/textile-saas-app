@@ -89,15 +89,24 @@
 
               <div class="form-group">
                 <label for="loginPassword" class="form-label">Password</label>
-                <input
-                  type="password"
-                  class="form-control"
-                  id="loginPassword"
-                  v-model="loginForm.password"
-                  autocomplete="current-password"
-                  required
-                  placeholder="Enter your password"
-                />
+                <div class="password-field-wrapper">
+                  <input
+                    :type="showLoginPassword ? 'text' : 'password'"
+                    class="form-control"
+                    id="loginPassword"
+                    v-model="loginForm.password"
+                    autocomplete="current-password"
+                    required
+                    placeholder="Enter your password"
+                  />
+                  <button 
+                    class="password-toggle-btn" 
+                    type="button" 
+                    @click="showLoginPassword = !showLoginPassword"
+                  >
+                    <i :class="showLoginPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
+                </div>
               </div>
 
               <div class="form-options">
@@ -415,28 +424,46 @@
                 <label for="registerPassword" class="form-label"
                   >Password</label
                 >
-                <input
-                  type="password"
-                  id="registerPassword"
-                  class="form-control"
-                  v-model="registerForm.password"
-                  minlength="8"
-                  required
-                  placeholder="Create a password"
-                />
+                <div class="password-field-wrapper">
+                  <input
+                    :type="showRegisterPassword ? 'text' : 'password'"
+                    id="registerPassword"
+                    class="form-control"
+                    v-model="registerForm.password"
+                    minlength="8"
+                    required
+                    placeholder="Create a password"
+                  />
+                  <button 
+                    class="password-toggle-btn" 
+                    type="button" 
+                    @click="showRegisterPassword = !showRegisterPassword"
+                  >
+                    <i :class="showRegisterPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
+                </div>
               </div>
               <div class="form-group">
                 <label for="registerRepeatPassword" class="form-label"
                   >Confirm Password</label
                 >
-                <input
-                  type="password"
-                  id="registerRepeatPassword"
-                  class="form-control"
-                  v-model="registerForm.password2"
-                  required
-                  placeholder="Confirm your password"
-                />
+                <div class="password-field-wrapper">
+                  <input
+                    :type="showRegisterConfirmPassword ? 'text' : 'password'"
+                    id="registerRepeatPassword"
+                    class="form-control"
+                    v-model="registerForm.password2"
+                    required
+                    placeholder="Confirm your password"
+                  />
+                  <button 
+                    class="password-toggle-btn" 
+                    type="button" 
+                    @click="showRegisterConfirmPassword = !showRegisterConfirmPassword"
+                  >
+                    <i :class="showRegisterConfirmPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
+                </div>
               </div>
 
               <div class="form-check mb-3">
@@ -490,6 +517,11 @@ import api from "@/api/axios";
 defineOptions({
   name: "Login and Register View",
 });
+
+// Password visibility toggles
+const showLoginPassword = ref(false);
+const showRegisterPassword = ref(false);
+const showRegisterConfirmPassword = ref(false);
 
 // ---------- Map & Nominatim helpers for registration ----------
 const mapRef = ref(null);
@@ -1386,5 +1418,34 @@ const handleRegister = async () => {
 
 .form-content::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* Password field styling */
+.password-field-wrapper {
+  position: relative;
+}
+
+.password-field-wrapper .form-control {
+  padding-right: 40px; /* Space for the eye icon */
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.password-toggle-btn:hover {
+  color: #343a40;
 }
 </style>
