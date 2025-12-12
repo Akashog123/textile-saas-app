@@ -1,0 +1,57 @@
+date,sku,product_name,category,quantity_sold,selling_price,region
+2025-11-29,MAH-001,Maheshwari Silk Cotton,Silk,14,2600,West
+2025-11-29,POC-001,Pochampally Ikat,Cotton,19,1850,North
+2025-11-29,MAN-001,Mangalagiri Cotton,Cotton,24,1100,South
+2025-11-29,SAT-001,Satin Silk,Satin,16,1550,East
+2025-11-30,PAT-001,Patola Double Ikat,Silk,7,6500,Central
+2025-11-30,MYS-001,Mysore Crepe Silk,Silk,12,4200,West
+2025-11-30,KAL-001,Kalamkari Print Cotton,Cotton,18,1450,North
+2025-11-30,AJR-001,Rasavada Block Print,Cotton,13,1650,East
+2025-11-30,BAN-001,Bandhani Fabric,Cotton,22,1350,South
+2025-11-30,IKT-001,Ikat Weave Polyester,Polyester,28,750,Central
+2025-12-01,PAI-001,Paithani Saree Fabric,Silk,6,7500,North
+2025-12-01,MAT-001,Matka Silk,Silk,9,2900,West
+2025-12-01,UPP-001,Uppada Silk,Silk,5,4800,East
+2025-12-01,POP-001,Cotton Poplin,Cotton,30,650,South
+2025-12-01,MOD-001,Porotta Fabric,Modal,17,1250,Central
+2025-12-02,TEN-001,Tencel Lyocell,Tencel,14,1400,North
+2025-12-02,DUP-001,Raw Silk Dupion,Silk,11,2100,West
+2025-12-02,CHN-002,Chanderi Zari Work,Silk,9,3100,South
+2025-12-02,TAN-001,Tant Cotton Bengal,Cotton,21,1200,East
+2025-12-02,SAM-001,Sambalpuri Ikat,Cotton,14,1750,Central
+2025-12-03,PAT-001,Patola Double Ikat,Silk,5,6500,North
+2025-12-03,MAH-001,Maheshwari Silk Cotton,Silk,11,2600,South
+2025-12-03,POC-001,Pochampally Ikat,Cotton,16,1850,West
+2025-12-03,MAN-001,Mangalagiri Cotton,Cotton,20,1100,East
+2025-12-03,SAT-001,Satin Silk,Satin,15,1550,North
+2025-12-04,MYS-001,Mysore Crepe Silk,Silk,10,4200,Central
+2025-12-04,PAI-001,Paithani Saree Fabric,Silk,4,7500,West
+2025-12-04,KAL-001,Kalamkari Print Cotton,Cotton,12,1450,East
+2025-12-04,AJR-001,Rasavada Block Print,Cotton,15,1650,South
+2025-12-04,BAN-001,Bandhani Fabric,Cotton,18,1350,North
+2025-12-04,IKT-001,Ikat Weave Polyester,Polyester,26,750,West
+2025-12-05,MAT-001,Matka Silk,Silk,8,2900,East
+2025-12-05,UPP-001,Uppada Silk,Silk,7,4800,Central
+2025-12-05,POP-001,Cotton Poplin,Cotton,35,650,North
+2025-12-05,MOD-001,Porotta Fabric,Modal,19,1250,West
+2025-12-05,TEN-001,Tencel Lyocell,Tencel,12,1400,South
+2025-12-05,DUP-001,Raw Silk Dupion,Silk,10,2100,East
+2025-12-06,CHN-002,Chanderi Zari Work,Silk,8,3100,Central
+2025-12-06,TAN-001,Tant Cotton Bengal,Cotton,23,1200,North
+2025-12-06,SAM-001,Sambalpuri Ikat,Cotton,16,1750,West
+2025-12-06,PAT-001,Patola Double Ikat,Silk,6,6500,East
+2025-12-06,MAH-001,Maheshwari Silk Cotton,Silk,13,2600,South
+2025-12-07,POC-001,Pochampally Ikat,Cotton,18,1850,Central
+2025-12-07,MAN-001,Mangalagiri Cotton,Cotton,26,1100,North
+2025-12-07,SAT-001,Satin Silk,Satin,17,1550,West
+2025-12-07,MYS-001,Mysore Crepe Silk,Silk,8,4200,East
+2025-12-07,KAL-001,Kalamkari Print Cotton,Cotton,11,1450,South
+2025-12-08,PAI-001,Paithani Saree Fabric,Silk,5,7500,Central
+2025-12-08,AJR-001,Rasavada Block Print,Cotton,14,1650,North
+2025-12-08,BAN-001,Bandhani Fabric,Cotton,20,1350,East
+2025-12-08,IKT-001,Ikat Weave Polyester,Polyester,32,750,South
+2025-12-08,MAT-001,Matka Silk,Silk,6,2900,West
+2025-12-08,UPP-001,Uppada Silk,Silk,8,4800,North
+2025-12-08,POP-001,Cotton Poplin,Cotton,28,650,Central
+2025-12-08,MOD-001,Porotta Fabric,Modal,15,1250,East
+2025-12-08,TEN-001,Tencel Lyocell,Tencel,10,1400,West

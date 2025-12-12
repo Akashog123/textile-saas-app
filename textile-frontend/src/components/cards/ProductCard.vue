@@ -151,7 +151,6 @@ const handleImageError = (e) => {
 }
 
 .product-card:hover {
-  transform: translateY(-4px);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
@@ -173,9 +172,9 @@ const handleImageError = (e) => {
   transition: transform 0.3s ease;
 }
 
-.product-card:hover .card-image {
+/* .product-card:hover .card-image {
   transform: scale(1.05);
-}
+} */
 
 .card-badges {
   position: absolute;
@@ -243,7 +242,6 @@ const handleImageError = (e) => {
 .btn-quick-view:hover {
   background: var(--color-primary, #6366f1);
   color: white;
-  transform: scale(1.05);
 }
 
 .card-content {
@@ -432,8 +430,7 @@ const handleImageError = (e) => {
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
+}  
 
 .flex-1 {
   flex: 1;

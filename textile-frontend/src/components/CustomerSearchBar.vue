@@ -295,6 +295,7 @@ const recordingTimer = ref(null)
 const MAX_RECORDING_SECONDS = 10
 const recognition = ref(null)
 const isAborted = ref(false)
+const finalVoiceTranscript = ref('')
 
 // Debounce timer
 let suggestionTimer = null
@@ -539,7 +540,7 @@ const initVoiceSearch = async () => {
   // Initialize voice manager with VAD settings
   voiceManager.value = voiceSearchUtils.createManager({
     maxRecordingTime: 10000, // 10 seconds max
-    redemptionMs: 1500 // 1.5 seconds silence to stop
+    redemptionMs: 2000 // 2 seconds silence to stop
   })
   
   // Initialize Web Speech API for live transcription
@@ -551,31 +552,36 @@ const initVoiceSearch = async () => {
     recognition.value.lang = 'en-US'
     
     recognition.value.onresult = (event) => {
-      let finalTranscript = ''
-      let interimTranscript = ''
+      let allFinal = ''
+      let allInterim = ''
       
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      for (let i = 0; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript
+          allFinal += event.results[i][0].transcript
         } else {
-          interimTranscript += event.results[i][0].transcript
+          allInterim += event.results[i][0].transcript
         }
       }
       
       // Update search query live
-      const currentText = finalTranscript || interimTranscript
+      const currentText = allFinal + allInterim
       if (currentText) {
         console.log('[Voice] Live Transcript:', currentText)
         searchQuery.value = currentText
         // Force update the status text
         voiceTranscript.value = currentText
+        finalVoiceTranscript.value = currentText
       }
     }
     
     recognition.value.onerror = (event) => {
       console.warn('[Voice] Live transcription error:', event.error)
+      
+      if (event.error === 'audio-capture') {
+        emit('error', { message: 'Microphone is busy. Please close other apps using it.', type: 'voice' })
+      }
       // If network error (Speech API requires internet), fall back to simple status
-      if (event.error === 'network' || event.error === 'not-allowed') {
+      else if (event.error === 'network' || event.error === 'not-allowed') {
         // Web Speech API failed - user will still see "Listening..." from voiceStatusText
         // The backend Whisper will still transcribe the audio
         console.log('[Voice] Web Speech API unavailable, using backend transcription only')
@@ -660,6 +666,7 @@ onUnmounted(() => {
  */
 const startBackendVoiceSearch = async () => {
   try {
+    finalVoiceTranscript.value = ''
     voiceTranscript.value = ''
     audioLevel.value = 0
     isSpeechDetected.value = false
@@ -688,16 +695,30 @@ const startBackendVoiceSearch = async () => {
     // 2. VAD Recorder (Backend Audio)
     voiceManager.value.startRecording().catch(err => {
         console.error(`VAD start failed: ${err.message}`)
+        
+        let errorMessage = 'High-quality recording failed, but live speech may work.'
+        if (err.name === 'NotReadableError' || err.message.includes('concurrent')) {
+             errorMessage = 'Microphone is busy. Please close other apps using it.'
+        } else if (err.name === 'NotAllowedError') {
+             errorMessage = 'Microphone permission denied.'
+        }
+        
         // We don't stop the whole thing immediately if VAD fails but Speech works, 
         // but for this app we usually need VAD for the backend file.
         // However, letting the error event flow naturally is better than a block.
-        emit('error', { message: 'High-quality recording failed, but live speech may work.', type: 'voice' })
+        emit('error', { message: errorMessage, type: 'voice' })
     })
     
   } catch (err) {
     console.error('Failed to start audio recording:', err)
     stopVoiceRecording() // Reset state
-    emit('error', { message: 'Microphone access failed. Please check permissions.', type: 'voice' })
+    
+    let errorMessage = 'Microphone access failed. Please check permissions.'
+    if (err.name === 'NotReadableError' || err.message.includes('concurrent')) {
+         errorMessage = 'Microphone is busy. Please close other apps using it.'
+    }
+    
+    emit('error', { message: errorMessage, type: 'voice' })
   }
 }
 
@@ -726,6 +747,7 @@ const resetVoiceState = () => {
   isVoiceRecording.value = false
   audioLevel.value = 0
   isSpeechDetected.value = false
+  finalVoiceTranscript.value = ''
   voiceTranscript.value = ''
   isAborted.value = false
   if (recognition.value) {
@@ -764,7 +786,7 @@ const stopVoiceRecording = () => {
  * Send recorded audio to backend for AI transcription
  */
 const transcribeWithBackend = async (audioFile) => {
-  if (!audioFile) {
+  if (!audioFile && !finalVoiceTranscript.value) {
     resetVoiceState()
     return
   }
@@ -772,7 +794,17 @@ const transcribeWithBackend = async (audioFile) => {
   voiceTranscript.value = 'Processing...'
   
   try {
-    const response = await findStoresWithAI({ voiceFile: audioFile })
+    let response;
+    
+    // Use Web Speech API transcript if available (faster)
+    if (finalVoiceTranscript.value && finalVoiceTranscript.value.trim().length > 0) {
+      console.log('[Voice] Using Web Speech API transcript:', finalVoiceTranscript.value)
+      response = await findStoresWithAI({ prompt: finalVoiceTranscript.value })
+    } else {
+      // Fallback to backend transcription (NVIDIA STT)
+      console.log('[Voice] Web Speech transcript unavailable, using backend transcription')
+      response = await findStoresWithAI({ voiceFile: audioFile })
+    }
     
     // Check if user aborted during request
     if (isAborted.value) {

@@ -5,7 +5,7 @@ Provides search, discovery, and shop browsing endpoints for customers.
 """
 
 from flask import Blueprint, request, jsonify
-from sqlalchemy import or_, distinct, func, desc
+from sqlalchemy import or_, distinct, func, desc, case
 from models.model import db, Shop, Product, ProductImage, Inventory, Review, Wishlist
 from services.search_service import (
     semantic_search_products,
@@ -277,7 +277,7 @@ def get_popular_shops():
     - lon: User longitude (for nearby filtering)
     - radius: Search radius in km (default: 25)
     
-    Scoring: (review_count * 2) + (avg_rating * 4) + (recent_reviews * 3)
+    Scoring: (review_count * 2) + (avg_rating * 4) + (recent_reviews * 3) + (avg_product_rating * 3) + (high_rated_products * 1)
     """
     from datetime import datetime, timedelta
     import math
@@ -308,17 +308,30 @@ def get_popular_shops():
         Review.shop_id.isnot(None),
         Review.created_at >= recency_threshold
     ).group_by(Review.shop_id).subquery()
+
+    # Subquery: Get product stats per shop
+    product_stats = db.session.query(
+        Product.shop_id,
+        func.avg(Product.rating).label('avg_product_rating'),
+        func.sum(case((Product.rating >= 4.0, 1), else_=0)).label('high_rated_products')
+    ).filter(
+        Product.is_active == True
+    ).group_by(Product.shop_id).subquery()
     
     # Build main query
     query = db.session.query(
         Shop,
         func.coalesce(review_stats.c.review_count, 0).label('review_count'),
         func.coalesce(review_stats.c.avg_rating, 0).label('avg_rating'),
-        func.coalesce(recent_reviews.c.recent_count, 0).label('recent_count')
+        func.coalesce(recent_reviews.c.recent_count, 0).label('recent_count'),
+        func.coalesce(product_stats.c.avg_product_rating, 0).label('avg_product_rating'),
+        func.coalesce(product_stats.c.high_rated_products, 0).label('high_rated_products')
     ).outerjoin(
         review_stats, Shop.id == review_stats.c.shop_id
     ).outerjoin(
         recent_reviews, Shop.id == recent_reviews.c.shop_id
+    ).outerjoin(
+        product_stats, Shop.id == product_stats.c.shop_id
     )
     
     # Apply location filter if coordinates provided
@@ -343,17 +356,19 @@ def get_popular_shops():
     
     # Order by popularity score
     query = query.order_by(
-        # Popularity score: (review_count * 2) + (avg_rating * 4) + (recent_count * 3)
+        # Popularity score: (review_count * 2) + (avg_rating * 4) + (recent_count * 3) + (avg_product_rating * 3) + (high_rated_products * 1)
         (func.coalesce(review_stats.c.review_count, 0) * 2 +
          func.coalesce(review_stats.c.avg_rating, 0) * 4 +
-         func.coalesce(recent_reviews.c.recent_count, 0) * 3).desc(),
+         func.coalesce(recent_reviews.c.recent_count, 0) * 3 +
+         func.coalesce(product_stats.c.avg_product_rating, 0) * 3 +
+         func.coalesce(product_stats.c.high_rated_products, 0) * 1).desc(),
         Shop.rating.desc()
     )
     
     shops_data = query.limit(limit * 3 if nearby_mode else limit).all()  # Get more for distance filtering
     
     result = []
-    for shop, review_count, avg_rating, recent_count in shops_data:
+    for shop, review_count, avg_rating, recent_count, avg_product_rating, high_rated_products in shops_data:
         # Calculate actual distance if in nearby mode
         distance_km = None
         if nearby_mode and shop.lat and shop.lon:
@@ -373,6 +388,7 @@ def get_popular_shops():
         shop_dict['review_count'] = int(review_count)
         shop_dict['avg_rating'] = round(float(avg_rating), 1) if avg_rating else shop.rating or 0
         shop_dict['recent_reviews'] = int(recent_count)
+        shop_dict['high_rated_products_count'] = int(high_rated_products) if high_rated_products else 0
         
         if distance_km is not None:
             shop_dict['distance'] = round(distance_km, 1)
@@ -389,12 +405,17 @@ def get_popular_shops():
         shop_dict['categories'] = [c[0] for c in categories if c[0]]
         
         # Add popularity badge
+        avg_prod_rating = float(avg_product_rating) if avg_product_rating else 0
+        high_rated_count = int(high_rated_products) if high_rated_products else 0
+        
         if recent_count >= 3:
             shop_dict['popularity_badge'] = 'Trending 🔥'
         elif review_count >= 10:
             shop_dict['popularity_badge'] = 'Very Popular'
         elif avg_rating >= 4.5:
             shop_dict['popularity_badge'] = 'Top Rated ⭐'
+        elif avg_prod_rating >= 4.5 or high_rated_count >= 5:
+             shop_dict['popularity_badge'] = 'Top Products ⭐'
         elif review_count >= 3:
             shop_dict['popularity_badge'] = 'Popular'
         
@@ -429,12 +450,16 @@ def get_all_shops():
     per_page = request.args.get('per_page', 20, type=int)
     city = request.args.get('city')
     category = request.args.get('category')
+    min_rating = request.args.get('min_rating', type=float)
     sort_by = request.args.get('sort', 'rating')  # rating, name, newest
     
     query = Shop.query
     
     if city:
         query = query.filter(Shop.city.ilike(f'%{city}%'))
+
+    if min_rating:
+        query = query.filter(Shop.rating >= min_rating)
     
     if category:
         query = query.join(Product).filter(

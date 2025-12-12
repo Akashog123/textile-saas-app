@@ -3,6 +3,17 @@
  * Handles various backend image field naming conventions
  */
 
+// Helper to generate SVG placeholder
+export const getPlaceholderImage = (text, width = 800, height = 600) => {
+  const svg = `
+  <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="#f3f4f6"/>
+    <text x="50%" y="50%" font-family="Arial" font-size="24" fill="#9ca3af" text-anchor="middle" dy=".3em">${text}</text>
+  </svg>
+  `;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
 /**
  * Extract image URLs from product data with robust fallback handling
  * @param {Object} product - Product object from backend API
@@ -36,7 +47,7 @@ export const getImageUrls = (product, fallbackText = 'Product') => {
   }
   
   // Fallback to placeholder
-  return [`https://placehold.co/800x600?text=${encodeURIComponent(fallbackText)}`];
+  return [getPlaceholderImage(fallbackText)];
 };
 
 /**
@@ -47,7 +58,8 @@ export const getImageUrls = (product, fallbackText = 'Product') => {
  */
 export const getPrimaryImage = (product, fallbackText = 'Product') => {
   const urls = getImageUrls(product, fallbackText);
-  return urls[0] || `https://placehold.co/400x300?text=${encodeURIComponent(fallbackText)}`;
+  return urls[0] || getPlaceholderImage(fallbackText, 400, 300);
+
 };
 
 /**

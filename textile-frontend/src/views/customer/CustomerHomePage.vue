@@ -390,8 +390,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { getTrendingFabrics, getPopularShops, searchByImage } from '@/api/apiCustomer';
-import { formatPricePerMeter } from '@/utils/priceUtils';
 import { validateFabricData, validateShopData } from '@/utils/dataValidation';
+import { getPlaceholderImage } from '@/utils/imageUtils';
 import CustomerSearchBar from '@/components/CustomerSearchBar.vue';
 import EmptyState from '@/components/EmptyState.vue';
 
@@ -612,7 +612,7 @@ const searchNearbyShops = async (location) => {
           location: shop.address,
           lat: shop.latitude,
           lon: shop.longitude,
-          image: `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`,
+          image: getPlaceholderImage(shop.name),
           distance: shop.distance
         }));
         
@@ -645,7 +645,7 @@ const searchNearbyShops = async (location) => {
         location: shop.address || shop.city,
         lat: parseFloat(shop.latitude) || shop.lat,
         lng: parseFloat(shop.longitude) || shop.lng,
-        image: shop.image || shop.image_url || `https://placehold.co/800x600?text=${encodeURIComponent(shop.name)}`,
+        image: shop.image || shop.image_url || getPlaceholderImage(shop.name || shop.shop_name),
         distance: shop.distance
       }));
       
@@ -705,21 +705,11 @@ const closeShopProfile = () => {
 
 // Image error handlers
 const handleFabricImageError = (event, index) => {
-  const fallbackImages = [
-    'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=800&h=600&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1591176134674-87e8f7c73ce9?w=800&h=600&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1642779978153-f5ed67cdecb2?w=800&h=600&fit=crop&q=80'
-  ];
-  event.target.src = fallbackImages[index % fallbackImages.length];
+  event.target.src = getPlaceholderImage('Fabric');
 };
 
 const handleShopImageError = (event, index) => {
-  const fallbackImages = [
-    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&h=600&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=800&h=600&fit=crop&q=80'
-  ];
-  event.target.src = fallbackImages[index % fallbackImages.length];
+  event.target.src = getPlaceholderImage('Shop');
 };
 
 // Map event handlers
@@ -841,7 +831,6 @@ onMounted(() => {
 }
 
 .section:hover {
-  transform: translateY(-5px);
   box-shadow: 0 15px 50px rgba(0, 0, 0, 0.08);
 }
 
