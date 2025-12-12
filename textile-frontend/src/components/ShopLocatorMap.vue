@@ -115,10 +115,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, shallowRef, markRaw, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { getPlaceholderImage } from '@/utils/imageUtils'
 
 // Fix Leaflet default marker icon issue
 delete L.Icon.Default.prototype._getIconUrl
@@ -179,9 +180,9 @@ const router = useRouter()
 
 // Refs
 const mapContainer = ref(null)
-const mapInstance = ref(null)
-const shopMarkers = ref([])
-const userLocationMarker = ref(null)
+const mapInstance = shallowRef(null)
+const shopMarkers = shallowRef([])
+const userLocationMarker = shallowRef(null)
 
 // State
 const loading = ref(true)
@@ -225,13 +226,12 @@ const initMap = async () => {
   
   // Double-check container exists after nextTick
   if (!mapContainer.value) {
-    console.warn('Map container not available, retrying...')
-    // Retry after a short delay
+    // Container not ready yet, retry silently
     setTimeout(() => {
       if (mapContainer.value && !mapInstance.value) {
         initMap()
       }
-    }, 100)
+    }, 200)
     return
   }
   
@@ -245,12 +245,12 @@ const initMap = async () => {
     destroyMap()
     
     // Create new map
-    mapInstance.value = L.map(mapContainer.value, {
+    mapInstance.value = markRaw(L.map(mapContainer.value, {
       center: [props.center.lat, props.center.lng],
       zoom: props.zoom,
       zoomControl: false,
       attributionControl: true
-    })
+    }))
 
     // Setup resize observer
     if (mapContainer.value) {
@@ -519,7 +519,7 @@ const formatDistance = (km) => {
 
 // Handle image error
 const handleShopImageError = (e) => {
-  e.target.src = 'https://placehold.co/100x100?text=Shop'
+  e.target.src = getPlaceholderImage('Shop', 100, 100)
 }
 
 // Watch for shops changes

@@ -422,6 +422,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getShopDetails, getWishlist, addToWishlist, removeFromWishlist } from '@/api/apiCustomer'
 import { getShopReviews, createReview, updateReview, deleteReview } from '@/api/apiReviews'
+import { getPlaceholderImage } from '@/utils/imageUtils'
 import ProductCard from '@/components/cards/ProductCard.vue'
 import ShopLocatorMap from '@/components/ShopLocatorMap.vue'
 
@@ -504,7 +505,7 @@ const hasUserReviewed = computed(() => {
   return reviews.value.some(r => r.user_id === currentUserId.value)
 })
 
-const FALLBACK_IMAGE = 'https://placehold.co/400x300?text=Shop'
+const FALLBACK_IMAGE = getPlaceholderImage('Shop')
 
 // Computed
 const shopImage = computed(() => {

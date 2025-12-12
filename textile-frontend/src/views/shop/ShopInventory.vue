@@ -63,7 +63,7 @@
                   </div>
                 </td>
                 <td>
-                  <span class="qty-badge">{{ item.qty }}</span>
+                  <span class="min-stock-badge">{{ item.qty }}</span>
                 </td>
                 <td>
                   <strong class="price-text">{{ item.price }}</strong>
@@ -1050,16 +1050,6 @@ h5 {
   margin-top: 0.15rem;
 }
 
-.qty-badge {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  color: white;
-  padding: 0.35rem 0.75rem;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  display: inline-block;
-}
-
 .price-text {
   color: #10b981;
   font-weight: 700;
@@ -1102,7 +1092,6 @@ h5 {
 }
 
 .btn-gradient:hover:not(:disabled) {
-  transform: translateY(-2px) scale(1.02);
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
   color: white;
 }
@@ -1129,7 +1118,6 @@ h5 {
   background: var(--gradient-primary) padding-box,
               var(--gradient-primary) border-box;
   color: white;
-  transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
 }
 
@@ -1153,8 +1141,7 @@ h5 {
 
 .action-buttons .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
+}  
 
 .inventory-stats {
   display: flex;
@@ -1303,7 +1290,6 @@ h5 {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.35);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 

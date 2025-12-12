@@ -73,8 +73,12 @@
             <i class="bi bi-info-circle"></i>
           </button>
         </div>
-        <button class="btn btn-sm btn-outline-danger" @click="showAllCritical = !showAllCritical">
-          {{ showAllCritical ? 'Show Less' : 'View All' }}
+        <button 
+          v-if="criticalProducts.length > cardsPerRow" 
+          class="btn btn-sm btn-outline-danger" 
+          @click="showAllCritical = !showAllCritical"
+        >
+          {{ showAllCritical ? 'Show Less' : `View All (${criticalProducts.length - cardsPerRow} more)` }}
         </button>
       </div>
 
@@ -328,7 +332,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getDistributorStockHeatmap } from '@/api/apiDistributor'
 
 // State
@@ -344,6 +348,7 @@ const categorySummary = ref({})
 const showAllCritical = ref(false)
 const showCriticalInfo = ref(false)
 const showStockOverviewInfo = ref(false)
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 
 // Computed stats
 const stats = computed(() => {
@@ -389,9 +394,23 @@ const healthScoreClass = computed(() => {
   return 'text-danger'
 })
 
-// Displayed critical products (limited or all)
+// Calculate how many cards fit in one row based on screen width
+const cardsPerRow = computed(() => {
+  const width = windowWidth.value
+  // Card min-width is ~200px + gap, account for container padding
+  if (width >= 1800) return 8
+  if (width >= 1600) return 7
+  if (width >= 1400) return 6
+  if (width >= 1200) return 5
+  if (width >= 992) return 4
+  if (width >= 768) return 3
+  if (width >= 576) return 2
+  return 1
+})
+
+// Displayed critical products (limited to one row or all)
 const displayedCriticalProducts = computed(() => {
-  return showAllCritical.value ? criticalProducts.value : criticalProducts.value.slice(0, 4)
+  return showAllCritical.value ? criticalProducts.value : criticalProducts.value.slice(0, cardsPerRow.value)
 })
 
 // Top selling products from stock data
@@ -419,9 +438,19 @@ const topSellingProducts = computed(() => {
     .slice(0, 5)
 })
 
+// Handle window resize for responsive card display
+const handleResize = () => {
+  windowWidth.value = window.innerWidth
+}
+
 // Load dashboard data
 onMounted(async () => {
+  window.addEventListener('resize', handleResize)
   await loadDashboardData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 
 const loadDashboardData = async () => {

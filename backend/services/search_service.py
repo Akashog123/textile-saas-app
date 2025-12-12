@@ -654,7 +654,7 @@ def fallback_text_search_products(
         category_lower = (product.category or '').lower()
         desc_lower = (product.description or '').lower()
         
-        score = 0.5  # Base score for matching products
+        score = 0.51  # Base score for matching products
         
         # Exact name match
         if search_lower == name_lower:
@@ -671,7 +671,7 @@ def fallback_text_search_products(
             search_set = set(search_terms)
             matching = name_words & search_set
             if matching:
-                score = 0.5 + (0.35 * len(matching) / max(len(search_set), len(name_words)))
+                score = 0.51 + (0.35 * len(matching) / max(len(search_set), len(name_words)))
         
         # Category bonus
         if category_lower and any(term in category_lower for term in search_terms):

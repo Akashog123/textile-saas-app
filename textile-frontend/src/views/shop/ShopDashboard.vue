@@ -113,7 +113,7 @@
                       {{ salesComparison.message || 'Upload sales data to see weekly insights' }}
                     </p>
                     <small class="text-muted" v-if="topCategory">
-                      <strong class="text-dark">{{ topCategory.name }}</strong> showing highest demand ({{ topCategory.percentage }}%)
+                      <strong class="text-dark">{{ topCategory.name }}</strong> is the top seller ({{ topCategory.percentage }}% of sales)
                     </small>
                     <small class="text-muted" v-else>
                       Upload data to see category insights
@@ -140,44 +140,11 @@
               <!-- Daily Breakdown Mini Chart -->
               <div v-if="salesSummaryData?.daily_breakdown?.length" class="daily-mini-chart mt-auto">
                 <small class="text-muted d-block mb-2 fw-bold" style="font-size: 0.75rem;">Daily Breakdown</small>
-                <div class="d-flex" style="height: 80px;">
-                  <!-- Y-Axis Scale -->
-                  <div class="d-flex flex-column justify-content-end align-items-end me-2" style="min-width: 25px;">
-                      <div class="d-flex flex-column justify-content-between text-muted text-end" style="height: 60px; font-size: 0.6rem;">
-                          <span>{{ formatCompactNumber(dailyMaxRevenue) }}</span>
-                          <span>{{ formatCompactNumber(dailyMaxRevenue / 2) }}</span>
-                          <span>0</span>
-                      </div>
-                      <!-- Spacer to align with X-axis labels -->
-                      <small class="mt-1" style="font-size: 0.65rem; line-height: 1; visibility: hidden;">Spacer</small>
-                  </div>
-                  
-                  <!-- Bars -->
-                  <div class="d-flex justify-content-between align-items-end gap-1 flex-grow-1">
-                    <div 
-                      v-for="(day, idx) in salesSummaryData.daily_breakdown" 
-                      :key="idx"
-                      class="d-flex flex-column align-items-center justify-content-end"
-                      style="flex: 1; min-width: 0;"
-                    >
-                      <div class="d-flex align-items-end justify-content-center w-100" style="height: 60px;">
-                        <div 
-                          class="daily-bar bg-primary rounded-top"
-                          :style="{ 
-                            height: `${Math.max(10, (day.revenue / dailyMaxRevenue) * 100)}%`, 
-                            opacity: 0.7,
-                            width: '100%',
-                            maxWidth: '40px',
-                            flex: 'none'
-                          }"
-                          :title="`${day.day_name}: ${day.revenue_formatted}`"
-                        ></div>
-                      </div>
-                      <small class="text-muted text-uppercase mt-1" style="font-size: 0.65rem; line-height: 1;">
-                        {{ day.day_name?.substring(0, 2) }}
-                      </small>
-                    </div>
-                  </div>
+                <div style="height: 90px;">
+                  <DailyBarChart
+                    :daily-data="salesSummaryData.daily_breakdown"
+                    :height="90"
+                  />
                 </div>
               </div>
             </div>
@@ -265,58 +232,16 @@
               </div>
             </div>
             
-            <!-- Chart -->
+            <!-- Chart.js Chart -->
             <div v-else class="flex-grow-1 d-flex flex-column justify-content-center position-relative" @click="viewDetailedChart">
-              <div class="chart-wrapper w-100" style="height: 220px;">
-                <svg viewBox="0 0 400 180" class="w-100 h-100" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.2"/>
-                      <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0"/>
-                    </linearGradient>
-                  </defs>
-                  <path
-                    :d="salesTrendData.chart_area_path || 'M0,160 L400,160 L400,180 L0,180 Z'"
-                    fill="url(#chartGradient)"
-                    class="chart-area"
-                  />
-                  <path
-                    :d="salesTrendData.chart_path || 'M0,160 L400,160'"
-                    fill="none"
-                    stroke="var(--color-primary)"
-                    stroke-width="3"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="chart-path"
-                  />
-                  <circle
-                    v-for="(point, i) in salesTrendData.data_points"
-                    :key="i"
-                    :cx="point.x"
-                    :cy="point.y"
-                    r="5"
-                    class="chart-point"
-                    @mouseenter="showChartTooltip($event, point)"
-                    @mouseleave="hideChartTooltip"
-                  />
-                </svg>
-                <!-- Tooltip -->
-                <div 
-                  v-if="chartTooltip.visible" 
-                  class="chart-tooltip"
-                  :style="{ left: chartTooltip.x + 'px', top: chartTooltip.y + 'px' }"
-                >
-                  <strong>{{ chartTooltip.label }}</strong>
-                  <div>{{ chartTooltip.value }}</div>
-                </div>
-              </div>
-              <div class="chart-labels d-flex justify-content-between mt-2 px-2">
-                <small 
-                  class="text-muted fw-medium" 
-                  v-for="(label, idx) in chartLabels" 
-                  :key="idx"
-                  :style="{ fontSize: chartPeriod === 'monthly' ? '0.6rem' : '0.75rem' }"
-                >{{ label }}</small>
+              <div class="chart-wrapper w-100" style="height: 220px; cursor: pointer;">
+                <SalesLineChart
+                  :labels="chartLabels"
+                  :data-points="salesTrendData.data_points || []"
+                  :trend="salesTrendData.trend || 'flat'"
+                  :period="chartPeriod"
+                  :height="220"
+                />
               </div>
             </div>
           </div>
@@ -490,8 +415,8 @@
                   <div 
                     class="insight-icon flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center" 
                     :class="[
-                      insight.type === 'success' ? 'bg-success-soft text-success' : 
-                      insight.type === 'warning' ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary'
+                      insight.type === 'success' ? 'icon-success' : 
+                      insight.type === 'warning' ? 'icon-warning' : 'icon-primary'
                     ]"
                     style="width: 40px; height: 40px;"
                   >
@@ -871,6 +796,8 @@ import {
   downloadSalesTemplate
 } from '@/api/apiShop';
 import ShopOwnerBot from '@/components/ShopOwnerBot.vue';
+import SalesLineChart from '@/components/charts/SalesLineChart.vue';
+import DailyBarChart from '@/components/charts/DailyBarChart.vue';
 
 // Loading and error states
 const loading = ref(false);
@@ -903,7 +830,6 @@ const quarterlyForecastError = ref('');
 const salesTrendData = ref(null);
 const chartLoading = ref(false);
 const chartPeriod = ref('weekly');
-const chartTooltip = ref({ visible: false, x: 0, y: 0, label: '', value: '' });
 
 // Demand forecast data (legacy)
 const demandForecast = ref([]);
@@ -1459,8 +1385,10 @@ const updateForecastsFromData = (data) => {
  */
 const getInsightIcon = (insight) => {
   // If backend sends icon directly, use it
-  if (insight.icon && insight.icon.startsWith('bi-')) {
-    return `bi ${insight.icon}`;
+  if (insight.icon) {
+    if (insight.icon.startsWith('bi ')) return insight.icon;
+    if (insight.icon.startsWith('bi-')) return `bi ${insight.icon}`;
+    return insight.icon;
   }
   
   // Map categories to icons
@@ -1471,7 +1399,14 @@ const getInsightIcon = (insight) => {
     'Strategy': 'bi bi-lightbulb',
     'Trend': 'bi bi-graph-up-arrow',
     'Product': 'bi bi-star',
-    'Inventory': 'bi bi-box-seam'
+    'Inventory': 'bi bi-box-seam',
+    'Sales': 'bi bi-graph-up',
+    'Revenue': 'bi bi-currency-rupee',
+    'Growth': 'bi bi-arrow-up-right-circle',
+    'Demand': 'bi bi-activity',
+    'Restock': 'bi bi-box-arrow-in-down',
+    'Customer': 'bi bi-people',
+    'Rating': 'bi bi-star-half'
   };
   
   return iconMap[insight.category] || 'bi bi-lightbulb';
@@ -1706,7 +1641,7 @@ const generateInsightsPDF = async () => {
     if (hasSalesData && salesComparison.value && salesComparison.value.message) {
         let summaryText = salesComparison.value.message;
         if (topCategory.value) {
-            summaryText += `\nTop performing category: ${topCategory.value.name} (${topCategory.value.percentage}% demand).`;
+            summaryText += `\nTop seller: ${topCategory.value.name} (${topCategory.value.percentage}% of sales).`;
         }
         reportData.summary = summaryText;
     }
@@ -2104,28 +2039,6 @@ const changeChartPeriod = (period) => {
 };
 
 /**
- * Show tooltip on chart point hover
- */
-const showChartTooltip = (event, point) => {
-  const rect = event.target.closest('.chart-wrapper').getBoundingClientRect();
-  const targetRect = event.target.getBoundingClientRect();
-  chartTooltip.value = {
-    visible: true,
-    x: targetRect.left - rect.left + 10,
-    y: targetRect.top - rect.top - 40,
-    label: point.label,
-    value: point.value_formatted || `₹${point.value?.toLocaleString() || 0}`
-  };
-};
-
-/**
- * Hide chart tooltip
- */
-const hideChartTooltip = () => {
-  chartTooltip.value.visible = false;
-};
-
-/**
  * Initialize dashboard data loading
  * Fetches data sequentially to avoid overwhelming the server
  * Primary data (dashboard + sales summary) loads first, then secondary data
@@ -2447,60 +2360,9 @@ h6.card-title {
 }
 
 .chart-wrapper {
-  height: 200px;
+  height: 220px;
   width: 100%;
   position: relative;
-}
-
-.chart-path {
-  filter: drop-shadow(0 4px 6px rgba(59, 130, 246, 0.3));
-  animation: drawLine 2s ease-out forwards;
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
-}
-
-@keyframes drawLine {
-  to { stroke-dashoffset: 0; }
-}
-
-.chart-point {
-  fill: white;
-  stroke: var(--color-primary);
-  stroke-width: 3px;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  cursor: pointer;
-}
-
-.chart-point:hover {
-  r: 8;
-  stroke-width: 4px;
-  filter: drop-shadow(0 4px 10px rgba(59, 130, 246, 0.5));
-}
-
-/* Chart Tooltip */
-.chart-tooltip {
-  position: absolute;
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  pointer-events: none;
-  z-index: 100;
-  white-space: nowrap;
-  transform: translateX(-50%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.chart-tooltip::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-top: 6px solid rgba(0, 0, 0, 0.85);
 }
 
 /* Period Button Group */
@@ -2663,7 +2525,6 @@ h6.card-title {
 .insight-icon {
   width: 48px;
   height: 48px;
-  background: var(--gradient-primary);
   color: white;
   border-radius: 14px;
   display: flex;
@@ -2672,6 +2533,20 @@ h6.card-title {
   font-size: 1.25rem;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
   transition: transform 0.3s ease;
+}
+
+.insight-icon.icon-primary {
+  background: var(--gradient-primary, linear-gradient(135deg, #3b82f6 0%, #2563eb 100%));
+}
+
+.insight-icon.icon-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.insight-icon.icon-warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
 }
 
 .insight-item:hover .insight-icon {
@@ -3111,7 +2986,6 @@ h6.card-title {
 }
 
 .forecast-item:hover {
-  transform: translateY(-4px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
   border-color: var(--color-primary);
 }
@@ -3238,7 +3112,6 @@ h6.card-title {
 }
 
 .btn-gradient:hover:not(:disabled) {
-  transform: translateY(-2px) scale(1.02);
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
   color: white;
 }
@@ -3265,7 +3138,6 @@ h6.card-title {
   background: var(--gradient-primary) padding-box,
               var(--gradient-primary) border-box;
   color: white;
-  transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
 }
 
