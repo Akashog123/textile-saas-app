@@ -2,6 +2,13 @@
 
 A **Vue 3 + Vite + Bootstrap 5** frontend application for textile supply chain management with role-based authentication supporting **Customers**, **Distributors**, and **Shop Owners/Managers**.
 
+## 🎥 Demo
+
+<video width="640" height="360" controls>
+  <source src="https://github.com/Akashog123/SE-Textile-App/releases/download/v1.0/Textile%20SaaS%20App-Walkthrough.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 ---
 
 ## 🚀 Quick Start
@@ -244,6 +251,8 @@ Use these credentials on the **Sign In** tab for development:
 | Matlin Jeleshiya D | 22f2000506 | Tester |
 
 ---
+
+*This project was done as part of Software engineering course of IITM BS Degree*
 
 ## 📚 Additional Resources
 
