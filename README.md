@@ -4,7 +4,7 @@ A **Vue 3 + Vite + Bootstrap 5** frontend application for textile supply chain m
 
 ## 🎥 Demo
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/iJG5x9OYPpA" frameborder="0" allowfullscreen></iframe>
+[![Textile SaaS App Walkthrough](https://img.youtube.com/vi/iJG5x9OYPpA/maxresdefault.jpg)](https://www.youtube.com/watch?v=iJG5x9OYPpA)
 
 ---
 
