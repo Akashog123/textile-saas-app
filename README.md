@@ -4,10 +4,7 @@ A **Vue 3 + Vite + Bootstrap 5** frontend application for textile supply chain m
 
 ## 🎥 Demo
 
-<video width="640" height="360" controls>
-  <source src="https://github.com/Akashog123/SE-Textile-App/releases/download/v1.0/Textile.SaaS.App-Walkthrough.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/iJG5x9OYPpA" frameborder="0" allowfullscreen></iframe>
 
 ---
 
