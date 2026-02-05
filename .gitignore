@@ -32,6 +32,11 @@ coverage
 .eslintcache
 
 
+# Environment variables
+.env
+backend/.env
+textile-frontend/.env
+
 # Virtual environments
 venv/
 backend/venv
